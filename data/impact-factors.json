@@ -1,0 +1,35 @@
+{
+  "_readme": "One entry per player action. Physics owns this file. Every value needs a source. Keep value at null until it is sourced, so nothing made up reaches the demo.",
+  "school_days_per_year": 190,
+  "actions": {
+    "litter_snack_wrapper": {
+      "label": "Dropped a snack wrapper instead of binning it",
+      "per_occurrence": { "plastic_kg": null, "co2e_kg": null },
+      "frequency": "school_day",
+      "source": ""
+    },
+    "bin_snack_wrapper": {
+      "label": "Binned the snack wrapper",
+      "per_occurrence": { "plastic_kg": 0, "co2e_kg": null },
+      "frequency": "school_day",
+      "source": ""
+    },
+    "bottled_water": {
+      "label": "Bought a single-use plastic bottle",
+      "per_occurrence": { "plastic_kg": null, "co2e_kg": null },
+      "frequency": "school_day",
+      "source": ""
+    },
+    "reusable_bottle": {
+      "label": "Refilled a reusable bottle",
+      "per_occurrence": { "plastic_kg": 0, "co2e_kg": null },
+      "frequency": "school_day",
+      "source": ""
+    }
+  },
+  "equivalents": {
+    "_readme": "Comparisons used on the results screen, e.g. 'plastic_kg' -> number of bottles or bags. Each needs a source.",
+    "plastic_kg": [{ "label": "plastic bottles", "per_unit_kg": null, "source": "" }],
+    "co2e_kg": [{ "label": "km driven in an average car", "per_unit_kg": null, "source": "" }]
+  }
+}
