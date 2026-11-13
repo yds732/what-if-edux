@@ -31,11 +31,3 @@ npm run dev        # then open http://localhost:5173/
 1. Physics finds a source and adds a row to `docs/SOURCES.md`.
 2. Put the value (per occurrence) into `data/impact-factors.json`, in place of `null`.
 3. The game multiplies it by 365, or by 190 for school-day habits, and shows it on the report. Until then, the report says "figure being checked".
-
-## Team
-| Role | Owns |
-|---|---|
-| Education | learning goals, level scripts, report wording, playtests, pitch |
-| Engineer A | 3D scene and MANIFEST integration (`manifest-adapter.js`) |
-| Engineer B | game loop, reports, year view, deploy |
-| Physics | sourced impact figures, assumptions, methodology slide |
