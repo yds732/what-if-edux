@@ -1,35 +1,103 @@
 {
-  "_readme": "One entry per player action. Physics owns this file. Every value needs a source. Keep value at null until it is sourced, so nothing made up reaches the demo.",
-  "school_days_per_year": 190,
+  "_readme": "Physics owns this file. One entry per action a player can choose. A value stays null until it has a source logged in docs/SOURCES.md. The game shows 'figure being checked' for null values and leaves them out of totals, so no made-up number reaches the demo.",
+  "disclaimer": "Estimates for learning purposes. Each figure comes from the source listed in our methodology. Figures marked 'being checked' are not sourced yet.",
+
+  "days_per_year": {
+    "day": 365,
+    "school_day": 190,
+    "_source_school_day": "England: 190 pupil days per school year. Confirm and cite in docs/SOURCES.md."
+  },
+
+  "metrics": {
+    "plastic_kg": { "unit": "kg", "noun": "of plastic" },
+    "water_l":    { "unit": "litres", "noun": "of water" },
+    "co2e_kg":    { "unit": "kg", "noun": "of CO2e" }
+  },
+
   "actions": {
-    "litter_snack_wrapper": {
-      "label": "Dropped a snack wrapper instead of binning it",
+    "wrapper_binned": {
+      "label": "Put your wrapper in the bin",
+      "consequence": "The wrapper is collected instead of blowing into hedges, drains and rivers.",
+      "frequency": "school_day",
+      "per_occurrence": {},
+      "source": ""
+    },
+    "wrapper_littered": {
+      "label": "Dropped your wrapper on the ground",
+      "consequence": "Litter can end up in drains and rivers, where it breaks into tiny pieces that animals swallow.",
+      "better": "wrapper_binned",
+      "frequency": "school_day",
+      "per_occurrence": { "plastic_kg": null },
+      "source": ""
+    },
+    "bottle_refill": {
+      "label": "Refilled your own bottle",
+      "consequence": "No new plastic bottle needed.",
+      "frequency": "school_day",
+      "per_occurrence": {},
+      "source": ""
+    },
+    "bottle_single_use": {
+      "label": "Bought a plastic bottle of water",
+      "consequence": "A new bottle is made, used once, then thrown away.",
+      "better": "bottle_refill",
+      "frequency": "school_day",
       "per_occurrence": { "plastic_kg": null, "co2e_kg": null },
-      "frequency": "school_day",
       "source": ""
     },
-    "bin_snack_wrapper": {
-      "label": "Binned the snack wrapper",
-      "per_occurrence": { "plastic_kg": 0, "co2e_kg": null },
+    "play_swing": {
+      "label": "Played on the swings",
+      "consequence": "Pure fun, no environmental cost.",
       "frequency": "school_day",
+      "per_occurrence": {},
       "source": ""
     },
-    "bottled_water": {
-      "label": "Bought a single-use plastic bottle",
-      "per_occurrence": { "plastic_kg": null, "co2e_kg": null },
+    "play_wall": {
+      "label": "Played on the climbing wall",
+      "consequence": "Pure fun, no environmental cost.",
       "frequency": "school_day",
+      "per_occurrence": {},
       "source": ""
     },
-    "reusable_bottle": {
-      "label": "Refilled a reusable bottle",
-      "per_occurrence": { "plastic_kg": 0, "co2e_kg": null },
-      "frequency": "school_day",
+
+    "tap_off": {
+      "label": "Turned the tap off while brushing",
+      "consequence": "Water only runs when you need it.",
+      "frequency": "day",
+      "per_occurrence": {},
       "source": ""
+    },
+    "tap_running": {
+      "label": "Left the tap running while brushing",
+      "consequence": "Clean drinking water goes straight down the drain.",
+      "better": "tap_off",
+      "frequency": "day",
+      "per_occurrence": { "water_l": null },
+      "source": "",
+      "_assumption": "State tap flow rate (litres/min) and brushing time (min) in SOURCES.md and on screen."
+    },
+    "shower_short": {
+      "label": "Had a quick 4-minute shower",
+      "consequence": "Less hot water used.",
+      "frequency": "day",
+      "per_occurrence": {},
+      "source": ""
+    },
+    "shower_long": {
+      "label": "Had a long 10-minute shower",
+      "consequence": "Heating extra water uses energy as well as water.",
+      "better": "shower_short",
+      "frequency": "day",
+      "per_occurrence": { "water_l": null, "co2e_kg": null },
+      "source": "",
+      "_assumption": "Store the EXTRA water/CO2e compared with a 4-minute shower (6 extra minutes x flow rate). State the flow rate in SOURCES.md."
     }
   },
+
   "equivalents": {
-    "_readme": "Comparisons used on the results screen, e.g. 'plastic_kg' -> number of bottles or bags. Each needs a source.",
-    "plastic_kg": [{ "label": "plastic bottles", "per_unit_kg": null, "source": "" }],
-    "co2e_kg": [{ "label": "km driven in an average car", "per_unit_kg": null, "source": "" }]
+    "_readme": "Comparisons for the report, e.g. 'about the same as N bathtubs'. per_unit stays null until sourced, and is not shown until then.",
+    "plastic_kg": [{ "label": "empty plastic bottles", "per_unit": null, "source": "" }],
+    "water_l":    [{ "label": "bathtubs full of water", "per_unit": null, "source": "" }],
+    "co2e_kg":    [{ "label": "km in an average car", "per_unit": null, "source": "" }]
   }
 }

@@ -1,18 +1,41 @@
-# what-if-edux
+# What If
 
-Our entry for EduX 2026 UK, Track 4.
+Our entry for EduX 2026 UK, Track 4. **What If** is a short, kid-friendly life simulation for ages 8–13. You play an everyday scene, like a playground break or your morning routine, and make small choices. At the end of each level, a report shows what those choices would add up to if you made them every day for a year. Then it suggests a better option. The aim is fun first, never scolding.
 
-**What it is:** a short, interactive 3D life simulation. You play through an ordinary day, such as school, the playground or a snack break. At the end of each level, a results screen shows the environmental impact of what you did, scaled up to a year and compared with things people can picture.
+## Quick start
 
-> e.g. "You didn't bin your snack wrapper. Do that every school day and it adds up to **X kg** of plastic a year, about the same as **Y**."
+You need [Node.js](https://nodejs.org) LTS.
 
-- The game plan, roles and timeline are in [`docs/PLAN.md`](docs/PLAN.md).
-- The impact numbers are in [`data/impact-factors.json`](data/impact-factors.json). Every number must have a source.
+```bash
+npm install
+npm run dev        # then open http://localhost:5173/
+```
+
+**Controls:** WASD or the arrow keys to move. Walk up to something, then press **1** or **2**, or click, to choose.
+
+## Structure
+
+| Path | What it is | Owner |
+|---|---|---|
+| `index.html` | Page shell, HUD and styles | Engineers |
+| `src/main.js` | Game loop, input, choice prompts, reports, year view | Engineers |
+| `src/game/levels.js` | Levels, objects and the two choices for each (data only) | Education |
+| `src/game/impact.js` | Turns choices into yearly figures | Engineers + Physics |
+| `src/render/manifest-adapter.js` | **The only file that touches 3D.** It uses Three.js for now; MANIFEST replaces it | Engineers |
+| `data/impact-factors.json` | Impact per action. **Values stay `null` until sourced** | Physics |
+| `docs/SOURCES.md` | A citation for every number | Physics |
+| `docs/PLAN.md` | Day-by-day plan, roles and open questions | Everyone |
+| `docs/HANDOFF.md` | Original design notes | |
+
+## How a number gets into the game
+1. Physics finds a source and adds a row to `docs/SOURCES.md`.
+2. Put the value (per occurrence) into `data/impact-factors.json`, in place of `null`.
+3. The game multiplies it by 365, or by 190 for school-day habits, and shows it on the report. Until then, the report says "figure being checked".
 
 ## Team
 | Role | Owns |
 |---|---|
-| Education | learning goals, level scripts, results-screen wording, pitch |
-| Engineer A | 3D scene and player interaction (MANIFEST) |
-| Engineer B | game state, event log, impact engine, results screen |
-| Physics | impact model: factors, sources, unit conversions, "equivalent to" comparisons |
+| Education | learning goals, level scripts, report wording, playtests, pitch |
+| Engineer A | 3D scene and MANIFEST integration (`manifest-adapter.js`) |
+| Engineer B | game loop, reports, year view, deploy |
+| Physics | sourced impact figures, assumptions, methodology slide |
