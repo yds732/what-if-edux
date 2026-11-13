@@ -1,4 +1,4 @@
-# edux
+# what-if-edux
 
 Our entry for EduX 2026 UK, Track 4.
 
