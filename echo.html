@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ECHO: Scene 2, Bedroom</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1015; color: #cbd0d5; font-family: system-ui, sans-serif; }
+    #app canvas { display: block; }
+    #start { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: rgba(13,16,21,.82); text-align: center; padding: 24px; }
+    #start h1 { margin: 0; font-size: 30px; letter-spacing: .35em; color: #a7c7e7; font-weight: 600; }
+    #start p { margin: 0; color: #8f96a1; max-width: 420px; line-height: 1.5; }
+    #startDesktop { margin-top: 10px; padding: 12px 26px; border-radius: 12px; border: 1px solid #a7c7e7; background: #252c36; color: #cbd0d5; font-size: 16px; cursor: pointer; }
+    #startDesktop:hover { background: #394452; }
+    #crosshair { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: #cbd0d5; opacity: .7; display: none; pointer-events: none; }
+    #hint { position: fixed; left: 12px; bottom: 12px; font-size: 12px; color: #8f96a1; display: none; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="start">
+    <h1>ECHO</h1>
+    <p>Scene 2 · Your bedroom, 2055</p>
+    <button id="startDesktop">Start on desktop</button>
+    <p>In a headset, press <strong>ENTER VR</strong> below.</p>
+  </div>
+  <div id="crosshair"></div>
+  <div id="hint">WASD or arrows: move · Mouse: look · Click: interact · E: use phone when close · Esc: free the mouse</div>
+  <script type="module" src="./src/echo/main.js"></script>
+</body>
+</html>

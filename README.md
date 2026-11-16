@@ -31,3 +31,25 @@ npm run dev        # then open http://localhost:5173/
 1. Physics finds a source and adds a row to `docs/SOURCES.md`.
 2. Put the value (per occurrence) into `data/impact-factors.json`, in place of `null`.
 3. The game multiplies it by 365, or by 190 for school-day habits, and shows it on the report. Until then, the report says "figure being checked".
+
+## ECHO: Scene 2 (bedroom, VR)
+
+A separate page in this repo: `echo.html`. It does not change the What If game.
+
+```bash
+npm install
+npm run dev        # then open http://localhost:5173/echo.html
+```
+
+- **Desktop:** click *Start on desktop*. WASD or arrows to move, mouse to look, click to interact, **E** to use the phone when close.
+- **VR:** open the same page in the headset browser and press *ENTER VR*. Left stick walks, right stick snap-turns, trigger selects. WebXR needs `localhost` or HTTPS (for a Quest over USB: `adb reverse tcp:5173 tcp:5173`).
+
+| Path | What it is |
+|---|---|
+| `src/echo/story.js` | State machine and the scripted dialogue (no 3D code) |
+| `src/echo/bedroom.js` | Room, furniture, lights, phone, headset |
+| `src/echo/holo-ui.js` | World-space holographic panel and buttons |
+| `src/echo/main.js` | VR and desktop input, interaction, transitions |
+| `src/echo/config.js` | Where each branch goes next (`NEXT_SCENE_URL`) |
+
+The choice is saved as `tuesdayChoice` (`meetJamie` or `stayInHaven`) in `localStorage` under `echo.tuesdayChoice`; read it with `loadTuesdayChoice()` from `story.js`. When the player chooses, the page also fires an `echo:transition` event. Until the classroom and Haven scenes exist, a placeholder card is shown.
