@@ -313,3 +313,93 @@ export function createHoloPanel({ width = 1.5, height = 1.0, px = 1200 } = {}) {
     },
   };
 }
+
+// ---------- dialogue panel (Scene 1: the teacher speaking) ----------
+// Speaker label, text revealed letter by letter, and a CONTINUE button once the line is shown.
+export function createDialoguePanel({ width = 1.6, height = 0.6, px = 1200 } = {}) {
+  const W = px;
+  const H = Math.round((px * height) / width);
+  const { ctx, texture } = makeCanvas(W, H);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  mesh.renderOrder = 20;
+  mesh.name = 'dialoguePanel';
+
+  const s = { speaker: '', text: '', reveal: 0, hover: false, clock: 0, button: null };
+  let dirty = true;
+
+  function draw() {
+    drawFrame(ctx, W, H, 34);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    setFont(ctx, 30, 700);
+    ctx.letterSpacing = '6px';
+    ctx.fillStyle = C.holo;
+    ctx.fillText(s.speaker, 70, 92);
+    ctx.letterSpacing = '0px';
+    ctx.fillStyle = 'rgba(167,199,231,0.3)';
+    ctx.fillRect(70, 114, W - 140, 2);
+
+    setFont(ctx, 44, 500);
+    ctx.fillStyle = C.text;
+    let left = Math.floor(s.reveal);
+    wrap(ctx, s.text, W - 140).forEach((ln, i) => {
+      if (left > 0) ctx.fillText(ln.slice(0, left), 70, 182 + i * 58);
+      left -= ln.length + 1;
+    });
+
+    const done = s.reveal >= s.text.length;
+    const bw = 300, bh = 74, bx = W - 70 - bw, by = H - 50 - bh;
+    s.button = done ? { x: bx, y: by, w: bw, h: bh } : null;
+    const hot = done && s.hover;
+    ctx.save();
+    ctx.globalAlpha = done ? 1 : 0.3;
+    if (hot) { ctx.shadowColor = 'rgba(167,199,231,0.9)'; ctx.shadowBlur = 30; }
+    rr(ctx, bx, by, bw, bh, 22);
+    ctx.fillStyle = hot ? C.buttonHover : C.button;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = hot ? 4 : 2;
+    ctx.strokeStyle = hot ? C.holo : 'rgba(167,199,231,0.45)';
+    ctx.stroke();
+    setFont(ctx, 30, 700);
+    ctx.letterSpacing = '3px';
+    ctx.fillStyle = C.text;
+    ctx.textAlign = 'center';
+    ctx.fillText('CONTINUE →', bx + bw / 2, by + bh / 2 + 11);
+    ctx.letterSpacing = '0px';
+    ctx.restore();
+    texture.needsUpdate = true;
+  }
+
+  return {
+    mesh,
+    get opacity() { return material.opacity; },
+    set opacity(v) { material.opacity = v; },
+    get revealed() { return s.reveal >= s.text.length; },
+    say(speaker, text) { Object.assign(s, { speaker, text, reveal: 0, hover: false }); dirty = true; },
+    finishReveal() { s.reveal = s.text.length; dirty = true; },
+    setHover(on) { if (on !== s.hover) { s.hover = on; dirty = true; } },
+    // uv comes from the raycast hit on this panel. Returns 'continue' or null.
+    hitTest(uv) {
+      const b = s.button;
+      if (!uv || !b) return null;
+      const x = uv.x * W;
+      const y = (1 - uv.y) * H;
+      return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h ? 'continue' : null;
+    },
+    update(dt) {
+      s.clock += dt;
+      if (s.reveal < s.text.length) {
+        s.reveal = Math.min(s.text.length, s.reveal + dt * REVEAL_CPS);
+        dirty = true;
+      }
+      if (dirty) {
+        dirty = false;
+        draw();
+      }
+    },
+  };
+}

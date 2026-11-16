@@ -1,4 +1,5 @@
 // ECHO Scene 2: the player's bedroom in 2055. Geometry, materials and lights only.
+// Scene 1 (classroom.js) reuses the exported kit below so both scenes share one look.
 // Look: glossy PBR surfaces lit by a generated environment map, one window light with a
 // shadow map that is rendered once, and static geometry merged per material (few draw calls).
 import * as THREE from 'three';
@@ -15,7 +16,7 @@ const HAZE = 0x2c3644;
 const WIN = { x0: -1.0, x1: 1.5, y0: 0.95, y1: 2.45, r: 0.3 };
 
 // ---------- small helpers ----------
-function seeded(seed) {
+export function seeded(seed) {
   let a = seed;
   return () => {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
@@ -29,7 +30,7 @@ const _pos = new THREE.Vector3();
 const _quat = new THREE.Quaternion();
 const _scl = new THREE.Vector3();
 const _eul = new THREE.Euler();
-function compose(x, y, z, rx = 0, ry = 0, rz = 0, s = 1) {
+export function compose(x, y, z, rx = 0, ry = 0, rz = 0, s = 1) {
   _pos.set(x, y, z);
   _quat.setFromEuler(_eul.set(rx, ry, rz, 'YXZ'));
   if (Array.isArray(s)) _scl.set(s[0], s[1], s[2]); else _scl.set(s, s, s);
@@ -37,7 +38,7 @@ function compose(x, y, z, rx = 0, ry = 0, rz = 0, s = 1) {
 }
 
 // Collects static geometry and merges it into one mesh per material.
-function createBatcher() {
+export function createBatcher() {
   const groups = new Map();
   return {
     add(geo, mat, matrix, origin) {
@@ -61,11 +62,11 @@ function createBatcher() {
   };
 }
 
-const rbox = (w, h, d, r = 0.02, seg = 3) => new RoundedBoxGeometry(w, h, d, seg, r);
-const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+export const rbox = (w, h, d, r = 0.02, seg = 3) => new RoundedBoxGeometry(w, h, d, seg, r);
+export const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 
 // Soft rounded solid (pillows, mattress, cushions). e < 1 makes it boxier.
-function superquadric(a, b, c, e1 = 0.5, e2 = 0.5, ws = 28, hs = 16) {
+export function superquadric(a, b, c, e1 = 0.5, e2 = 0.5, ws = 28, hs = 16) {
   const g = new THREE.SphereGeometry(1, ws, hs);
   const p = g.attributes.position;
   const pw = (v, e) => Math.sign(v) * Math.pow(Math.abs(v), e);
@@ -80,14 +81,14 @@ function superquadric(a, b, c, e1 = 0.5, e2 = 0.5, ws = 28, hs = 16) {
   return g;
 }
 
-function displaceY(g, fn) {
+export function displaceY(g, fn) {
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + fn(p.getX(i), p.getY(i), p.getZ(i)));
   g.computeVertexNormals();
   return g;
 }
 
-function roundedRect(path, x, y, w, h, r) {
+export function roundedRect(path, x, y, w, h, r) {
   path.moveTo(x + r, y);
   path.lineTo(x + w - r, y);
   path.quadraticCurveTo(x + w, y, x + w, y + r);
@@ -101,30 +102,30 @@ function roundedRect(path, x, y, w, h, r) {
 }
 
 // Flat slab from a top-view outline. Shape coordinates are (x, -z); the slab's top is at y = 0.
-function slab(shape, thickness, bevel = 0.008, curveSegments = 16) {
+export function slab(shape, thickness, bevel = 0.008, curveSegments = 16) {
   const g = new THREE.ExtrudeGeometry(shape, { depth: thickness - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments });
   g.rotateX(-Math.PI / 2);
   g.translate(0, -(thickness - bevel), 0);
   return g;
 }
 
-function planeM(w, h, tile) { // plane with UVs in tiles, so textures keep their real size
+export function planeM(w, h, tile) { // plane with UVs in tiles, so textures keep their real size
   const g = new THREE.PlaneGeometry(w, h);
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * w) / tile, (uv.getY(i) * h) / tile);
   return g;
 }
 
-function scaleUV(g, su, sv) {
+export function scaleUV(g, su, sv) {
   const uv = g.attributes.uv;
   for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
   return g;
 }
 
-const profile = (pts) => pts.map(([r, y]) => new THREE.Vector2(r, y));
+export const profile = (pts) => pts.map(([r, y]) => new THREE.Vector2(r, y));
 
 // ---------- textures (all drawn in code: no image files) ----------
-function canvasTexture(w, h, draw, { repeat = false, srgb = true } = {}) {
+export function canvasTexture(w, h, draw, { repeat = false, srgb = true } = {}) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -144,7 +145,7 @@ function noise(g, W, H, rnd, amount, n = 2600) {
   }
 }
 
-function makeTextures() {
+export function makeTextures() {
   const rnd = seeded(2055);
   const T = {};
 
@@ -285,7 +286,7 @@ function makeTextures() {
 }
 
 // ---------- materials ----------
-function makeMaterials(T) {
+export function makeMaterials(T) {
   const S = (o) => new THREE.MeshStandardMaterial(o);
   const P = (o) => new THREE.MeshPhysicalMaterial(o);
   const fabric = (color, o = {}) => S({ color, roughness: 0.95, metalness: 0, bumpMap: T.fabric, bumpScale: 0.6, envMapIntensity: 0.5, ...o });
@@ -339,7 +340,7 @@ function makeEnvironment(renderer) {
 }
 
 // ---------- city outside the window ----------
-function buildCity(root, T) {
+export function buildCity(root, T) {
   const rnd = seeded(77);
   const city = createBatcher();
   const facade = new THREE.MeshBasicMaterial({ map: T.city });
@@ -407,6 +408,22 @@ function buildCity(root, T) {
     });
     tg.attributes.position.needsUpdate = true;
   };
+}
+
+// ---------- Echo headset (stand-in model, shared by Scene 1 and Scene 2) ----------
+// Origin at the bottom; the visor faces +z.
+export function createEchoHeadset(M) {
+  const headset = new THREE.Group();
+  const hsBody = new THREE.Mesh(superquadric(0.1, 0.048, 0.055, 0.45, 0.35, 28, 14), M.satin);
+  hsBody.position.y = 0.05; hsBody.castShadow = true;
+  const visor = new THREE.Mesh(superquadric(0.094, 0.036, 0.02, 0.5, 0.35, 28, 12), M.black);
+  visor.position.set(0, 0.052, 0.045);
+  const visorLight = new THREE.Mesh(rbox(0.11, 0.006, 0.004, 0.002, 1), M.holoSolid);
+  visorLight.position.set(0, 0.03, 0.064);
+  const strap = new THREE.Mesh(new THREE.TorusGeometry(0.098, 0.011, 8, 28, Math.PI), M.fabricDark);
+  strap.position.set(0, 0.05, -0.03); strap.rotation.x = -Math.PI / 2;
+  headset.add(hsBody, visor, visorLight, strap);
+  return headset;
 }
 
 // ---------- scene ----------
@@ -646,20 +663,11 @@ export function buildBedroom(scene, renderer) {
   loose(keys, 1.74, top + 0.0085, -1.05);
   glow(PALETTE.holo, 1.5, 0.16, 1.95, 1.3, -1.05);
 
-  // ===== Echo headset (stand-in model: there is no Scene 1 model in this repo yet) =====
-  const headset = new THREE.Group();
+  // ===== Echo headset (the one the player volunteered for in Scene 1) =====
+  const headset = createEchoHeadset(M);
   headset.position.set(1.2, top, -2.18);
   headset.rotation.y = 0.5;
   root.add(headset);
-  const hsBody = new THREE.Mesh(superquadric(0.1, 0.048, 0.055, 0.45, 0.35, 28, 14), M.satin);
-  hsBody.position.y = 0.05; hsBody.castShadow = true;
-  const visor = new THREE.Mesh(superquadric(0.094, 0.036, 0.02, 0.5, 0.35, 28, 12), M.black);
-  visor.position.set(0, 0.052, 0.045);
-  const visorLight = new THREE.Mesh(rbox(0.11, 0.006, 0.004, 0.002, 1), M.holoSolid);
-  visorLight.position.set(0, 0.03, 0.064);
-  const strap = new THREE.Mesh(new THREE.TorusGeometry(0.098, 0.011, 8, 28, Math.PI), M.fabricDark);
-  strap.position.set(0, 0.05, -0.03); strap.rotation.x = -Math.PI / 2;
-  headset.add(hsBody, visor, visorLight, strap);
   const lift = { on: false, t: 0, dur: 1, from: new THREE.Vector3(), to: new THREE.Vector3() };
 
   // ===== phone on its charging pad =====
