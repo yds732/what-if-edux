@@ -46,7 +46,7 @@ const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0xffc890;
 /** The wall shelf model's platform: its underside above the shelf's base, and how far its front lip stands from the shelf's middle. */
 const SHELF = { under: 0.18, front: 0.13 };
 /** The mattress's top, where something left on the bed lies. */
-const MATTRESS_TOP = 0.565;
+const MATTRESS_TOP = 0.56;
 /** Toward the afternoon sun, and toward the middle of the city's glow at night: both beyond the window. */
 const SUN_DIRECTION = new THREE.Vector3(-0.28, 0.28, -0.96).normalize(), CITY_GLOW = new THREE.Vector3(0.12, 0.16, -1).normalize();
 
@@ -165,7 +165,16 @@ export class BedroomWorld extends World {
     // two floating shelves of slim, modern books and a few keepsakes: an astronaut, a glass planet, a glass dome
     scene.add(buildShelf(1.02, -0.72, 'lower'), buildShelf(1.6, -0.3, 'upper'));
     scene.add(buildWardrobe(WARDROBE.x, WARDROBE.z));
-    await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
+    // the beanbag, recovered in soft white: its own copy of the material, keeping the model's stitching in relief
+    const beanbag = await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
+    beanbag.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const m = (o.material as THREE.MeshStandardMaterial).clone();
+      m.map = null;
+      m.color.set(0xeceae6);
+      m.roughness = 0.9;
+      o.material = m;
+    });
     // school bag slumped by the bed
     await dress(ctx, scene, 'backpack', [[BAG.x, 0, BAG.z, 35]]);
     await dress(ctx, scene, 'door', [[-1.2, 0, D - 0.07, 180]]);
@@ -180,7 +189,7 @@ export class BedroomWorld extends World {
     await ctx.step('bedroom: furniture');
 
     // ---- rug, posters, glass ----
-    const rug = new THREE.Mesh(new THREE.CircleGeometry(1.15, 64), new THREE.MeshStandardMaterial({ map: (await ctx.assets.picture('rug')).map, roughness: 0.95 }));
+    const rug = new THREE.Mesh(new THREE.CircleGeometry(1.15, 96), new THREE.MeshStandardMaterial({ map: beigeRug(), roughness: 1 }));
     rug.rotation.x = -Math.PI / 2;
     rug.position.set(0.25, 0.006, 0.35);
     rug.receiveShadow = true;
@@ -1210,21 +1219,147 @@ const starryCloth = (): THREE.CanvasTexture => {
   return map;
 };
 
+/** A plain beige low-pile rug: a soft speckle of fibres and a slightly deeper band round its edge. */
+const beigeRug = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1024;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#cdb896';
+  c.fillRect(0, 0, 1024, 1024);
+  const rng = new Rng(97);
+  for (let i = 0; i < 26000; i++) {
+    const v = rng.next();
+    c.fillStyle = v < 0.5 ? 'rgba(255, 250, 240, 0.16)' : 'rgba(120, 100, 75, 0.12)';
+    c.fillRect(rng.next() * 1024, rng.next() * 1024, 1 + rng.next() * 2, 1 + rng.next() * 2);
+  }
+  c.strokeStyle = 'rgba(150, 128, 98, 0.35)';
+  c.lineWidth = 14;
+  c.beginPath(); c.arc(512, 512, 470, 0, TAU); c.stroke();
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  return map;
+};
+
 /**
- * A low upholstered platform bed: a soft grey base that floats on a warm light tucked under it, an arched padded
- * headboard against the window wall, a white mattress, a starry navy duvet with its top folded back, a plump white
- * pillow and the yellow star plush that came with them from the old house. Head toward -Z; `x`,`z` is its middle.
+ * A cloth laid over a box and falling over its sides and foot: `top` x `long` lies flat at height `y`, then it rolls
+ * over a rounded edge and hangs `side` metres down each side and `foot` metres down the +Z end, swinging out a little
+ * and rippling as it hangs. `quilt` presses a grid of stitched squares into the part that lies on top. Its origin is
+ * the middle of the head end of the flat part.
+ */
+const drape = (wide: number, long: number, y: number, side: number, foot: number, opts: { quilt?: number; seed?: number; nx?: number; nz?: number } = {}): THREE.BufferGeometry => {
+  const nx = opts.nx ?? 72, nz = opts.nz ?? 96, quilt = opts.quilt ?? 0, seed = opts.seed ?? 0, rc = 0.05;
+  // how a distance `s` past the edge of the flat part turns into an outward reach and a drop
+  const over = (s: number): [number, number] => {
+    if (s <= 0) return [s, 0];
+    const arc = (Math.PI / 2) * rc;
+    if (s < arc) { const t = s / rc; return [rc * Math.sin(t), rc * (1 - Math.cos(t))]; }
+    const hang = s - arc;
+    return [rc + hang * 0.12, rc + hang];
+  };
+  const totalX = wide + 2 * side, totalZ = long + foot;
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= nz; j++) {
+    for (let i = 0; i <= nx; i++) {
+      const u = i / nx, v = j / nz;
+      const sx = u * totalX - totalX / 2, sz = v * totalZ;
+      const ex = Math.abs(sx) - wide / 2, ez = sz - long;
+      const [ox, dx] = over(ex), [oz, dz] = over(ez);
+      let px = ex > 0 ? Math.sign(sx) * (wide / 2 + ox) : sx;
+      let pz = ez > 0 ? long + oz : sz;
+      let py = y - Math.max(dx, dz) - Math.min(dx, dz) * 0.35;
+      // folds in the hanging part: they grow toward the hem
+      const hx = Math.max(0, ex - rc) / Math.max(side, 1e-3), hz = Math.max(0, ez - rc) / Math.max(foot, 1e-3);
+      const ripple = (a: number): number => Math.sin(a * 23 + seed) * 0.6 + Math.sin(a * 41 + seed * 2.3) * 0.4;
+      px += Math.sign(sx) * 0.009 * hx * hx * ripple(pz);
+      pz += 0.009 * hz * hz * ripple(px + 3);
+      // a soft swell over the whole top, and the quilted squares
+      if (ex <= 0 && ez <= 0) {
+        const edge = Math.min(1, -ex / 0.12, -ez / 0.12);
+        py += 0.012 * edge;
+        if (quilt > 0) {
+          const qx = Math.abs(Math.sin((Math.PI * sx) / quilt)), qz = Math.abs(Math.sin((Math.PI * sz) / quilt));
+          py += 0.012 * edge * Math.pow(qx * qz, 0.6);
+        }
+        py += 0.004 * Math.sin(sx * 9 + seed) * Math.sin(sz * 7 + seed * 1.7);
+      }
+      pos.push(px, py, pz);
+      uv.push(u * totalX, v * totalZ);
+    }
+  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const a = j * (nx + 1) + i, b = a + nx + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+};
+
+/** A plump pillow: a box whose top and bottom swell in the middle and pinch in to seams at the edges. */
+const pillowGeo = (w: number, h: number, d: number): THREE.BufferGeometry => {
+  const g = new THREE.BoxGeometry(1, 1, 1, 28, 6, 18);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) * 2, y = p.getY(i) * 2, z = p.getZ(i) * 2;
+    const puff = Math.sqrt(Math.max(0, (1 - x * x) * (1 - z * z)));
+    // the corners pull in a little where the seams meet
+    const pinch = 1 - 0.08 * (1 - puff) * (1 - Math.abs(y));
+    p.setXYZ(i, (x * w * pinch) / 2, (y * h * (0.18 + 0.82 * Math.pow(puff, 0.7))) / 2, (z * d * pinch) / 2);
+  }
+  g.computeVertexNormals();
+  return g;
+};
+
+/** A cream knitted throw: soft ribs along its length. */
+const knit = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#e9e1d2';
+  c.fillRect(0, 0, 256, 256);
+  for (let x = 0; x < 256; x += 16) {
+    const g = c.createLinearGradient(x, 0, x + 16, 0);
+    g.addColorStop(0, 'rgba(140, 120, 95, 0.28)');
+    g.addColorStop(0.5, 'rgba(255, 252, 245, 0.2)');
+    g.addColorStop(1, 'rgba(140, 120, 95, 0.28)');
+    c.fillStyle = g;
+    c.fillRect(x, 0, 16, 256);
+  }
+  for (let y = 0; y < 256; y += 8) { c.fillStyle = 'rgba(120, 100, 80, 0.08)'; c.fillRect(0, y, 256, 2); }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(5, 5);
+  return map;
+};
+
+/**
+ * A low upholstered platform bed with no headboard, its head to the window wall: a soft grey base with piped edges
+ * floating on a warm light tucked under it, a white mattress in a fitted sheet, a quilted starry navy duvet that
+ * drapes over the sides and foot with its top turned back, a cream knitted throw across the foot, two plump white
+ * pillows (one propped against the wall) and the yellow star plush that came with them from the old house.
  */
 const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group => {
   const group = new THREE.Group();
   const fabric = new THREE.MeshStandardMaterial({ color: 0xa9a7ad, roughness: 0.92 });
-  const panel = new THREE.MeshStandardMaterial({ color: 0x6d7385, roughness: 0.95 });
-  const white = new THREE.MeshStandardMaterial({ color: 0xf3f2ef, roughness: 0.85 });
-  // the base, lifted on a recessed plinth with a warm strip of light round it
+  const sheet = new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.9, side: THREE.DoubleSide });
   const plinth = new THREE.Mesh(roundBox(wide - 0.2, 0.1, long - 0.2, 0.02, 2), new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.6 }));
   plinth.position.y = 0.05;
-  const base = new THREE.Mesh(roundBox(wide, 0.2, long, 0.06, 4), fabric);
-  base.position.y = 0.1 + 0.1;
+  const base = new THREE.Mesh(roundBox(wide, 0.2, long, 0.06, 5), fabric);
+  base.position.y = 0.2;
+  // piping round the top and bottom edges of the base
+  const ring = (y: number): THREE.Mesh => {
+    const s = new THREE.Shape(), hw = wide / 2 - 0.004, hl = long / 2 - 0.004, r = 0.055;
+    s.moveTo(-hw + r, -hl); s.lineTo(hw - r, -hl); s.quadraticCurveTo(hw, -hl, hw, -hl + r); s.lineTo(hw, hl - r);
+    s.quadraticCurveTo(hw, hl, hw - r, hl); s.lineTo(-hw + r, hl); s.quadraticCurveTo(-hw, hl, -hw, hl - r); s.lineTo(-hw, -hl + r);
+    s.quadraticCurveTo(-hw, -hl, -hw + r, -hl);
+    const pts = s.getSpacedPoints(160).map((p) => new THREE.Vector3(p.x, y, p.y));
+    return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, 0.007, 8, true), new THREE.MeshStandardMaterial({ color: 0x8f8d94, roughness: 0.8 }));
+  };
   const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(1.6) });
   for (const [w, d, dx, dz] of [[wide - 0.2, 0.01, 0, (long - 0.2) / 2], [wide - 0.2, 0.01, 0, -(long - 0.2) / 2], [0.01, long - 0.2, (wide - 0.2) / 2, 0], [0.01, long - 0.2, -(wide - 0.2) / 2, 0]] as const) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(w, 0.006, d), glowMat);
@@ -1233,49 +1368,41 @@ const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group
   }
   const under = new THREE.PointLight(SCONCE_COLOR, 0.25, 1.4, 2);
   under.position.set(0.35, 0.06, 0);
-  // the mattress and the duvet
-  const mattress = new THREE.Mesh(roundBox(wide - 0.08, 0.19, long - 0.1, 0.06, 4), white);
-  mattress.position.set(0, 0.3 + 0.095, 0.02);
-  const cloth = new THREE.MeshStandardMaterial({ map: starryCloth(), roughness: 0.9 });
-  cloth.map!.repeat.set(1.2, 2);
-  const duvetLong = long * 0.72;
-  const duvet = new THREE.Mesh(roundBox(wide + 0.02, 0.17, duvetLong, 0.05, 4), cloth);
-  duvet.position.set(0, 0.565 - 0.085, long / 2 - duvetLong / 2 + 0.01);
-  const fold = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, wide - 0.06, 6, 16), white);
-  fold.rotation.z = Math.PI / 2;
-  fold.position.set(0, 0.56, long / 2 - duvetLong + 0.02);
-  // the pillow: a squashed sphere is as soft as a pillow looks
-  const pillow = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), white);
-  pillow.scale.set(wide * 0.4, 0.075, 0.19);
-  pillow.position.set(0, 0.56, -long / 2 + 0.3);
-  // the headboard: an arched padded panel in a grey frame, standing against the wall
-  const arch = (w: number, h: number, r: number): THREE.Shape => {
-    const sh = new THREE.Shape();
-    sh.moveTo(-w / 2, 0);
-    sh.lineTo(w / 2, 0);
-    sh.lineTo(w / 2, h - r);
-    sh.quadraticCurveTo(w / 2, h, w / 2 - r, h);
-    sh.lineTo(-w / 2 + r, h);
-    sh.quadraticCurveTo(-w / 2, h, -w / 2, h - r);
-    sh.lineTo(-w / 2, 0);
-    return sh;
-  };
-  const frameGeo = new THREE.ExtrudeGeometry(arch(wide + 0.06, 0.82, 0.32), { depth: 0.06, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 4, curveSegments: 24 });
-  const frame = new THREE.Mesh(frameGeo, fabric);
-  frame.position.set(0, 0.22, -long / 2 - 0.06);
-  const padGeo = new THREE.ExtrudeGeometry(arch(wide - 0.14, 0.62, 0.24), { depth: 0.04, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 5, curveSegments: 24 });
-  const pad = new THREE.Mesh(padGeo, panel);
-  pad.position.set(0, 0.36, -long / 2 + 0.02);
-  // the star plush, resting on the pillow
+  // the mattress in its fitted sheet
+  const mw = wide - 0.06, ml = long - 0.06, mTop = 0.5;
+  const mattress = new THREE.Mesh(roundBox(mw, 0.2, ml, 0.07, 6), sheet);
+  mattress.position.set(0, mTop - 0.1, 0);
+  // the duvet: from below the pillows to the foot, over the sides and the end
+  const cloth = new THREE.MeshStandardMaterial({ map: starryCloth(), roughness: 0.92, side: THREE.DoubleSide });
+  cloth.map!.repeat.set(1.4, 1.4);
+  const head = -long / 2 + 0.6, duvetLong = ml / 2 - head;
+  const duvet = new THREE.Mesh(drape(mw, duvetLong, mTop + 0.03, 0.27, 0.26, { quilt: 0.2, seed: 1 }), cloth);
+  duvet.position.set(0, 0, head);
+  // its top turned back: the white underside, a band across the head end
+  const turn = new THREE.Mesh(drape(mw + 0.01, 0.17, mTop + 0.065, 0.27, 0, { seed: 4, nz: 24 }), sheet);
+  turn.position.set(0, 0, head - 0.02);
+  // a knitted throw across the foot
+  const throwMat = new THREE.MeshStandardMaterial({ map: knit(), roughness: 1, side: THREE.DoubleSide });
+  const blanket = new THREE.Mesh(drape(mw + 0.02, 0.42, mTop + 0.075, 0.3, 0.2, { seed: 7, nz: 40 }), throwMat);
+  blanket.position.set(0, 0, ml / 2 - 0.42);
+  // two pillows: one propped against the wall, one lying in front of it
+  const pillowMat = new THREE.MeshStandardMaterial({ color: 0xf6f5f2, roughness: 0.88 });
+  const back = new THREE.Mesh(pillowGeo(wide * 0.78, 0.22, 0.44), pillowMat);
+  back.position.set(0, mTop + 0.2, -long / 2 + 0.15);
+  back.rotation.x = -1.05;
+  const front = new THREE.Mesh(pillowGeo(wide * 0.72, 0.13, 0.4), pillowMat);
+  front.position.set(0.03, mTop + 0.06, -long / 2 + 0.36);
+  front.rotation.set(-0.08, 0.04, 0);
+  // the star plush, resting on the front pillow
   const star = new THREE.Shape();
   for (let k = 0; k <= 10; k++) {
     const a = Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 0.045 : 0.1;
     if (k === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r); else star.lineTo(Math.cos(a) * r, Math.sin(a) * r);
   }
   const plush = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.022, bevelSegments: 5 }), new THREE.MeshStandardMaterial({ color: 0xf0c03a, roughness: 0.95 }));
-  plush.position.set(0.16, 0.66, -long / 2 + 0.34);
-  plush.rotation.set(-0.5, 0.25, 0.2);
-  group.add(plinth, base, under, mattress, duvet, fold, pillow, frame, pad, plush);
+  plush.position.set(0.2, mTop + 0.16, -long / 2 + 0.34);
+  plush.rotation.set(-0.9, 0.25, 0.2);
+  group.add(plinth, base, ring(0.297), ring(0.103), under, mattress, duvet, turn, blanket, back, front, plush);
   group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
   group.position.set(x, 0, z);
   return group;
