@@ -159,6 +159,8 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
     const a = (i / 5) * TAU + rng.range(-0.4, 0.4);
     branch(trunkTop.clone().add(v3(0, -0.25 * i * 0.3, 0)), v3(Math.cos(a) * 0.95, rng.range(0.3, 0.65), Math.sin(a) * 0.95).normalize(), rng.range(2.1, 2.8), 0.21, 1);
   }
+  // a central leader straight up through the middle, so the crown is full rather than a ring
+  branch(trunkTop.clone(), v3(0.06, 1, 0.04).normalize(), 2.5, 0.2, 1);
   const trunk = new THREE.Mesh(merge(bark), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
   trunk.castShadow = true;
   trunk.receiveShadow = true;

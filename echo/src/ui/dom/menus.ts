@@ -48,32 +48,44 @@ const button = (label: string, className: string, onClick: () => void): HTMLButt
   return b;
 };
 
-/** Timing of the click sparkle: it starts with the press and is gone shortly after the button settles. */
-const SPARKLE = { count: 6, ms: 420, reach: [16, 28] as const };
+/**
+ * The click: an echo. The button pulses once, two outlines of it ripple outward and fade, and its four corner
+ * pixels ride out on the first ripple. Echo is the game's companion; every press answers like one.
+ */
+const ECHO = { ms: 560, second: 140, reach: 12, pulse: 1.035, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' } as const;
 const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-/** A few motes of light thrown out from where a button was pressed: a small secondary touch on the click. */
-const sparkle = (button: HTMLElement, event: MouseEvent): void => {
+const echo = (button: HTMLElement): void => {
   if (reducedMotion()) return;
   const box = button.getBoundingClientRect();
-  // a keyboard press has no pointer position: sparkle from the middle of the button
-  const x = event.detail > 0 ? event.clientX : box.left + box.width / 2, y = event.detail > 0 ? event.clientY : box.top + box.height / 2;
-  const layer = el('div', 'sparkles');
+  const layer = el('div', 'echoes');
   document.body.append(layer);
-  const turn = Math.random() * Math.PI * 2;
-  const motes = Array.from({ length: SPARKLE.count }, (_, i) => {
-    const mote = document.createElement('i');
-    mote.style.left = `${x}px`;
-    mote.style.top = `${y}px`;
-    layer.append(mote);
-    const a = turn + (i / SPARKLE.count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-    const r = SPARKLE.reach[0] + Math.random() * (SPARKLE.reach[1] - SPARKLE.reach[0]);
-    return mote.animate([
-      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-      { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r}px) scale(0.2)`, opacity: 0 },
-    ], { duration: SPARKLE.ms * (0.8 + Math.random() * 0.4), easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' }).finished;
-  });
-  void Promise.allSettled(motes).then(() => layer.remove());
+  const sx = (box.width + ECHO.reach * 2) / box.width, sy = (box.height + ECHO.reach * 2) / box.height;
+  const done: Promise<unknown>[] = [];
+  // two rings, the second fainter and a beat behind: the echo of the echo
+  for (const [delay, strength] of [[0, 0.75], [ECHO.second, 0.4]] as const) {
+    const ring = el('div', 'echo-ring');
+    Object.assign(ring.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
+    layer.append(ring);
+    done.push(ring.animate([
+      { transform: 'scale(1, 1)', opacity: strength },
+      { transform: `scale(${sx}, ${sy})`, opacity: 0 },
+    ], { duration: ECHO.ms, delay, easing: ECHO.ease, fill: 'both' }).finished);
+  }
+  // the corner pixels ride outward on the first ring and fade
+  for (const [cx, cy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+    const px = el('div', 'echo-corner');
+    Object.assign(px.style, { left: `${box.left + cx * box.width}px`, top: `${box.top + cy * box.height}px` });
+    layer.append(px);
+    const dx = (cx ? 1 : -1) * (ECHO.reach + 4), dy = (cy ? 1 : -1) * (ECHO.reach + 4);
+    done.push(px.animate([
+      { transform: `translate(${cx ? 2 : -6}px, ${cy ? 2 : -6}px)`, opacity: 1 },
+      { transform: `translate(${(cx ? 2 : -6) + dx}px, ${(cy ? 2 : -6) + dy}px)`, opacity: 0 },
+    ], { duration: ECHO.ms, easing: ECHO.ease, fill: 'both' }).finished);
+  }
+  // and the button itself gives one small pulse
+  button.animate([{ transform: 'scale(1)' }, { transform: `scale(${ECHO.pulse})`, offset: 0.35 }, { transform: 'scale(1)' }], { duration: 320, easing: ECHO.ease });
+  void Promise.allSettled(done).then(() => layer.remove());
 };
 
 /** Small line icons for the title's utility buttons, drawn in the text colour. */
@@ -106,10 +118,10 @@ class Menus {
   constructor(private readonly game: Game, private readonly settings: Settings, private readonly tierPinned: boolean) {
     this.loading.style.opacity = '0';
     this.root.append(this.loading);
-    // every menu button answers a click with a little sparkle
+    // every menu button answers a click with an echo
     this.root.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement | null)?.closest('button');
-      if (b && !b.disabled) sparkle(b, e);
+      if (b && !b.disabled) echo(b);
     });
     void XRRig.supported().then((ok) => {
       this.xrSupported = ok;

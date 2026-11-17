@@ -6,12 +6,18 @@
   --line: rgba(255, 226, 180, 0.16);
   --line-hover: rgba(255, 217, 138, 0.5);
   /* buttons: squarer, with a little softness left at the corners */
-  --r-btn: 10px;
+  --r-btn: 0;
+  /* the corner pixels: a small square just outside each corner of a button */
+  --px: 3px;
+  --px-gap: 4px;
+  --px-color: rgba(255, 217, 138, 0.7);
   /* motion tokens: press and hover answer at once, the sheen and sparkle are a touch longer */
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-press: 150ms;
   --dur-sheen: 520ms;
-  --font: 'Lexend Variable', 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* a classical serif for names and titles, so the game reads as a story rather than a toy */
+  --display: 'Cormorant Garamond', 'EB Garamond', Georgia, 'Times New Roman', serif;
 }
 
 .menu {
@@ -145,7 +151,6 @@
 .btn {
   appearance: none;
   position: relative;
-  overflow: hidden;
   font: 500 17px/1 var(--font);
   letter-spacing: 0.06em;
   color: var(--ink);
@@ -163,9 +168,27 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255, 240, 210, 0.22) 50%, transparent 70%);
-  transform: translateX(-110%);
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 240, 210, 0.22) 50%, transparent 65%) no-repeat;
+  background-size: 300% 100%;
+  background-position: 100% 0;
   pointer-events: none;
+}
+/* four pixels just outside the corners */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * (var(--px-gap) + var(--px)));
+  background:
+    linear-gradient(var(--px-color), var(--px-color)) top left / var(--px) var(--px) no-repeat,
+    linear-gradient(var(--px-color), var(--px-color)) top right / var(--px) var(--px) no-repeat,
+    linear-gradient(var(--px-color), var(--px-color)) bottom left / var(--px) var(--px) no-repeat,
+    linear-gradient(var(--px-color), var(--px-color)) bottom right / var(--px) var(--px) no-repeat;
+  pointer-events: none;
+  transition: inset var(--dur-press) var(--ease-out), opacity var(--dur-press) ease;
+  opacity: 0.75;
+}
+.btn--quiet::after {
+  opacity: 0;
 }
 .btn:focus-visible {
   outline: none;
@@ -180,8 +203,13 @@
     box-shadow: 0 6px 24px rgba(255, 196, 120, 0.22);
   }
   .btn:hover::before {
-    transform: translateX(110%);
-    transition: transform var(--dur-sheen) var(--ease-out);
+    background-position: 0% 0;
+    transition: background-position var(--dur-sheen) var(--ease-out);
+  }
+  /* on hover the corner pixels step out a little and brighten */
+  .btn:hover::after {
+    inset: calc(-1 * (var(--px-gap) + var(--px) + 2px));
+    opacity: 1;
   }
 }
 .btn:active {
@@ -530,21 +558,25 @@
   }
 }
 
-/* the click's sparkle: a few motes thrown out from where the button was pressed (menus.ts) */
-.sparkles {
+/* the click's echo (menus.ts): rings and corner pixels thrown out from the pressed button */
+.echoes {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 50;
 }
-.sparkles i {
+.echo-ring {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
-  background: radial-gradient(circle, #ffffff 0%, #fff0c4 40%, rgba(255, 217, 138, 0) 75%);
-  box-shadow: 0 0 8px 2px rgba(255, 210, 130, 0.7);
-  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 217, 138, 0.9);
+  box-shadow: 0 0 12px rgba(255, 196, 120, 0.35);
+}
+.echo-corner {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #ffe3a8;
+  box-shadow: 0 0 6px rgba(255, 210, 130, 0.9);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -647,4 +679,34 @@
   .btn--go .icon {
     transition: none;
   }
+}
+
+/* ---- type: the serif carries the name and the titles ---- */
+.logo,
+.card h2 {
+  font-family: var(--display);
+}
+.logo {
+  font-weight: 300;
+  letter-spacing: 0.28em;
+  margin-right: -0.28em;
+}
+.card h2 {
+  font-weight: 500;
+  font-size: 34px;
+  letter-spacing: 0.01em;
+}
+.tagline {
+  font-weight: 350;
+}
+
+/* ---- everything rectangular (the touch joystick stays round: it is a stick) ---- */
+.card,
+.week div,
+.touch .pause,
+.day,
+.seg,
+.btn,
+.btn--utility {
+  border-radius: 0;
 }

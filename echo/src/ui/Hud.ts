@@ -3,7 +3,7 @@ import { clamp } from '../core/math';
 import { Cancelled, Signal } from '../core/tasks';
 import { ACTION_LABELS, type Input, type InputMode } from '../input/Input';
 import type { Hints } from '../story/script';
-import { THEMES, font, glass, keyCap, roundRect, spaced, sparkle, wrap, type Theme, type ThemeName } from './draw';
+import { THEMES, displayFont, font, glass, keyCap, roundRect, spaced, sparkle, wrap, type Theme, type ThemeName } from './draw';
 import { Widget } from './Panel';
 
 export interface SubtitleLine {
@@ -644,8 +644,8 @@ export class Hud {
       ctx.shadowColor = 'rgba(0,0,0,0.6)';
       ctx.shadowBlur = 18;
       ctx.fillStyle = '#ffffff';
-      ctx.font = font(300, 74);
-      spaced(ctx, this.cardText.title.toUpperCase(), w / 2, h / 2 - 26, 20, 'center');
+      ctx.font = displayFont(400, 84);
+      spaced(ctx, this.cardText.title.toUpperCase(), w / 2, h / 2 - 26, 18, 'center');
       ctx.fillStyle = this.theme.accent;
       ctx.fillRect(w / 2 - 44, h / 2 + 34, 88, 2);
       ctx.fillStyle = 'rgba(255,255,255,0.86)';
@@ -734,7 +734,7 @@ export class Hud {
     let wrapped: string[] = [];
     const maxW = Math.min(1000, this.vw - 60);
     widget.panel.paint((ctx) => {
-      ctx.font = font(300, 34);
+      ctx.font = displayFont(400, 38, true);
       wrapped = this.reflectionLines.flatMap((l) => (l === '' ? [''] : wrap(ctx, l, maxW - 60)));
     });
     widget.panel.resize(maxW, wrapped.length * 50 + 70);
@@ -760,7 +760,7 @@ export class Hud {
       ctx.textBaseline = 'middle';
       ctx.shadowColor = 'rgba(0,0,0,0.75)';
       ctx.shadowBlur = 16;
-      ctx.font = font(300, 34);
+      ctx.font = displayFont(400, 38, true);
       ctx.fillStyle = '#ffffff';
       wrapped.forEach((line, i) => ctx.fillText(line, w / 2, h / 2 + (i - (wrapped.length - 1) / 2) * 50));
     });

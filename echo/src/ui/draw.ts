@@ -1,6 +1,9 @@
 /** Canvas-2D drawing vocabulary for every panel: holographic glass, type, key caps. */
 
-export const FONT = '"Lexend Variable", "Lexend", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const FONT = '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+/** The display face: names, titles and headings. */
+export const DISPLAY = '"Cormorant Garamond", "EB Garamond", Georgia, "Times New Roman", serif';
+export const displayFont = (weight: number, size: number, italic = false): string => `${italic ? 'italic ' : ''}${weight} ${size}px ${DISPLAY}`;
 export const font = (weight: number, size: number): string => `${weight} ${size}px ${FONT}`;
 
 export interface Theme {
@@ -52,7 +55,8 @@ export interface GlassOptions {
 
 /** A pane of holographic glass. Leave `pad` pixels of margin around it for the glow. */
 export const glass = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, theme: Theme, o: GlassOptions = {}): void => {
-  const r = o.radius ?? 20;
+  // panels are square-cornered, to match the menu buttons
+  const r = 0 * (o.radius ?? 0);
   ctx.save();
   if ((o.glow ?? 1) > 0) {
     ctx.shadowColor = theme.glow;

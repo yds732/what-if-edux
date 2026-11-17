@@ -9,6 +9,9 @@ import { bakeEnvironment } from '../../render/env';
 import { Panel } from '../../ui/Panel';
 import { THEMES, font, glass, spaced, sparkle, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, type Anchor, type BuildContext, type FrameContext } from '../World';
+import { buildLanterns, type Lanterns, type LanternSpot } from './lanterns';
+import { buildReeds, type ReedClump } from './reeds';
+import { buildShootingStars, type ShootingStars } from './shootingStars';
 import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo, type Motes } from './atmosphere';
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildCrystals, buildGlowFlowers, buildGrass, windUniforms } from './flora';
@@ -73,6 +76,8 @@ export class HavenWorld extends World {
   private readonly rockets: Rocket[] = [];
   private readonly festival = new THREE.Group();
   private readonly lanterns: { mesh: THREE.Object3D; x: number; z: number; speed: number; phase: number }[] = [];
+  private floating!: Lanterns;
+  private shootingStars!: ShootingStars;
   private board!: Panel;
   private boardData: { title: string; body: string; value: number; total: number } | null = null;
   private boardShown = 0;
@@ -248,6 +253,52 @@ export class HavenWorld extends World {
       this.colliders.circle(x, z, 0.28);
     }
 
+    // the lanterns, reeds and shooting stars draw on their own seed, so everything else in Haven stays where it was
+    const extra = new Rng(4081);
+
+    // ---- floating lanterns: lining the path from the arrival to the bridge, and scattered over the island ----
+    const spots: LanternSpot[] = [];
+    const spot = (x: number, z: number): void => {
+      const y = this.mainIsland.heightAt(x, z);
+      if (y !== null) spots.push({ x, z, ground: y });
+    };
+    for (const z of [3.6, 1.4, -0.8]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
+    for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 2.4) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
+    for (let i = 0, made = 0; i < 200 && made < 12; i++) {
+      const a = extra.range(0, TAU), r = extra.range(5, 11.5);
+      const x = Math.cos(a) * r, z = Math.sin(a) * r - 1;
+      // away from the path, the plaza, the tree and each other
+      if (Math.abs(x) < 3 || Math.hypot(x - HAVEN.plaza.x, z - HAVEN.plaza.z) < 4.8 || Math.hypot(x - HAVEN.tree.x, z - HAVEN.tree.z) < 3.4) continue;
+      if (!ground(x, z) || spots.some((s) => Math.hypot(s.x - x, s.z - z) < 2.6)) continue;
+      spot(x, z);
+      made++;
+    }
+    this.floating = buildLanterns(extra.fork(), spots, { motesEach: Math.round(10 * q.density) + 4, lights: q.tier === 'low' ? 0 : q.tier === 'medium' ? 4 : 6 });
+    scene.add(this.floating.group);
+
+    // ---- reeds: natural clumps toward the island's edge, a few by the tree and the crystals ----
+    const clumps: ReedClump[] = [];
+    for (let i = 0; i < 600 && clumps.length < Math.round(26 * q.density) + 6; i++) {
+      const a = extra.range(0, TAU), edge = this.mainIsland.outline(a);
+      const r = edge * extra.range(0.7, 0.93);
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      // keep the way to the bridge and the arrival clear
+      if ((Math.abs(x) < 3.2 && z < -2) || (Math.abs(x) < 2.2 && z > 2.5)) continue;
+      const g = ground(x, z);
+      if (!g || g.scale < 1 || clumps.some((c) => Math.hypot(c.x - x, c.z - z) < 1.1)) continue;
+      // clumps gather in loose families, like reeds where the ground stays wet
+      clumps.push({ x, z, ground: g.y, size: extra.range(0.75, 1.3) });
+      if (extra.chance(0.55)) {
+        const b = extra.range(0, TAU), d = extra.range(0.55, 0.9), x2 = x + Math.cos(b) * d, z2 = z + Math.sin(b) * d, g2 = ground(x2, z2);
+        if (g2) clumps.push({ x: x2, z: z2, ground: g2.y, size: extra.range(0.55, 0.95) });
+      }
+    }
+    scene.add(buildReeds(extra.fork(), clumps));
+
+    // ---- the occasional shooting star ----
+    this.shootingStars = buildShootingStars(extra.fork());
+    scene.add(this.shootingStars.mesh);
+
     // ---- bridge, rings, gateway ----
     this.bridge = buildStarBridge(v3(0, 0.14, edgeZ), HAVEN.bridgeEnd);
     scene.add(this.bridge.group);
@@ -416,6 +467,8 @@ export class HavenWorld extends World {
     const { dt, time } = frame;
     this.time.value = time;
     this.sky.update(time, frame.camera, frame.pixelHeight);
+    this.floating.update(time, frame.pixelHeight);
+    this.shootingStars.update(dt, frame.camera);
     this.bridge.update(dt, time);
     this.gateway.update(dt, time);
     if (this.bonusRing.group.visible) {

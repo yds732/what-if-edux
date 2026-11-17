@@ -35,6 +35,9 @@ export class Player {
 
   private readonly velocity = new THREE.Vector2();
   private bobPhase = 0;
+  /** Seconds lived: drives the camera's breathing. */
+  private life = 0;
+  private readonly breathing = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
   private bob = 0;
   private eye = EYE_STANDING;
   private turn: { yaw: number; pitch: number; left: number; total: number; fromYaw: number; fromPitch: number } | null = null;
@@ -168,6 +171,7 @@ export class Player {
     const walking = clamp(speed / WALK_SPEED, 0, 1);
     this.bob = xr ? 0 : damp(this.bob, Math.sin(this.bobPhase * 2) * 0.022 * walking, 14, dt);
     this.eye = damp(this.eye, this.eyeHeight, 6, dt);
+    this.life += dt;
     this.apply();
   }
 
@@ -180,10 +184,24 @@ export class Player {
       return;
     }
     rig.position.copy(this.position);
-    camera.position.set(0, this.eye + this.bob, 0);
-    camera.rotation.set(this.pitch, 0, 0, 'YXZ');
+    // a person standing still is never still: slow breathing, a faint sway, and the eyes drifting a little.
+    // Several slow waves out of step with one another, so the motion never visibly repeats.
+    const t = this.life, k = this.breathing;
+    const breath = Math.sin((t * TAU) / BREATH_SECONDS);
+    const lift = (0.006 * breath + 0.0015 * Math.sin(t * 0.83 + 1.3)) * k;
+    const swayX = (0.0035 * Math.sin(t * 0.37 + 0.6) + 0.0012 * Math.sin(t * 1.13)) * k;
+    const drift = {
+      pitch: (0.0035 * breath + 0.0022 * Math.sin(t * 0.61 + 2.1) + 0.0008 * Math.sin(t * 1.9)) * k,
+      yaw: (0.0028 * Math.sin(t * 0.43 + 0.4) + 0.0009 * Math.sin(t * 1.27 + 3)) * k,
+      roll: (0.0016 * Math.sin(t * 0.29 + 1.7) + 0.0006 * Math.sin(t * 0.97)) * k,
+    };
+    camera.position.set(swayX, this.eye + this.bob + lift, 0);
+    camera.rotation.set(this.pitch + drift.pitch, drift.yaw, drift.roll, 'YXZ');
   }
 }
 
+/** One breath, in and out. */
+const BREATH_SECONDS = 4.6;
+const TAU = Math.PI * 2;
 const _v = new THREE.Vector3();
 const _p = new THREE.Vector2();

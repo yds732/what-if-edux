@@ -1,4 +1,8 @@
-import '@fontsource-variable/lexend';
+import '@fontsource-variable/inter/index.css';
+import '@fontsource/cormorant-garamond/300.css';
+import '@fontsource/cormorant-garamond/400.css';
+import '@fontsource/cormorant-garamond/500.css';
+import '@fontsource/cormorant-garamond/400-italic.css';
 import './ui/dom/base.css';
 
 declare global {
@@ -36,7 +40,10 @@ if (!(canvas instanceof HTMLCanvasElement)) throw new Error('missing #view canva
 
 try {
   // every panel is drawn to a canvas: the typeface must be there before the first one is painted
-  await Promise.all([300, 400, 500, 600, 700].map((w) => document.fonts.load(`${w} 20px "Lexend Variable"`)));
+  await Promise.all([
+    ...[300, 400, 500, 600, 700].map((w) => document.fonts.load(`${w} 20px "Inter Variable"`)),
+    ...[300, 400, 500].map((w) => document.fonts.load(`${w} 20px "Cormorant Garamond"`)),
+  ]);
   if (params.has('shot')) {
     document.querySelector('.boot')?.remove();
     await (await import('./app/shot')).runShot(canvas, params);
