@@ -7,7 +7,7 @@ import { Bursts } from '../../render/Bursts';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeEnvironment } from '../../render/env';
 import { Panel } from '../../ui/Panel';
-import { THEMES, font, glass, spaced, sparkle, wrap } from '../../ui/draw';
+import { THEMES, font, glass, roundRect, spaced, sparkle, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, type Anchor, type BuildContext, type FrameContext } from '../World';
 import { buildLanterns, type Lanterns, type LanternSpot } from './lanterns';
 import { buildReeds, type ReedClump } from './reeds';
@@ -17,6 +17,7 @@ import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
+import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
 
 /** Where things stand in Haven. The player arrives facing -Z: plaza, bridge, gateway, planet. */
@@ -52,8 +53,8 @@ export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title
 /** The floating islands as modelled: how wide each is and how far up from its lowest point its turf lies, in metres. */
 const ISLANDS = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;
 /** The challenge board stands in a frame planted in the meadow, turned to the plaza. */
-const BOARD = { x: -3.7, z: -5.6, eye: 1.75, frameScale: 1.9, opening: { wide: 1.04, tall: 0.42, y: 1.4365 } };
-const FIREWORK_HUES = [0xffd27a, 0xff8fd6, 0x7fe9ff, 0xb59bff, 0x9dffb0, 0xffffff];
+const BOARD = { x: -3.7, z: -5.6, eye: 1.75, frameScale: 2.4, opening: { wide: 1.04, tall: 0.42, y: 1.4365 } };
+const FIREWORK_HUES = [0xffd27a, 0xff6f61, 0x4fd8ff, 0x9a6bff, 0x3fe8a0, 0xffffff];
 
 interface Rocket {
   at: THREE.Vector3;
@@ -96,12 +97,12 @@ export class HavenWorld extends World {
     this.near = 0.08;
     this.far = 3200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.14, contrast: 0.22, vignette: 0.36, grain: 0.014, chroma: 0.005,
-      shafts: 0.22, shaftColor: new THREE.Color(1.0, 0.8, 0.62), dof: 0.5, streak: 0.1,
-      // warm, glowing highlights over soft plum shadows: a magical golden hour
-      shadowTint: new THREE.Color(0.018, 0.004, 0.024), highlightTint: new THREE.Color(0.08, 0.04, -0.03),
+      exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.26, contrast: 0.24, vignette: 0.36, grain: 0.014, chroma: 0.005,
+      shafts: 0.22, shaftColor: new THREE.Color(0.7, 0.88, 1.0), dof: 0, streak: 0.1,
+      // warm, glowing highlights over cool cobalt-teal shadows: a jewel-toned twilight
+      shadowTint: new THREE.Color(0.0, 0.008, 0.028), highlightTint: new THREE.Color(0.035, 0.03, -0.01),
     }));
-    this.clearColor.set(0x1a1038);
+    this.clearColor.set(0x0c1438);
     // the planet and the bright sky around it: everything past the furthest island
     this.shafts = { direction: PLANET_DIR, skyFrom: 700 };
     // the rings out over the bridge are what there is to aim at: they stay sharp
@@ -112,13 +113,15 @@ export class HavenWorld extends World {
     const scene = this.scene;
     const q = ctx.quality;
     const rng = new Rng(4080);
+    // the generated props were painted rose and antique gold: repaint them in Haven's palette before any is placed
+    await recolourHavenProps(ctx);
 
     // ---- sky, environment light, haze ----
     this.sky = buildSky(Math.round(2600 * (0.5 + 0.5 * q.density)));
     scene.add(this.sky.group);
     scene.environment = bakeEnvironment(ctx.renderer, this.sky.envScene, 0.02);
     scene.environmentIntensity = 1.1;
-    scene.fog = new THREE.FogExp2(0x6a3a4a, 0.0046);
+    scene.fog = new THREE.FogExp2(0x2e4a6a, 0.0046);
     scene.add(buildCloudSea(-44, this.time));
     await ctx.step('haven: sky');
 
@@ -133,9 +136,9 @@ export class HavenWorld extends World {
     key.shadow.bias = -0.0005;
     key.shadow.normalBias = 0.05;
     key.shadow.radius = 5;
-    const rim = new THREE.DirectionalLight(0xff8fb8, 1.7);
+    const rim = new THREE.DirectionalLight(0x78a6ff, 1.7);
     rim.position.copy(PLANET_DIR).multiplyScalar(60);
-    scene.add(key, key.target, rim, new THREE.HemisphereLight(0xe0a8c0, 0x8a5a4a, 1.1));
+    scene.add(key, key.target, rim, new THREE.HemisphereLight(0x9cc4e8, 0x2a6a4a, 1.1));
 
     // ---- islands ----
     const rock = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
@@ -189,7 +192,7 @@ export class HavenWorld extends World {
       return { y, scale: path };
     };
     scene.add(buildGrass(Math.round(26000 * q.density), 13.5, rng.fork(), ground));
-    const flowerColors = [new THREE.Color(0xff8fd6), new THREE.Color(0x7fe9ff), new THREE.Color(0xffd27a), new THREE.Color(0xb59bff)];
+    const flowerColors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8a3d)];
     const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
     for (let i = 0; i < 400 && flowers.length < Math.round(110 * q.density); i++) {
       const a = rng.range(0, TAU), r = rng.range(3.4, 12);
@@ -200,8 +203,9 @@ export class HavenWorld extends World {
     }
     scene.add(buildGlowFlowers(flowers));
     const clusters: [x: number, z: number, scale: number, color: number][] = [
-      [4.9, -7.0, 1.5, 0x59d8ff], [-6.3, -8.2, 1.2, 0x9a6bff], [7.6, -1.6, 0.95, 0xff7ad0], [-8.3, 5.9, 1.3, 0x59d8ff],
-      [6.0, 5.4, 0.8, 0x9a6bff], [-2.4, 8.2, 0.9, 0xff7ad0], [9.6, -5.2, 1.1, 0x9a6bff], [-8.4, -5.6, 0.85, 0x59d8ff],
+      // cyan clusters and emerald ones (the broad kind, repainted from lavender in recolour.ts)
+      [4.9, -7.0, 1.5, 0x59d8ff], [-6.3, -8.2, 1.2, 0x1fd68a], [7.6, -1.6, 0.95, 0x1fd68a], [-8.3, 5.9, 1.3, 0x59d8ff],
+      [6.0, 5.4, 0.8, 0x1fd68a], [-2.4, 8.2, 0.9, 0x1fd68a], [9.6, -5.2, 1.1, 0x1fd68a], [-8.4, -5.6, 0.85, 0x59d8ff],
     ];
     const crystals: Record<'crystals-a' | 'crystals-b', Spot[]> = { 'crystals-a': [], 'crystals-b': [] };
     for (const [x, z, scale, color] of clusters) {
@@ -328,7 +332,7 @@ export class HavenWorld extends World {
       scene.add(buildWaterfall(v3(x + radius * 0.72, y - 0.4, z + radius * 0.5), radius * 0.2, radius * 2.6, 0.6, this.time));
     }
     this.motes.push(buildMotes(Math.round(190 * q.density), v3(0, 0.15, -1), v3(11, 3.4, 11), rng.fork(), this.time, { a: 0xffd98a, b: 0x8fe9ff, size: 0.07, gain: 2.2 }));
-    this.motes.push(buildMotes(Math.round(120 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0xffb0e0, size: 0.11, gain: 2.0 }));
+    this.motes.push(buildMotes(Math.round(120 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0x6f9cff, size: 0.11, gain: 2.0 }));
     for (const m of this.motes) scene.add(m.points);
     scene.add(this.bursts.points);
 
@@ -345,6 +349,10 @@ export class HavenWorld extends World {
     this.board.mesh.scale.set(BOARD.opening.wide * BOARD.frameScale * 0.97, BOARD.opening.tall * BOARD.frameScale * 0.97, 1);
     this.board.mesh.position.y = BOARD.eye;
     this.board.opacity = 0;
+    // the pane writes its own depth: otherwise depth of field and the god rays read the far sky behind the glass
+    // and soften the writing as if it hung hundreds of metres away. Its clear corners are cut out, not written.
+    this.board.mesh.material.depthWrite = true;
+    this.board.mesh.material.alphaTest = 0.02;
     boardGroup.add(frame, this.board.mesh);
     scene.add(boardGroup);
     this.colliders.circle(BOARD.x, BOARD.z, 0.3);
@@ -366,7 +374,7 @@ export class HavenWorld extends World {
   /** Strings of lights along the bridge and paper lanterns adrift: hidden until the festival. */
   private async buildFestival(ctx: BuildContext, rng: Rng, edgeZ: number): Promise<void> {
     const bulbs: THREE.BufferGeometry[] = [];
-    const colors = [0xffd27a, 0xff8fd6, 0x7fe9ff, 0xfff1c9];
+    const colors = [0xffd27a, 0xff7a5c, 0x7fe9ff, 0xfff1c9];
     const p = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3();
     const N = 46;
     for (let i = 0; i <= N; i++) {
@@ -436,29 +444,33 @@ export class HavenWorld extends World {
     if (!data) return;
     const theme = THEMES.haven;
     this.board.paint((ctx, w, h) => {
+      // a solid backing under the glass: in the meadow the glass alone lets the island behind show through the words
+      ctx.fillStyle = 'rgba(8, 14, 38, 0.94)';
+      roundRect(ctx, 10, 10, w - 20, h - 20, 22);
+      ctx.fill();
       glass(ctx, 10, 10, w - 20, h - 20, theme, { radius: 22, glow: 1.4, borderWidth: 2.5 });
       ctx.fillStyle = theme.accent;
-      sparkle(ctx, 60, 66, 16);
+      // large type in full-strength colour: the board is read from the arrival point and the throwing spot, 7–11 m off
+      sparkle(ctx, 56, 58, 18);
       ctx.fillStyle = theme.text;
-      ctx.font = font(600, 36);
+      ctx.font = font(700, 48);
       ctx.textBaseline = 'middle';
-      ctx.fillText(data.title, 92, 68);
-      ctx.font = font(400, 25);
-      ctx.fillStyle = theme.dim;
-      wrap(ctx, data.body, w - 110).forEach((line, i) => ctx.fillText(line, 52, 128 + i * 34));
+      ctx.fillText(data.title, 90, 60, w - 120);
+      ctx.font = font(500, 36);
+      wrap(ctx, data.body, w - 90).slice(0, 3).forEach((line, i) => ctx.fillText(line, 44, 120 + i * 44));
       for (let i = 0; i < data.total; i++) {
-        const x = w / 2 + (i - (data.total - 1) / 2) * 70 - 40, y = h - 66;
-        ctx.lineWidth = 3;
+        const x = w / 2 + (i - (data.total - 1) / 2) * 64 - 40, y = h - 44;
+        ctx.lineWidth = 3.5;
         ctx.strokeStyle = theme.accent;
         ctx.fillStyle = theme.accent;
         ctx.beginPath();
-        ctx.arc(x, y, 22, 0, TAU);
+        ctx.arc(x, y, 20, 0, TAU);
         ctx.stroke();
-        if (i < data.value) sparkle(ctx, x, y, 16);
+        if (i < data.value) sparkle(ctx, x, y, 15);
       }
-      ctx.font = font(600, 22);
+      ctx.font = font(700, 30);
       ctx.fillStyle = theme.text;
-      spaced(ctx, `${data.value} / ${data.total}`, w - 170, h - 66, 3);
+      spaced(ctx, `${data.value} / ${data.total}`, w - 170, h - 44, 3);
     });
   }
 

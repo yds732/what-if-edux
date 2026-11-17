@@ -58,7 +58,7 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
   // a round paper lantern: a bellied shade between two small dark caps, a little loop on top
   const shade = sweep([v3(0, 0, 0), v3(0, 0.38, 0)], (k) => 0.11 + 0.09 * Math.sin(k * Math.PI), { radial: 12, steps: 8, startCap: 'flat', endCap: 'flat' });
   const geo = merge([
-    tint(shade, 0xf6b070),
+    tint(shade, 0xffa54a),
     tint(place(blob(0.085, 0.022, 0.085, 1), [0, 0.39, 0]), 0x6a3a30),
     tint(place(blob(0.075, 0.02, 0.075, 1), [0, -0.01, 0]), 0x6a3a30),
     tint(place(blob(0.018, 0.04, 0.018, 1), [0, 0.44, 0]), 0x6a3a30),

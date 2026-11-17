@@ -152,6 +152,19 @@ describe('ResolutionGovernor', () => {
     for (let i = 0; i < 300; i++) pinned.sample(40);
     expect(pinned.scale).toBe(0.6);
   });
+  it('starts a new world at full resolution and ignores its slow first seconds', () => {
+    const g = new ResolutionGovernor(() => undefined);
+    for (let i = 0; i < 200; i++) g.sample(34);
+    expect(g.scale).toBeLessThan(1);
+    g.reset(3000);
+    expect(g.scale).toBe(1);
+    // 2.7 s of loading stalls: none of it counts
+    for (let i = 0; i < 80; i++) g.sample(34);
+    expect(g.scale).toBe(1);
+    // slowness that lasts past the settling time still counts
+    for (let i = 0; i < 200; i++) g.sample(34);
+    expect(g.scale).toBeLessThan(1);
+  });
 });
 
 describe('the script', () => {

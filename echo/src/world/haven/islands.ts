@@ -24,8 +24,8 @@ export interface Island {
   heightAt(x: number, z: number): number | null;
 }
 
-const GRASS_A = new THREE.Color(0x1f5a5e), GRASS_B = new THREE.Color(0x3f9a86), MOSS = new THREE.Color(0x66d6b0);
-const ROCK_A = new THREE.Color(0x6d5c96), ROCK_B = new THREE.Color(0x2a2248), ROCK_WARM = new THREE.Color(0x9a6f9c);
+const GRASS_A = new THREE.Color(0x0a4a34), GRASS_B = new THREE.Color(0x14965e), MOSS = new THREE.Color(0x2fd889);
+const ROCK_A = new THREE.Color(0x4a5aa8), ROCK_B = new THREE.Color(0x1a2050), ROCK_WARM = new THREE.Color(0x4f72c0);
 
 /**
  * A floating island as one closed surface: level turf rising into mounds at the rim, a rounded lip, then

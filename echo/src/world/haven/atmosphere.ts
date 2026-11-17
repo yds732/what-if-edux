@@ -29,8 +29,8 @@ export const buildCloudSea = (y: number, timeUniform: { value: number }): THREE.
   const mesh = new THREE.Mesh(new THREE.CircleGeometry(2600, 48), new THREE.ShaderMaterial({
     vertexShader: CLOUD_VS, fragmentShader: CLOUD_FS, fog: false,
     uniforms: {
-      uTime: timeUniform, uLit: { value: new THREE.Color(0.62, 0.36, 0.72) }, uShade: { value: new THREE.Color(0.12, 0.08, 0.3) },
-      uHaze: { value: new THREE.Color(0.36, 0.2, 0.46) }, uGlow: { value: new THREE.Color(1.0, 0.55, 0.5) }, uLightDir: { value: new THREE.Vector2(0.1, -1).normalize() },
+      uTime: timeUniform, uLit: { value: new THREE.Color(0.30, 0.42, 0.80) }, uShade: { value: new THREE.Color(0.04, 0.10, 0.28) },
+      uHaze: { value: new THREE.Color(0.14, 0.24, 0.40) }, uGlow: { value: new THREE.Color(1.0, 0.6, 0.34) }, uLightDir: { value: new THREE.Vector2(0.1, -1).normalize() },
     },
   }));
   mesh.rotation.x = -Math.PI / 2;
@@ -69,7 +69,7 @@ export const buildWaterfall = (top: THREE.Vector3, width: number, height: number
   g.translate(0, -height / 2, 0);
   const mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
     vertexShader: FALL_VS, fragmentShader: FALL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uTime: timeUniform, uColor: { value: new THREE.Color(0.75, 0.9, 1.35) } },
+    uniforms: { uTime: timeUniform, uColor: { value: new THREE.Color(0.6, 1.0, 1.25) } },
   }));
   mesh.position.copy(top);
   mesh.rotation.y = facing;

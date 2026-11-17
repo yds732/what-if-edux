@@ -80,13 +80,36 @@ export class ResolutionGovernor {
   private static readonly STEPS = [1, 0.87, 0.76, 0.66, 0.58, 0.5];
   private level = 0;
 
+  get isFixed(): boolean {
+    return this.fixed !== null;
+  }
+
   constructor(private readonly onChange: (scale: number) => void, private readonly fixed: number | null = null) {
     if (fixed !== null) this.scale = clamp(fixed, 0.3, 1);
+  }
+
+  /** Milliseconds of frames still to ignore: a world's first seconds are slow while it uploads and compiles. */
+  private settle = 0;
+
+  /**
+   * Starts afresh at full resolution for a new world, and ignores its first seconds. Without this, the stalls of
+   * arriving drop the resolution to its lowest step, and it then climbs back one step at a time over many seconds.
+   */
+  reset(settleMs = 3000): void {
+    if (this.fixed !== null) return;
+    this.acc = this.frames = this.slowWindows = this.goodMs = this.probing = 0;
+    this.upWait = 4000;
+    this.settle = settleMs;
+    if (this.level !== 0) this.setLevel(0);
   }
 
   /** Feed every rendered frame's wall time in ms. */
   sample(frameMs: number, targetMs = 1000 / 60): void {
     if (this.fixed !== null) return;
+    if (this.settle > 0) {
+      this.settle -= Math.min(frameMs, 250);
+      return;
+    }
     if (frameMs > 250) {
       this.acc = 0;
       this.frames = 0;

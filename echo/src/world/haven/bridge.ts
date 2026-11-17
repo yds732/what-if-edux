@@ -3,6 +3,7 @@ import { addGlow } from '../../assets/glow';
 import { merge, place, v3 } from '../../core/geo';
 import { TAU, damp } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
+import { recolourMaterial } from './recolour';
 
 /** Centres of the three rings of the Star Bridge challenge, near to far. */
 export const RING_POINTS = [new THREE.Vector3(2.3, 2.8, -12.8), new THREE.Vector3(-3.1, 4.0, -18.6), new THREE.Vector3(1.1, 5.4, -25.2)] as const;
@@ -11,7 +12,8 @@ export const RING_RADIUS = 1.25;
 const TILES = 40;
 /** Tiles that already stand when the player first arrives: the bridge is begun, not absent. */
 const STUB = 4;
-const GOLD = new THREE.Color(1.0, 0.74, 0.32);
+/** The bridge's light: a cool cyan-white hard light, more engineered than the gold it replaced. */
+const GOLD = new THREE.Color(0.45, 0.84, 1.0);
 
 const TILE_VS = /* glsl */ `
 attribute float aTile; attribute vec3 aCenter;
@@ -49,9 +51,9 @@ void main(){
   float starLine = 1.0 - smoothstep(0.0, 0.03, abs(sdStar(q * vec2(1.0, 1.15), 0.56)));
   float sheen = 0.5 + 0.5 * sin(uTime * 1.6 - vTile * 0.55);
   // built: a pane of warm light. unbuilt: only the ghost of where it will be
-  vec3 lit = uGold * (0.5 + edge * 3.4 + star * (1.3 + 1.2 * sheen) + starLine * 1.5) + vec3(1.0, 0.9, 0.75) * edge * 1.2;
+  vec3 lit = uGold * (0.5 + edge * 3.4 + star * (1.3 + 1.2 * sheen) + starLine * 1.5) + vec3(0.85, 0.95, 1.0) * edge * 1.2;
   float litA = 0.34 + 0.6 * max(edge, star * 0.85);
-  vec3 ghost = mix(vec3(0.55, 0.5, 1.0), uGold, 0.3) * (edge * 0.7 + starLine * 0.25);
+  vec3 ghost = mix(vec3(0.35, 0.55, 1.0), uGold, 0.3) * (edge * 0.7 + starLine * 0.25);
   float ghostA = (0.035 + edge * 0.5 + starLine * 0.16) * (0.55 + 0.45 * sin(uTime * 1.3 - vTile * 0.5));
   float flash = vBuilt * (1.0 - vBuilt) * 4.0;
   vec3 c = mix(ghost, lit, vBuilt) + vec3(1.0, 0.95, 0.8) * flash * 5.0 + uGold * uFestival * star * 1.2 * vBuilt;
@@ -128,6 +130,7 @@ export class Ring {
       // every ring wakes on its own, so each has a material of its own
       if (!material) {
         material = (o.material as THREE.MeshStandardMaterial).clone();
+        recolourMaterial(material, 'ring');
         material.emissive.copy(GOLD);
         paint = addGlow(material, { strength: 1, vivid: 0.46 });
       }
@@ -150,7 +153,7 @@ export class Ring {
       const a = (i / 16) * TAU;
       dashGeo.push(place(new THREE.BoxGeometry(0.22, 0.035, 0.02), [Math.cos(a) * (radius + 0.42), Math.sin(a) * (radius + 0.42), 0], [0, 0, a + Math.PI / 2]));
     }
-    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.9, 0.7).multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false });
+    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.92, 1.0).multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false });
     this.dashes = new THREE.Mesh(merge(dashGeo.map((g) => { g.deleteAttribute('uv'); return g; })), dashMat);
     this.group.add(this.dashes);
   }
