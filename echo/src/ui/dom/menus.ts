@@ -76,6 +76,23 @@ const sparkle = (button: HTMLElement, event: MouseEvent): void => {
   void Promise.allSettled(motes).then(() => layer.remove());
 };
 
+/** Small line icons for the title's utility buttons, drawn in the text colour. */
+const ICONS = {
+  chapters: '<path d="M4 5.5h16M4 12h16M4 18.5h10" />',
+  settings: '<circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" />',
+  arrow: '<path d="M5 12h13M13 6.5 18.5 12 13 17.5" />',
+} as const;
+const icon = (name: keyof typeof ICONS): SVGSVGElement => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.classList.add('icon', `icon--${name}`);
+  svg.innerHTML = ICONS[name];
+  return svg;
+};
+/** The title's words and buttons arrive once per visit; returning to the title later shows them at once. */
+let titleEntered = false;
+
 /** Title, pause, settings, chapter select and the end-of-week summary: ordinary DOM, laid over the canvas. */
 class Menus {
   private readonly root = document.getElementById('ui') as HTMLElement;
@@ -179,7 +196,9 @@ class Menus {
     const menu = el('div', 'menu menu--title');
     const save = loadProgress();
     const buttons = el('div', 'buttons');
-    buttons.append(button('Begin the week', 'btn--primary', () => this.begin('monday', freshState())));
+    const begin = button('Begin the week', 'btn--primary btn--go', () => this.begin('monday', freshState()));
+    begin.append(icon('arrow'));
+    buttons.append(begin);
     if (save && save.chapter !== 'monday') {
       buttons.append(button(`Continue · ${save.chapter[0]!.toUpperCase()}${save.chapter.slice(1)}`, '', () => this.begin(save.chapter, save.state)));
     }
@@ -188,13 +207,25 @@ class Menus {
         void this.game.xr.enter().then(() => this.begin('monday', freshState()), (e: unknown) => console.warn('Could not start VR:', e));
       }));
     }
-    const row = el('div', 'buttons buttons--row');
-    row.append(button('Chapters', 'btn--quiet', () => this.showChapters()), button('Settings', 'btn--quiet', () => this.showSettings(() => void this.showTitle())));
+    // chapters and settings live apart from the main action, in the corner where games keep them
+    const utility = el('nav', 'utility');
+    utility.setAttribute('aria-label', 'More');
+    const chapters = button('Chapters', 'btn--utility', () => this.showChapters());
+    const settings = button('Settings', 'btn--utility', () => this.showSettings(() => void this.showTitle()));
+    chapters.prepend(icon('chapters'));
+    settings.prepend(icon('settings'));
+    utility.append(chapters, settings);
     const head = el('div', 'head'), actions = el('div', 'actions');
     head.append(el('h1', 'logo', 'ECHO'), el('p', 'logo-sub', 'Between Two Worlds'),
       el('p', 'tagline', 'A week in 2080 with an AI companion who always understands you, a classmate who does not always agree, and a vote that shapes your city.'));
-    actions.append(buttons, row, el('p', 'fine', 'About 10 minutes · Sound on · Ages 11 to 14'));
-    menu.append(head, actions);
+    actions.append(buttons, el('p', 'fine', 'About 10 minutes · Sound on · Ages 11 to 14'));
+    menu.append(head, actions, utility);
+    if (!titleEntered) {
+      titleEntered = true;
+      menu.classList.add('enter');
+      // the order things arrive in: the name, its subtitle, the line, the action, then the corner
+      [...Array.from(head.children), actions, utility].forEach((part, i) => (part as HTMLElement).style.setProperty('--i', String(i)));
+    }
     menu.classList.toggle('tall', this.title.view === 'tall');
     this.show(menu);
     // the picture comes up behind the title

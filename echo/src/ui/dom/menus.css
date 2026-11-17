@@ -561,3 +561,90 @@
     display: none;
   }
 }
+
+/* ---- title: one main action on the left, utilities in the top-right corner ---- */
+.utility {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  display: flex;
+  gap: 8px;
+}
+.btn--utility {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 14px;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--dim);
+  background-color: rgba(20, 14, 42, 0.38);
+}
+.btn--utility .icon {
+  width: 16px;
+  height: 16px;
+}
+.icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.btn--go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.btn--go .icon {
+  width: 18px;
+  height: 18px;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn--utility:hover {
+    color: var(--ink);
+  }
+  .btn--go:hover .icon {
+    transform: translateX(3px);
+  }
+}
+/* the first arrival: name, subtitle, line, action and corner, one after another */
+@keyframes title-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.menu--title.enter .head > *,
+.menu--title.enter .actions,
+.menu--title.enter .utility {
+  animation: title-rise 500ms var(--ease-out) both;
+  animation-delay: calc(500ms + var(--i, 0) * 90ms);
+}
+@media (max-width: 560px) {
+  .btn--utility {
+    padding: 10px 12px;
+  }
+}
+/* on a tall screen the pause control holds the top-right corner: the utilities take the top-left, clear of the name */
+.menu--title.tall .utility {
+  right: auto;
+  left: max(16px, env(safe-area-inset-left));
+}
+.menu--title.tall {
+  padding-top: max(13vh, calc(env(safe-area-inset-top) + 76px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu--title.enter .head > *,
+  .menu--title.enter .actions,
+  .menu--title.enter .utility {
+    animation: none;
+  }
+  .btn--go .icon {
+    transition: none;
+  }
+}
