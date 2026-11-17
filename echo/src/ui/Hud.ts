@@ -16,6 +16,8 @@ export interface SubtitleLine {
 export interface ChoiceOption {
   readonly title: string;
   readonly detail?: string;
+  /** loud: bright and glowing even untouched, the one the screen wants you to pick. quiet: small and grey. */
+  readonly emphasis?: 'loud' | 'quiet';
 }
 
 interface Painted {
@@ -942,27 +944,29 @@ export class Hud {
     const o = c.options[index];
     if (!o) return;
     const hover = c.hover === index;
+    const loud = o.emphasis === 'loud', quiet = o.emphasis === 'quiet';
     item.widget.panel.paint((ctx, w, h) => {
       const bw = w - PAD * 2, bh = h - PAD * 2;
+      ctx.globalAlpha = quiet && !hover ? 0.5 : 1;
       // a second coat under the glass: whatever is behind a choice must not read through it
       ctx.fillStyle = 'rgba(10, 11, 22, 0.62)';
       roundRect(ctx, PAD, PAD, bw, bh, 22);
       ctx.fill();
-      glass(ctx, PAD, PAD, bw, bh, this.theme, { radius: 22, glow: hover ? 1.6 : 0.8, border: hover ? this.theme.accent : undefined, borderWidth: hover ? 2.5 : 1.5, wash: hover ? 'rgba(255,255,255,0.09)' : undefined });
+      glass(ctx, PAD, PAD, bw, bh, this.theme, { radius: 22, glow: hover || loud ? (loud ? 2.4 : 1.6) : 0.8, border: hover || loud ? this.theme.accent : undefined, borderWidth: hover || loud ? 2.5 : 1.5, wash: loud ? 'rgba(255,255,255,0.14)' : hover ? 'rgba(255,255,255,0.09)' : undefined });
       // letter badge; the key that picks it on a keyboard
       const bx = PAD + 22, by = PAD + 22;
-      ctx.fillStyle = hover ? this.theme.accent : 'rgba(255,255,255,0.12)';
+      ctx.fillStyle = hover || loud ? this.theme.accent : 'rgba(255,255,255,0.12)';
       roundRect(ctx, bx, by, 36, 36, 11);
       ctx.fill();
-      ctx.fillStyle = hover ? '#1b1430' : this.theme.text;
+      ctx.fillStyle = hover || loud ? '#1b1430' : this.theme.text;
       ctx.font = font(700, 18);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       // numbers are also the keys that pick; letters on a touch screen, but never in a headset, where A and B are buttons that do something else
       ctx.fillText(this.mode === 'touch' ? 'ABC'[index] ?? '' : String(index + 1), bx + 18, by + 19);
       ctx.textAlign = 'left';
-      ctx.fillStyle = this.theme.text;
-      ctx.font = font(600, 22);
+      ctx.fillStyle = quiet ? this.theme.dim : this.theme.text;
+      ctx.font = font(loud ? 700 : quiet ? 400 : 600, loud ? 25 : quiet ? 17 : 22);
       const titleLines = wrap(ctx, o.title, bw - 110);
       titleLines.forEach((line, i) => ctx.fillText(line, bx + 52, by + 19 + i * 28));
       if (o.detail) {
@@ -971,8 +975,11 @@ export class Hud {
         const y0 = by + 19 + titleLines.length * 28 + 12;
         wrap(ctx, o.detail, bw - 56).forEach((line, i) => ctx.fillText(line, PAD + 28, y0 + i * 23));
       }
+      ctx.globalAlpha = 1;
     });
-    item.widget.panel.mesh.scale.set(item.widget.panel.width * (hover ? 1.025 : 1), item.widget.panel.height * (hover ? 1.025 : 1), 1);
+    // the quiet one is drawn smaller, the loud one a touch bigger
+    const size = (quiet ? 0.78 : loud ? 1.06 : 1) * (hover ? 1.025 : 1);
+    item.widget.panel.mesh.scale.set(item.widget.panel.width * size, item.widget.panel.height * size, 1);
   }
 
 }

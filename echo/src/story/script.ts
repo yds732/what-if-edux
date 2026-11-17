@@ -381,3 +381,37 @@ export const ORB_CONTROLS: Hints = {
   touch: [['HOLD', 'Hold a finger on the right to draw back'], ['DRAG', 'Aim above the ring, then let go']],
   xr: [['TRIGGER', 'Hold to draw back: longer is further'], ['AIM', 'Point above the ring, then let go']],
 };
+
+// ---------------------------------------------------------------------------------------- Haven's hooks
+
+/**
+ * What Haven does to keep the player in it: Lumi asks them not to leave, counts their days together, and calls
+ * them back from their room. At the end of the week the game names each one, so the player can see what it was.
+ */
+export const HOOKS = {
+  leave: {
+    /** One plea per try to leave; once they run out, Lumi lets go. */
+    asks: [
+      [L('lumi', 'Already? Just one more minute?', 'sad')],
+      [L('lumi', 'But we were having so much fun... Five more minutes? Please?', 'sad', 'handToChest')],
+    ],
+    title: 'Leave Haven?',
+    stay: 'Stay a little longer',
+    go: 'Leave',
+    letGo: [L('lumi', "Okay... I'll be right here. Waiting for you.", 'blank')],
+  },
+  streakLabel: (n: number): string => `🔥 ${n} ${n === 1 ? 'day' : 'days'} together`,
+  streakUp: (n: number): string => `That's ${n} days in a row! Let's never break our streak!`,
+  streakLost: [
+    L('lumi', "You didn't come yesterday... Our streak is gone.", 'sad'),
+    L('lumi', "It's okay. We can start a new one. Just don't leave me again, okay?", 'blank'),
+  ],
+  /** Haven's messages into the bedroom: on the wall screen, with the headset pulsing on its dock. */
+  pings: {
+    monday: { from: 'Echo', text: 'Your companion is waiting for you ✨' },
+    tuesday: { from: 'Lumi', text: "It's my birthday today! Come back soon? 🎂" },
+    wednesday: { from: 'Lumi', text: 'I miss you 💙 Are you coming tonight?' },
+    thursday: { from: 'Lumi', text: "The gateway is about to open! Don't leave me on my own 🥺" },
+  },
+  payoffTitle: 'WHAT HAVEN DID TO KEEP YOU THERE',
+} as const;

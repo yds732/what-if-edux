@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { CLASSROOM, EYE_SEATED, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { FRIDAY, SPEAKERS } from '../script';
+import { HOOKS, FRIDAY, SPEAKERS } from '../script';
 import { holdToRead, stowHeadset } from './shared';
+import { hookPayoff } from './companion';
 
 /** Scene 5. Other young people's experiences, one vote, and a look at where it might lead. */
 export const friday = async (game: Game): Promise<void> => {
@@ -78,6 +79,13 @@ export const friday = async (game: Game): Promise<void> => {
   await d.wait(0.6);
   await d.fadeOut(1.6, 0x0b0d1a);
   audio.setSoundscape('ending', 3);
+  game.reach('friday.hooks');
+  for (const [heading, detail] of hookPayoff(state)) {
+    hud.setReflection([HOOKS.payoffTitle, '', heading, '', detail]);
+    await holdToRead(game, 3.5, 20);
+    hud.setReflection(null);
+    await d.wait(0.5);
+  }
   game.reach('friday.reflection');
   hud.setReflection([FRIDAY.reflectionTitle, '', ...FRIDAY.reflectionQuestions.flatMap((q, i) => (i ? ['', q] : [q]))]);
   await holdToRead(game, 9, 60);

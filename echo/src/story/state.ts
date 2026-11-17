@@ -11,9 +11,23 @@ export interface StoryState {
   policyChoice: Policy | null;
   /** Lumi's birthday present: not asked for yet, asked for, a gem in hand, or given. */
   lumiGift: 'none' | 'asked' | 'carrying' | 'given';
+  // ---- what Haven does to keep the player, counted so the end can show it back to them. Not a score. ----
+  /** Days in a row spent with Lumi, the best run, whether a break is still to be mentioned, and whether one ever happened. */
+  streak: number;
+  streakBest: number;
+  streakLost: boolean;
+  streakBroke: boolean;
+  /** Times Lumi asked the player not to leave, and times the player stayed. */
+  leaveAsks: number;
+  stayedOn: number;
+  /** Messages Haven sent into the bedroom. */
+  pings: number;
 }
 
-export const freshState = (): StoryState => ({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none' });
+export const freshState = (): StoryState => ({
+  tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none',
+  streak: 0, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0,
+});
 
 interface Save {
   readonly version: 1;

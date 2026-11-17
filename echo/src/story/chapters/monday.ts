@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { CONTROLS, MONDAY } from '../script';
+import { CONTROLS, HOOKS, MONDAY } from '../script';
 import type { Interactable } from '../../player/Interaction';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
-import { giveGem, holdGem, refreshSideTasks, lumiTour, takeGem } from './companion';
+import { giveGem, havenCalls, holdGem, labelLumi, lumiPleads, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
 
 /** Scene 1. The pilot is announced; the player volunteers, goes home, and puts the headset on for the first time. */
 export const monday = async (game: Game): Promise<void> => {
@@ -68,10 +68,12 @@ export const monday = async (game: Game): Promise<void> => {
   game.reach('monday.bedroom');
   await d.fadeIn(1.4);
   d.objective(MONDAY.objectiveWear);
+  const call = havenCalls(game, bedroom, HOOKS.pings.monday);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
     onFocus: (on) => headset.setPower(on ? 1 : 0.25),
   });
+  call();
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
@@ -89,7 +91,7 @@ export const monday = async (game: Game): Promise<void> => {
   const guide = haven.companion;
   haven.showCompanion(true);
   guide.setAlert(true);
-  guide.setLabel(MONDAY.birthdayLabel);
+  labelLumi(game, haven, MONDAY.birthdayLabel);
   refreshSideTasks(game);
   player.canMove = true;
   d.objective(MONDAY.objectiveLumi);
@@ -102,6 +104,7 @@ export const monday = async (game: Game): Promise<void> => {
   await d.play(MONDAY.lumiHello);
   const trust = await d.choose(MONDAY.trust.title, MONDAY.trust.options);
   await d.play(trust === 0 ? MONDAY.trustYes : MONDAY.trustMaybe);
+  await tickStreak(game, haven);
   player.canMove = true;
 
   // ---- the tour: Lumi leads, the player follows ----
@@ -117,6 +120,7 @@ export const monday = async (game: Game): Promise<void> => {
 const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, input, state } = game;
   const guide = haven.companion;
+  let asks = 0;
   for (;;) {
     d.objective(MONDAY.objectiveFree);
     let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
@@ -142,7 +146,11 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       for (const item of items) game.interaction.remove(item);
     }
     const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
-    if (did === 'off' || did === null) break;
+    if (did === null) break;
+    if (did === 'off') {
+      if (await lumiPleads(game, haven, asks++)) continue;
+      break;
+    }
     if (did === 'talk') {
       player.canMove = false;
       guide.mode = 'still';

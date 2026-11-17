@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroom/BedroomWorld';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
-import { MONDAY, THURSDAY } from '../script';
-import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, stowHeadset, waitHeadsetOff, waitUse } from './shared';
+import { HOOKS, MONDAY, THURSDAY } from '../script';
+import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, stowHeadset, waitUse } from './shared';
+import { breakStreak, havenCalls, labelLumi, leaveWhenLumiLets, tickStreak } from './companion';
 
 /** Scene 4. The Starlight Festival and Jamie's rehearsal fall on the same evening. */
 export const thursday = async (game: Game): Promise<void> => {
@@ -11,6 +12,7 @@ export const thursday = async (game: Game): Promise<void> => {
   app.fx.fade = 1;
   const haven = (await d.enter('haven', HAVEN.spawn)) as HavenWorld;
   haven.setVariant('festival');
+  labelLumi(game, haven, null);
   stowHeadset(game);
   game.hands.setStyle('haven', true);
   game.hands.pose('rest');
@@ -35,11 +37,12 @@ export const thursday = async (game: Game): Promise<void> => {
   audio.sfx('notify');
   hud.setToast(THURSDAY.notification);
   d.objective(THURSDAY.objectiveRemove);
-  await waitHeadsetOff(game, THURSDAY.promptRemove);
+  await leaveWhenLumiLets(game, haven, THURSDAY.promptRemove);
   hud.setToast(null);
   d.objective(null);
   player.canMove = false;
   const bedroom = await leaveHaven(game, 1);
+  const call = havenCalls(game, bedroom, HOOKS.pings.thursday);
   player.canMove = true;
   d.objective(THURSDAY.objectivePhone);
   game.reach('thursday.bedroom');
@@ -64,6 +67,8 @@ export const thursday = async (game: Game): Promise<void> => {
   game.reach('thursday.decision');
   const pick = await d.choose(THURSDAY.decision.title, THURSDAY.decision.options);
   state.thursdayChoice = pick === 0 ? 'help' : 'haven';
+  call();
+  if (state.thursdayChoice === 'help') breakStreak(state);
   if (state.thursdayChoice === 'help') await helpJamie(game, bedroom, thread);
   else await returnToHaven(game, bedroom, thread);
   await d.reflect(THURSDAY.reflection, 6.5);
@@ -112,6 +117,7 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   player.canMove = false;
   await liftHeadset(game);
   const haven = await enterHaven(game, 'festival');
+  labelLumi(game, haven, null);
   // back where the player left off, partway across
   const partway = haven.bridge.path.getPointAt(0.3);
   player.position.set(partway.x, partway.y, partway.z);
@@ -119,6 +125,7 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   game.reach('thursday.return');
   for (const name of ['lumi', 'kai', 'nova'] as const) haven.cast[name]!.lookAtPoint(game.playerEye);
   await d.play(THURSDAY.haven.back);
+  await tickStreak(game, haven);
   d.objective(THURSDAY.haven.objective);
   const end = haven.bridge.path.getPointAt(1);
   await d.walkTo(end.x, end.z - 1.5, 2.6);

@@ -3,8 +3,9 @@ import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, SEAT, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
 import { HAVEN } from '../../world/haven/HavenWorld';
-import { MONDAY, WEDNESDAY } from '../script';
+import { HOOKS, MONDAY, WEDNESDAY } from '../script';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { havenCalls, labelLumi, tickStreak } from './companion';
 
 /** Scene 3. A disagreement with a classmate, and a companion who agrees with everyone. */
 export const wednesday = async (game: Game): Promise<void> => {
@@ -68,10 +69,12 @@ export const wednesday = async (game: Game): Promise<void> => {
   game.reach('wednesday.bedroom');
   await d.fadeIn(1.4);
   d.objective(WEDNESDAY.objectiveWear);
+  const call = havenCalls(game, bedroom, HOOKS.pings.wednesday);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
     onFocus: (on) => headset.setPower(on ? 1 : 0.25),
   });
+  call();
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
@@ -81,6 +84,8 @@ export const wednesday = async (game: Game): Promise<void> => {
   lumi.lookAtPoint(game.playerEye);
   await d.wait(1.2);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.1);
+  labelLumi(game, haven, null);
+  await tickStreak(game, haven);
   await d.play(WEDNESDAY.evening);
 
   // ---- the pause ----

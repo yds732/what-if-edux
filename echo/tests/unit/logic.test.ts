@@ -205,7 +205,8 @@ describe('the script', () => {
 
 describe('story state', () => {
   it('starts with nothing decided and no score to keep', () => {
-    expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none' });
+    expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none',
+      streak: 0, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0 });
   });
   it('knows the five days in order', () => {
     expect(CHAPTERS).toEqual(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);

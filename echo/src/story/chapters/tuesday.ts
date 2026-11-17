@@ -3,9 +3,9 @@ import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
-import { MONDAY, TUESDAY } from '../script';
-import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, playRings, stowHeadset, waitHeadsetOff, waitUse } from './shared';
-import { giveGem, holdGem, pickGem, refreshSideTasks } from './companion';
+import { HOOKS, MONDAY, TUESDAY } from '../script';
+import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, playRings, stowHeadset, waitUse } from './shared';
+import { breakStreak, giveGem, havenCalls, holdGem, labelLumi, leaveWhenLumiLets, pickGem, refreshSideTasks, tickStreak } from './companion';
 
 /** Scene 2. The Star Bridge, a message from the real world, and the first decision. */
 export const tuesday = async (game: Game): Promise<void> => {
@@ -14,7 +14,7 @@ export const tuesday = async (game: Game): Promise<void> => {
   const haven = (await d.enter('haven', HAVEN.spawn)) as HavenWorld;
   haven.setVariant('arrival');
   haven.showCompanion(true);
-  haven.companion.setLabel(TUESDAY.birthdayLabel);
+  labelLumi(game, haven, TUESDAY.birthdayLabel);
   haven.companion.person.lookAtPoint(game.playerEye);
   // a gem carried over from Monday waits until there is a free hand for it
   holdGem(game, false);
@@ -74,11 +74,13 @@ export const tuesday = async (game: Game): Promise<void> => {
   hud.setToast(TUESDAY.notification);
   d.objective(TUESDAY.objectiveRemove);
   game.reach('tuesday.notify');
-  await waitHeadsetOff(game, TUESDAY.promptRemove);
+  await leaveWhenLumiLets(game, haven, TUESDAY.promptRemove);
   hud.setToast(null);
   d.objective(null);
   player.canMove = false;
   const bedroom = await leaveHaven(game, 0.1);
+  // Lumi is already asking for the player back
+  const call = havenCalls(game, bedroom, HOOKS.pings.tuesday);
   player.canMove = true;
   d.objective(TUESDAY.objectivePhone);
   game.reach('tuesday.bedroom');
@@ -91,6 +93,8 @@ export const tuesday = async (game: Game): Promise<void> => {
   game.reach('tuesday.decision');
   const pick = await d.choose(TUESDAY.decision.title, TUESDAY.decision.options);
   state.tuesdayChoice = pick === 0 ? 'meet' : 'haven';
+  call();
+  if (state.tuesdayChoice === 'meet') breakStreak(state);
   if (state.tuesdayChoice === 'meet') await meetJamie(game, bedroom, thread);
   else await stayInHaven(game, bedroom, thread);
   await d.fadeOut(1.2);
@@ -168,13 +172,14 @@ const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   haven.bridge.rings.forEach((ring) => ring.setState('lit', true));
   const guide = haven.companion;
   haven.showCompanion(true, { x: 0.6, z: 1.6, yaw: Math.PI });
-  guide.setLabel(TUESDAY.birthdayLabel);
+  labelLumi(game, haven, TUESDAY.birthdayLabel);
   guide.mode = 'still';
   player.canMove = true;
   game.reach('tuesday.lumi');
   guide.person.lookAtPoint(game.playerEye);
   player.faceToward(guide.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);
+  await tickStreak(game, haven);
   guide.mode = 'roam';
 
   // ---- Lumi's present ----

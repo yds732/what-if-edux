@@ -76,6 +76,10 @@ export class BedroomWorld extends World {
   private holoShown = 0;
   private holoTarget = 0;
   private alert = false;
+  /** A message from Haven on the wall screen, pulsing until it is answered. */
+  private ping!: ReturnType<typeof buildPing>;
+  private pingOn = false;
+  private pingShown = 0;
   private callShown = 0;
   private callTarget = 0;
   private rain!: THREE.Mesh;
@@ -175,6 +179,10 @@ export class BedroomWorld extends World {
     board.position.set(-W + 0.002, H / 2, 1.2);
     board.rotation.y = Math.PI / 2;
     scene.add(board);
+    // Haven's messages land on top of the routine screen, over the alarms
+    this.ping = buildPing(1.12, 0.3);
+    this.ping.mesh.position.set(0, (H * 0.65) / 2 - 0.26, 0.034);
+    board.add(this.ping.mesh);
     // a sports bottle on the desk, and a book left open face down on the bed
     scene.add(buildBottle(0.42, deskTop, -2.46));
     scene.add(buildBook(bx + 0.08, MATTRESS_TOP, bz + 0.38, 28));
@@ -427,6 +435,12 @@ export class BedroomWorld extends World {
     this.alert = on;
   }
 
+  /** A message from Haven on the wall screen, or null to clear it. */
+  setPing(message: { from: string; text: string } | null): void {
+    this.pingOn = !!message;
+    if (message) this.ping.paint(message.from, message.text);
+  }
+
   /** Shows the phone's hologram with a chat thread and an optional footer; null closes it. */
   setMessages(messages: readonly ChatMessage[] | null, footer?: { left: string; right: string } | null): void {
     if (!messages) {
@@ -516,6 +530,10 @@ export class BedroomWorld extends World {
     this.hologram.mesh.position.y = BEDROOM.hologram.y + Math.sin(time * 1.1) * 0.008 - (1 - this.holoShown) * 0.12;
     (this.beam.material as THREE.ShaderMaterial).uniforms.uShow!.value = Math.max(this.holoShown, this.callShown);
     this.dockGlow.value = this.dockFull * (1 + 0.3 * Math.sin(time * 2));
+    this.pingShown = damp(this.pingShown, this.pingOn ? 1 : 0, 6, dt);
+    this.ping.mesh.visible = this.pingShown > 0.01;
+    this.ping.material.opacity = this.pingShown * (0.82 + 0.18 * Math.sin(time * 4));
+    this.ping.mesh.scale.setScalar(0.9 + 0.1 * this.pingShown);
     const jamie = this.cast.jamie!;
     if (jamie.root.visible) {
       jamie.root.scale.setScalar(0.34 * Math.max(0.001, this.callShown));
@@ -667,6 +685,48 @@ const buildDesk = (): THREE.Group => {
 };
 
 // ---- the routine screen, the bottle and the book ----
+
+/** A notification banner for the routine screen: who it is from and what it says. Faces +Z; hidden until painted. */
+const buildPing = (wide: number, tall: number): { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial; paint: (from: string, text: string) => void } => {
+  const px = 900, py = Math.round((px * tall) / wide);
+  const canvas = document.createElement('canvas');
+  canvas.width = px;
+  canvas.height = py;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), material);
+  mesh.visible = false;
+  mesh.renderOrder = 2;
+  const paint = (from: string, text: string): void => {
+    const c = canvas.getContext('2d')!;
+    c.clearRect(0, 0, px, py);
+    c.fillStyle = 'rgba(14, 26, 48, 0.96)';
+    roundRect(c, 6, 6, px - 12, py - 12, 40);
+    c.fill();
+    c.strokeStyle = '#8feaff';
+    c.lineWidth = 5;
+    c.stroke();
+    // a glowing dot for the sender, then the name and the message
+    const cy = py / 2;
+    c.fillStyle = '#8feaff';
+    c.beginPath(); c.arc(78, cy, 34, 0, TAU); c.fill();
+    c.fillStyle = '#0e1a30';
+    c.font = font(700, 36);
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(from.slice(0, 1), 78, cy + 2);
+    c.textAlign = 'left';
+    c.fillStyle = '#8feaff';
+    c.font = font(700, 30);
+    c.fillText(from, 136, cy - 36);
+    c.fillStyle = '#ffffff';
+    c.font = font(500, 34);
+    wrap(c, text, px - 170).slice(0, 2).forEach((line, i) => c.fillText(line, 136, cy + 8 + i * 40));
+    texture.needsUpdate = true;
+  };
+  return { mesh, material, paint };
+};
 
 /** A wall screen that helps with the day: the two alarms, and the week's weather as symbols. Faces +Z; its origin is its middle. */
 const buildRoutineBoard = (wide: number, tall: number): THREE.Group => {

@@ -4,7 +4,10 @@ import type { Interactable } from '../../player/Interaction';
 import { makeGem } from '../../world/haven/gem';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { glowScreenEdges } from '../../ui/dom/taskGlow';
-import { MONDAY, SPEAKERS } from '../script';
+import { HOOKS, MONDAY, SPEAKERS } from '../script';
+import type { StoryState } from '../state';
+import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
+import { waitHeadsetOff } from './shared';
 
 /**
  * Lumi's part of the story: the tour of Haven, its birthday, and the gem it asks for. Shared by Monday (where it
@@ -137,4 +140,126 @@ export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   await d.play(MONDAY.thanksGift);
   guide.mode = 'roam';
   player.canMove = true;
+};
+
+// ---------------------------------------------------------------------------------------- Haven's hooks
+
+let labelExtra: string | null = null;
+
+/** The caption over Lumi: the streak, if there is one, above `extra` (such as the birthday). */
+export const labelLumi = (game: Game, haven: HavenWorld, extra: string | null = labelExtra): void => {
+  labelExtra = extra;
+  const n = game.state.streak;
+  haven.companion.setLabel([n > 0 ? HOOKS.streakLabel(n) : null, extra].filter(Boolean).join('\n') || null);
+};
+
+/**
+ * Another day with Lumi. A streak broken since the last visit is mentioned first, and starts again from one.
+ * Anything past the first day is celebrated, out loud.
+ */
+export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> => {
+  const { state, director: d, audio } = game;
+  if (state.streakLost) {
+    state.streakLost = false;
+    state.streak = 0;
+    await d.play(HOOKS.streakLost);
+  }
+  state.streak++;
+  state.streakBest = Math.max(state.streakBest, state.streak);
+  labelLumi(game, haven);
+  if (state.streak < 2) return;
+  audio.sfx('taskDone');
+  glowScreenEdges('255, 160, 70');
+  haven.bursts.emit(haven.companion.chest.clone().add(new THREE.Vector3(0, 0.9, 0)), { count: 40, color: new THREE.Color(1, 0.6, 0.2), color2: new THREE.Color(1, 0.9, 0.4), speed: 1.6, life: 0.9, size: 0.1, gravity: -0.3 });
+  await bark(game, haven, HOOKS.streakUp(state.streak));
+};
+
+/** The real world won: the streak goes, and Lumi will bring it up next time. */
+export const breakStreak = (state: StoryState): void => {
+  if (state.streak === 0) return;
+  state.streak = 0;
+  state.streakLost = true;
+  state.streakBroke = true;
+};
+
+/**
+ * Waits for the player to take the headset off, with Lumi asking them not to each time: staying is the big bright
+ * button, leaving the small grey one. Once its pleas run out, Lumi lets them go.
+ */
+export const leaveWhenLumiLets = async (game: Game, haven: HavenWorld, prompt: string): Promise<void> => {
+  for (let ask = 0; ; ask++) {
+    await waitHeadsetOff(game, prompt);
+    if (!(await lumiPleads(game, haven, ask))) return;
+  }
+};
+
+/** Lumi's plea when the player tries to leave; true if they stay. */
+export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Promise<boolean> => {
+  const { director: d, player, state } = game;
+  haven.cast.lumi!.lookAtPoint(game.playerEye);
+  const could = player.canMove;
+  player.canMove = false;
+  try {
+    const plea = HOOKS.leave.asks[ask];
+    if (!plea) {
+      await d.play(HOOKS.leave.letGo);
+      return false;
+    }
+    state.leaveAsks++;
+    await d.play(plea);
+    const pick = await d.choose(HOOKS.leave.title, [{ title: HOOKS.leave.stay, emphasis: 'loud' }, { title: HOOKS.leave.go, emphasis: 'quiet' }]);
+    if (pick === 0) state.stayedOn++;
+    return pick === 0;
+  } finally {
+    player.canMove = could;
+  }
+};
+
+/**
+ * Haven calls the player back while they are in their room: a message on the wall screen and the headset pulsing
+ * on its dock, with a chime now and then. Returns the call's end; it also ends by itself when the bedroom is left.
+ */
+export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
+  const { audio, headset, app } = game;
+  game.state.pings++;
+  bedroom.setPing(message);
+  audio.sfx('notify', { gain: 0.55 });
+  let on = true, beat = 0;
+  const stop = (): void => {
+    if (!on) return;
+    on = false;
+    bedroom.setPing(null);
+    headset.setPower(0.25);
+  };
+  void (async () => {
+    while (on) {
+      await app.tasks.tween(1.4, (k) => {
+        if (on && app.world === bedroom) headset.setPower(0.3 + 0.7 * Math.sin(k * Math.PI));
+      });
+      if (app.world !== bedroom) stop();
+      else if (on && ++beat % 5 === 0) audio.sfx('notify', { gain: 0.4 });
+    }
+  })().catch(() => stop());
+  return stop;
+};
+
+/** The end of the week: each thing Haven did to keep the player, as it happened to them. Pages of [heading, detail]. */
+export const hookPayoff = (state: StoryState): [string, string][] => {
+  const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
+  const pages: [string, string][] = [];
+  if (state.leaveAsks > 0) {
+    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi asked you to stay. It asked ${times(state.leaveAsks)}, and you stayed ${state.stayedOn ? times(state.stayedOn) : 'not at all'}. "Stay" was big and bright. "Leave" was small and grey.`]);
+  }
+  if (state.streakBest > 0) {
+    pages.push(['It counted your days.', `Your streak with Lumi reached ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}.${state.streakBroke ? ' When you chose the real world, Lumi made sure you knew the streak was gone.' : ' A number like that is hard to give up.'}`]);
+  }
+  if (state.pings > 0) {
+    pages.push(['It called you back.', `While you were in your room, Haven sent you ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} and made the headset glow on its dock.`]);
+  }
+  if (state.lumiGift !== 'none') {
+    pages.push(['It asked you for something.', "Lumi's birthday made a present feel like something you owed. Giving makes it harder to walk away."]);
+  }
+  pages.push(['It always agreed with you.', 'Whatever you said, Lumi said you were right. Jamie did not, and that is part of what made Jamie real.']);
+  pages.push(['It rewarded you, every time.', "Every task in Haven ended with a chime and a golden glow. The real world doesn't do that. Real apps use these same tricks."]);
+  return pages;
 };

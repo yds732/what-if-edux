@@ -29,37 +29,46 @@ const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial }
 };
 
 /** A small caption over the head, such as "Birthday tomorrow". */
-const buildLabel = (): { sprite: THREE.Sprite; set: (text: string | null) => void } => {
-  const canvas = document.createElement('canvas');
+const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: string | null) => void } => {
+  // up to two pills, one per line of text, stacked upward from the sprite's foot
+  const ROW = 112, canvas = document.createElement('canvas');
   canvas.width = 512;
-  canvas.height = 112;
+  canvas.height = ROW * 2;
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false }));
-  sprite.scale.set(0.82, 0.18, 1);
+  sprite.scale.set(0.82, 0.36, 1);
+  sprite.center.set(0.5, 0);
   sprite.renderOrder = 5;
   sprite.visible = false;
+  let rows = 0;
   const set = (text: string | null): void => {
-    sprite.visible = !!text;
-    if (!text) return;
+    const lines = text ? text.split('\n').filter(Boolean).slice(0, 2) : [];
+    rows = lines.length;
+    sprite.visible = rows > 0;
+    if (!rows) return;
     const g = canvas.getContext('2d')!;
     g.clearRect(0, 0, canvas.width, canvas.height);
-    g.font = '600 46px system-ui, "Segoe UI", sans-serif';
-    const w = Math.min(500, g.measureText(text).width + 64), x = (canvas.width - w) / 2;
-    g.fillStyle = 'rgba(18, 22, 34, 0.82)';
-    g.beginPath();
-    g.roundRect(x, 18, w, 76, 38);
-    g.fill();
-    g.strokeStyle = 'rgba(143, 234, 255, 0.9)';
-    g.lineWidth = 3;
-    g.stroke();
-    g.fillStyle = '#e9fbff';
+    g.font = '600 46px system-ui, "Segoe UI", "Segoe UI Emoji", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, canvas.width / 2, 58);
+    // the last line sits lowest, nearest the head
+    lines.forEach((line, i) => {
+      const top = canvas.height - ROW * (lines.length - i);
+      const w = Math.min(500, g.measureText(line).width + 64), x = (canvas.width - w) / 2;
+      g.fillStyle = 'rgba(18, 22, 34, 0.82)';
+      g.beginPath();
+      g.roundRect(x, top + 18, w, 76, 38);
+      g.fill();
+      g.strokeStyle = 'rgba(143, 234, 255, 0.9)';
+      g.lineWidth = 3;
+      g.stroke();
+      g.fillStyle = '#e9fbff';
+      g.fillText(line, canvas.width / 2, top + 58);
+    });
     texture.needsUpdate = true;
   };
-  return { sprite, set };
+  return { sprite, rows: () => rows, set };
 };
 
 /** A ring on the ground around Lumi while it leads: faint and beckoning far off, bright once you are with it. */
@@ -134,7 +143,7 @@ export class Companion {
     this.alertOn = on;
   }
 
-  /** The caption over Lumi's head, or null for none. */
+  /** The caption over Lumi's head, one or two lines split by a newline, or null for none. */
   setLabel(text: string | null): void {
     this.label.set(text);
   }
@@ -170,9 +179,9 @@ export class Companion {
     const a = this.alert.group;
     a.visible = this.alertShown > 0.01;
     const top = p.eyeHeight + 0.42;
-    this.label.sprite.position.y = top;
+    this.label.sprite.position.y = top - 0.09;
     if (a.visible) {
-      a.position.y = top + (this.label.sprite.visible ? 0.3 : 0.12) + Math.sin(this.time * 2.6) * 0.05;
+      a.position.y = top + (this.label.rows() ? 0.12 + 0.18 * this.label.rows() : 0.12) + Math.sin(this.time * 2.6) * 0.05;
       a.scale.setScalar(this.alertShown * (1 + 0.06 * Math.sin(this.time * 5.2)));
       a.quaternion.copy(p.root.quaternion).invert().multiply(camera.quaternion);
     }
