@@ -51,7 +51,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0x1d6f6a), b = new THREE.Color(0x58c9a0), glow = new THREE.Color(0x9ff0d0), c = new THREE.Color();
+  const a = new THREE.Color(0x07543a), b = new THREE.Color(0x17a86a), glow = new THREE.Color(0x6ff0a8), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 3 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -126,7 +126,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
-  const barkA = new THREE.Color(0x24181f), barkB = new THREE.Color(0x4e3438);
+  const barkA = new THREE.Color(0x1e1a2a), barkB = new THREE.Color(0x3e3450);
 
   const branch = (from: THREE.Vector3, dir: THREE.Vector3, length: number, radius: number, depth: number): void => {
     const bend = v3(rng.range(-0.8, 0.8), rng.range(-0.1, 0.5), rng.range(-0.8, 0.8));
@@ -168,6 +168,8 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
 
   // canopy: soft masses at the branch tips...
   const pinkA = new THREE.Color(0xeeb0c6), pinkB = new THREE.Color(0xfff0e6), lilac = new THREE.Color(0x7c6fa8);
+  // deep magenta-rose streaks through the pastel crown, so it has some punch
+  const rose = new THREE.Color(0xd6337f);
   const masses: THREE.BufferGeometry[] = [];
   // each branch tip carries a cluster of small puffs: light on top, deep violet underneath
   const puffs: { p: THREE.Vector3; r: number }[] = [];
@@ -219,13 +221,13 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   petals.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 4, 0), 9);
   const petalMat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.7 });
   petalMat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, windUniforms, { uPinkA: { value: pinkA }, uPinkB: { value: pinkB }, uLilac: { value: lilac } });
+    Object.assign(shader.uniforms, windUniforms, { uPinkA: { value: pinkA }, uPinkB: { value: pinkB }, uLilac: { value: lilac }, uRose: { value: rose } });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${PETAL_VS_PARS}`)
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nobjectNormal = normalize(aLeaf.xyz - vec3(0.5, 4.0, 0.2)) * 0.75 + vec3(0.0, 0.45, 0.0);')
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${PETAL_VS.replace(/objectNormal = [^;]+;/, '')}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vLeafTint, vLeafPhase; varying vec2 vLeafUv;\nuniform vec3 uPinkA, uPinkB, uLilac;')
+      .replace('#include <common>', '#include <common>\nvarying float vLeafTint, vLeafPhase; varying vec2 vLeafUv;\nuniform vec3 uPinkA, uPinkB, uLilac, uRose;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         // a cluster of blossom, not a single petal: a few round lobes around a centre, like a painted dab
         vec2 q = (vLeafUv - 0.5) * vec2(1.0, 1.16);
@@ -239,6 +241,8 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
         // lavender in the shade, soft pink in between, warm cream where the light lands
         vec3 col = mix(uLilac, uPinkA, smoothstep(0.05, 0.55, vLeafTint));
         col = mix(col, uPinkB, smoothstep(0.5, 0.95, vLeafTint));
+        // about one cluster in five is magenta-rose
+        col = mix(col, uRose, step(0.8, fract(vLeafPhase * 13.7)) * 0.85);
         diffuseColor.rgb = col * (0.9 + 0.18 * vLeafPhase) * (0.86 + 0.14 * smoothstep(0.0, 0.5, m));`)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.12 + 0.2 * vLeafTint);');
   };
@@ -258,7 +262,7 @@ export const buildGlowFlowers = (spots: readonly { x: number; y: number; z: numb
   for (const s of spots) {
     const lean = v3(Math.sin(s.x * 7.1) * 0.08, 0, Math.cos(s.z * 5.3) * 0.08);
     const top = v3(s.x + lean.x * s.h * 2, s.y + s.h, s.z + lean.z * s.h * 2);
-    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x2f8a78));
+    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x1f8a70));
     const b = blob(0.03 * (0.7 + s.h), 0.042 * (0.7 + s.h), 0.03 * (0.7 + s.h), 2, (p) => { if (p.y > 0) p.multiplyScalar(1 - 0.25 * p.y); });
     bulbs.push(tint(place(b, top), s.color));
   }

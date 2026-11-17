@@ -56,6 +56,7 @@ export const runShot = async (canvas: HTMLCanvasElement, params: URLSearchParams
   app.renderAt(t); // second draw: shadow maps and any one-frame-late targets have settled
   window.__INFO = { ...app.info, buildMs: Math.round(performance.now() - t0), world: name };
   if (params.has('live')) app.start();
-  (window as any).__world = world; window.__READY = true;
+  // `__app.renderAt(t)` lets a capture's @eval change the world and then step the clock on to see it
+  (window as any).__world = world; (window as any).__app = app; window.__READY = true;
   return app;
 };

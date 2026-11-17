@@ -98,6 +98,7 @@ export class App {
     this.world?.scene.remove(this.rig);
     this.world = world;
     world.scene.add(this.rig);
+    this.governor.reset();
     this.camera.near = world.near;
     this.camera.far = world.far;
     this.camera.updateProjectionMatrix();
@@ -120,7 +121,11 @@ export class App {
     this.renderer.setSize(w, h, false);
     const bw = w * dpr, bh = h * dpr;
     const cap = Math.min(1, Math.sqrt(this.quality.maxPixels / (bw * bh)));
-    const scale = cap * this.governor.scale;
+    // never draw the world much below the window's own size: under it, edges step and the scene looks smeared
+    // beside the crisp HUD. On a high-density screen that still leaves room to save work (85% of the window's pixels
+    // across); a fixed scale (captures, `?scale=`) is taken as asked.
+    const floor = this.governor.isFixed ? 0 : Math.min(1, 0.85 / dpr);
+    const scale = Math.max(floor, cap * this.governor.scale);
     this.post.setSize(bw * scale, bh * scale);
     this.camera.aspect = w / h;
     this.info.scale = scale;
