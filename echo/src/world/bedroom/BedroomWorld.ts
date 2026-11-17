@@ -78,6 +78,7 @@ export class BedroomWorld extends World {
   private callTarget = 0;
   private rain!: THREE.Mesh;
   private dust!: Motes;
+  private holoDesk!: { group: THREE.Group; update(time: number): void };
   private readonly clock = { value: 0 };
   private readonly lightDirection = new THREE.Vector3();
 
@@ -143,8 +144,14 @@ export class BedroomWorld extends World {
     this.lampGlow = glowOf(await dress(ctx, scene, 'bedside', [[LAMP.x, 0, LAMP.z, 15]]));
     this.lampFull = this.lampGlow.value;
     scene.add(buildDesk());
-    await dress(ctx, scene, 'desk-chair', [[CHAIR.x, 0, CHAIR.z, 205]]);
-    scene.add(buildMonitor(1.72, deskTop, -2.27, 0));
+    // an egg chair on a pedestal, turned a little out from the desk, its seam lit
+    scene.add(buildPodChair(CHAIR.x, CHAIR.z, 30));
+    // the study station: a projector puck throwing a glass screen, a slowly turning planet and two side cards
+    this.holoDesk = buildHoloStation(1.25, deskTop, -2.22);
+    scene.add(this.holoDesk.group);
+    // a glass orb with a warm light inside, in the corner of the desk, and a little stack of books
+    scene.add(buildOrb(2.02, deskTop, -1.62));
+    scene.add(buildBookStack(0.68, deskTop, -2.38, -8));
     await dress(ctx, scene, 'slate', [[DESK.x - 0.2, deskTop, DESK.z + 0.1, 12]]);
     this.dockGlow = glowOf(await dress(ctx, scene, 'dock', [[BEDROOM.dock.x, deskTop, BEDROOM.dock.z]]));
     this.dockFull = this.dockGlow.value;
@@ -162,7 +169,7 @@ export class BedroomWorld extends World {
     board.rotation.y = Math.PI / 2;
     scene.add(board);
     // a sports bottle on the desk, and a book left open face down on the bed
-    scene.add(buildBottle(1.12, deskTop, -2.42));
+    scene.add(buildBottle(0.42, deskTop, -2.46));
     scene.add(buildBook(bx + 0.08, MATTRESS_TOP, bz + 0.38, 28));
     await ctx.step('bedroom: furniture');
 
@@ -309,6 +316,8 @@ export class BedroomWorld extends World {
     strip([1.0, 0.006, 0.008], [WARDROBE.x, 1.905, D - 0.04], [WARDROBE.x, 2.1, D - 0.12], 0.8, 2.4);
     // on each shelf, a strip along the front edge of the platform itself, under its lip, lighting the shelf below and the wall
     for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3);
+    // and one you can see: a thin warm line along the desk's front edge
+    strips.box('glow', LED_COLOR, [W - TOP.retDeep - TOP.bend - TOP.start - 0.06, 0.008, 0.006], [(TOP.start + W - TOP.retDeep - TOP.bend) / 2, TOP.y - TOP.slab - 0.004, -D + TOP.deep + 0.002]);
     this.ledGlow = strips.finish(scene, { glow: 2.2, shadows: false }).glow!;
 
     this.dust = buildMotes(Math.round(60 * ctx.quality.density), v3(LAMP.x + 0.3, 0.4, LAMP.z + 0.5), v3(1.0, 1.1, 0.9), rng.fork(), this.clock, { a: 0xffc890, b: 0xffe9c8, size: 0.015, gain: 0.7 });
@@ -473,6 +482,7 @@ export class BedroomWorld extends World {
     super.update(frame);
     const { dt, time } = frame;
     this.city.update(time);
+    this.holoDesk.update(time);
     this.clock.value = time;
     this.dust.setPixelHeight(frame.pixelHeight);
     if (Math.abs(this.night - this.nightTarget) > 0.001) {
@@ -638,27 +648,6 @@ const buildDesk = (): THREE.Group => {
   return group;
 };
 
-/** A large, slim monitor: an edge-to-edge dark glass screen, a white ceramic back no thicker than a finger, on a slender neck and a round oak foot. */
-const buildMonitor = (x: number, y: number, z: number, yawDeg: number): THREE.Group => {
-  const group = new THREE.Group();
-  const wide = 0.86, tall = 0.37, thick = 0.008, lift = 0.17;
-  const back = new THREE.Mesh(new THREE.BoxGeometry(wide, tall, thick), new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.4 }));
-  back.position.set(0, lift + tall / 2, 0);
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(wide - 0.004, tall - 0.004), new THREE.MeshPhysicalMaterial({ color: 0x07090d, roughness: 0.08, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 }));
-  screen.position.set(0, lift + tall / 2, thick / 2 + 0.0005);
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.011, lift + 0.08, 16), new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.35 }));
-  neck.position.set(0, (lift + 0.08) / 2, -0.03);
-  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.115, 0.012, 40), new THREE.MeshStandardMaterial({ map: oakGrain(), roughness: 0.55 }));
-  foot.position.set(0, 0.006, -0.03);
-  for (const m of [back, screen, neck, foot]) {
-    m.castShadow = m.receiveShadow = true;
-    group.add(m);
-  }
-  group.position.set(x, y, z);
-  group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
-  return group;
-};
-
 // ---- the routine screen, the bottle and the book ----
 
 /** A wall screen that helps with the day: the two alarms, and the week's weather as symbols. Faces +Z; its origin is its middle. */
@@ -820,6 +809,206 @@ const buildBook = (x: number, y: number, z: number, yawDeg: number): THREE.Group
   spine.position.set(0, rise + 0.016, 0);
   group.add(spine);
   group.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, y, z);
+  group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
+};
+
+// ---- the futuristic pieces: the egg chair, the hologram station, the orb and the books ----
+
+/** An egg chair: a white shell open at the front and over the top, a slate cushion, a lit seam, on a trumpet pedestal. Opens toward +Z. */
+const buildPodChair = (x: number, z: number, yawDeg: number): THREE.Group => {
+  const group = new THREE.Group();
+  const R = 0.41, cy = 0.55, top = 0.22 * Math.PI, SY = 0.8;
+  const shellMat = new THREE.MeshStandardMaterial({ color: 0xdcd8d2, roughness: 0.38, metalness: 0.05, side: THREE.DoubleSide });
+  // the bowl: the whole lower half of the sphere
+  const bowl = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 16, 0, TAU, Math.PI / 2, Math.PI / 2), shellMat);
+  // the back: the upper half, behind the sitter only
+  const backStart = Math.PI - 0.3, backLen = Math.PI + 0.6;
+  const back = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 16, backStart, backLen, top, Math.PI / 2 - top), shellMat);
+  for (const m of [bowl, back]) { m.position.y = cy; m.scale.set(1, SY, 1); group.add(m); }
+  // the cushion
+  const seatY = 0.43;
+  const cushion = new THREE.Mesh(roundBox(0.5, 0.08, 0.46, 0.04, 4), new THREE.MeshStandardMaterial({ color: 0x5b6782, roughness: 0.85 }));
+  cushion.position.set(0, seatY, 0.02);
+  group.add(cushion);
+  const pillow = new THREE.Mesh(roundBox(0.44, 0.26, 0.08, 0.04, 4), cushion.material);
+  pillow.position.set(0, seatY + 0.2, -0.24);
+  pillow.rotation.x = -0.22;
+  group.add(pillow);
+  // the seam: up one edge of the back, over its top, down the other, then round the rim of the bowl at the front
+  const at = (phi: number, theta: number, r = R + 0.004): THREE.Vector3 =>
+    new THREE.Vector3(-r * Math.cos(phi) * Math.sin(theta), cy + r * Math.cos(theta) * SY, r * Math.sin(phi) * Math.sin(theta));
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 10; i++) pts.push(at(backStart, Math.PI / 2 - (i / 10) * (Math.PI / 2 - top)));
+  for (let i = 1; i <= 24; i++) pts.push(at(backStart + (i / 24) * backLen, top));
+  for (let i = 1; i <= 10; i++) pts.push(at(backStart + backLen, top + (i / 10) * (Math.PI / 2 - top)));
+  // and back along the front of the bowl, closing the loop
+  for (let i = 1; i < 20; i++) pts.push(at(0.3 + (i / 20) * (Math.PI - 0.6), Math.PI / 2));
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(2.2) });
+  const seam = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 160, 0.006, 6, true), glowMat);
+  group.add(seam);
+  // the pedestal: a flared trumpet to a wide disc
+  const steel = new THREE.MeshStandardMaterial({ color: 0xc9ccd2, roughness: 0.3, metalness: 0.6 });
+  const profile = [new THREE.Vector2(0, 0), new THREE.Vector2(0.27, 0), new THREE.Vector2(0.27, 0.02), new THREE.Vector2(0.2, 0.03),
+    new THREE.Vector2(0.09, 0.07), new THREE.Vector2(0.045, 0.14), new THREE.Vector2(0.035, 0.24), new THREE.Vector2(0.06, 0.28), new THREE.Vector2(0, 0.28)];
+  group.add(new THREE.Mesh(new THREE.LatheGeometry(profile, 48), steel));
+  group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, 0, z);
+  group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
+};
+
+/** A canvas drawn once and shown as glowing glass. */
+const holoCard = (wide: number, tall: number, paint: (c: CanvasRenderingContext2D, w: number, h: number) => void): THREE.Mesh => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = Math.round((512 * tall) / wide);
+  const c = canvas.getContext('2d')!;
+  const w = canvas.width, h = canvas.height;
+  const fill = c.createLinearGradient(0, 0, 0, h);
+  fill.addColorStop(0, 'rgba(120, 170, 255, 0.22)');
+  fill.addColorStop(1, 'rgba(70, 120, 230, 0.1)');
+  c.fillStyle = fill;
+  roundRect(c, 6, 6, w - 12, h - 12, 26);
+  c.fill();
+  c.strokeStyle = 'rgba(190, 220, 255, 0.95)';
+  c.lineWidth = 5;
+  c.stroke();
+  c.strokeStyle = c.fillStyle = 'rgba(205, 228, 255, 0.95)';
+  paint(c, w, h);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.MeshBasicMaterial({
+    map, color: new THREE.Color(1.3, 1.45, 1.7), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+  }));
+  mesh.renderOrder = 3;
+  return mesh;
+};
+
+/** The study station on the desk: a lit puck, a beam, a floating glass screen with a ringed planet in front of it, and two side cards. */
+const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group; update(time: number): void } => {
+  const group = new THREE.Group();
+  const puckMat = new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 0.35, metalness: 0.5 });
+  const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.024, 48), puckMat);
+  puck.position.y = 0.012;
+  puck.castShadow = puck.receiveShadow = true;
+  const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.45, 0.75, 1.0).multiplyScalar(2.6) });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.006, 8, 64), ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.025;
+  group.add(puck, ring);
+  // a faint cone of light up from the puck
+  const beamGeo = new THREE.CylinderGeometry(0.3, 0.09, 0.27, 32, 1, true);
+  beamGeo.translate(0, 0.16, 0);
+  const beam = new THREE.Mesh(beamGeo, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+    vertexShader: /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: /* glsl */ `varying vec2 vUv; void main(){ gl_FragColor = vec4(vec3(0.35, 0.62, 1.0) * (1.0 - vUv.y) * 0.35, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+  }));
+  group.add(beam);
+
+  const float = new THREE.Group();
+  float.position.y = 0.52;
+  group.add(float);
+  // the main screen: a title bar, three dots and a soft frame round the planet
+  const screen = holoCard(0.82, 0.46, (c, w, h) => {
+    c.lineWidth = 4;
+    c.beginPath(); c.moveTo(40, 52); c.lineTo(150, 52); c.stroke();
+    c.beginPath(); c.arc(40, 52, 9, 0, TAU); c.stroke();
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.arc(w - 50 - i * 30, 50, 8, 0, TAU); c.fill(); }
+    c.globalAlpha = 0.35;
+    roundRect(c, 40, h - 70, w - 80, 30, 14);
+    c.stroke();
+    c.globalAlpha = 1;
+  });
+  // left: a little chart; right: a checklist
+  const chart = holoCard(0.26, 0.19, (c, w, h) => {
+    c.lineWidth = 5;
+    c.beginPath(); c.moveTo(40, 40); c.lineTo(110, 40); c.stroke();
+    c.globalAlpha = 0.5;
+    c.beginPath(); c.moveTo(40, h - 40);
+    for (let i = 0; i <= 40; i++) { const t = i / 40; c.lineTo(40 + t * (w - 80), h - 50 - (Math.sin(t * 7) * 0.3 + 0.5 + t * 0.3) * (h - 140)); }
+    c.lineTo(w - 40, h - 40); c.closePath(); c.fill();
+    c.globalAlpha = 1;
+  });
+  const list = holoCard(0.26, 0.23, (c, w) => {
+    c.lineWidth = 5;
+    for (let i = 0; i < 4; i++) {
+      const yy = 70 + i * 82;
+      c.strokeRect(40, yy - 20, 40, 40);
+      if (i < 3) { c.beginPath(); c.moveTo(48, yy); c.lineTo(58, yy + 12); c.lineTo(74, yy - 12); c.stroke(); }
+      c.globalAlpha = 0.6; c.fillRect(110, yy - 6, w - 160 - (i % 2) * 90, 12); c.globalAlpha = 1;
+    }
+  });
+  chart.position.set(-0.57, -0.05, 0.06);
+  chart.rotation.y = 0.35;
+  list.position.set(0.57, -0.03, 0.06);
+  list.rotation.y = -0.35;
+  float.add(screen, chart, list);
+  // the planet: a glassy sphere with a bright ring, just in front of the screen
+  const planet = new THREE.Group();
+  planet.position.set(0, -0.01, 0.05);
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.1, 40, 24), new THREE.MeshPhysicalMaterial({
+    color: 0x9cc4ff, emissive: 0x3d6fd6, emissiveIntensity: 0.9, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.85, clearcoat: 1,
+  }));
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.005, 8, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.85, 0.6).multiplyScalar(2.4) }));
+  band.rotation.set(Math.PI / 2 - 0.35, 0.25, 0);
+  planet.add(globe, band);
+  float.add(planet);
+  const light = new THREE.PointLight(0x7fb0ff, 0.9, 1.8, 2);
+  light.position.set(0, 0.42, 0.2);
+  group.add(light);
+  group.position.set(x, y, z);
+  group.rotation.y = -0.22;
+  return {
+    group,
+    update(time) {
+      float.position.y = 0.52 + Math.sin(time * 1.1) * 0.006;
+      globe.rotation.y = time * 0.4;
+      band.rotation.z = time * 0.15;
+      (ringMat.color as THREE.Color).setRGB(0.45, 0.75, 1.0).multiplyScalar(2.2 + 0.5 * Math.sin(time * 2));
+    },
+  };
+};
+
+/** A glass sphere on a small oak foot, with a warm light inside. */
+const buildOrb = (x: number, y: number, z: number): THREE.Group => {
+  const group = new THREE.Group();
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 32), new THREE.MeshStandardMaterial({ map: oakGrain(), roughness: 0.5 }));
+  foot.position.y = 0.015;
+  const glassBall = new THREE.Mesh(new THREE.SphereGeometry(0.075, 40, 24), new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, roughness: 0.05, transmission: 0.9, thickness: 0.02, transparent: true, opacity: 0.35, clearcoat: 1, depthWrite: false,
+  }));
+  glassBall.position.y = 0.1;
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.018, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(3) }));
+  core.position.y = 0.09;
+  const halo = makeHalo(SCONCE_COLOR, 0.32, 0.5);
+  halo.position.y = 0.1;
+  const light = new THREE.PointLight(SCONCE_COLOR, 0.5, 1.4, 2);
+  light.position.y = 0.12;
+  group.add(foot, glassBall, core, halo, light);
+  group.position.set(x, y, z);
+  return group;
+};
+
+/** Two closed hardbacks lying flat, one on the other. */
+const buildBookStack = (x: number, y: number, z: number, yawDeg: number): THREE.Group => {
+  const group = new THREE.Group();
+  const paper = new THREE.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.9 });
+  let h = 0;
+  for (const [w, d, t, color, turn] of [[0.24, 0.17, 0.035, 0x3e4e6e, 0], [0.21, 0.15, 0.03, 0x6c7a96, 0.12]] as const) {
+    const cover = new THREE.Mesh(roundBox(w, t, d, 0.004, 2), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
+    const pages = new THREE.Mesh(new THREE.BoxGeometry(w - 0.012, t - 0.008, d - 0.006), paper);
+    for (const m of [cover, pages]) { m.position.set(0.004, h + t / 2, 0); m.rotation.y = turn; m.castShadow = m.receiveShadow = true; }
+    pages.position.x += 0.006;
+    group.add(cover, pages);
+    h += t;
+  }
   group.position.set(x, y, z);
   group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
   return group;
