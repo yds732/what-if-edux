@@ -1,0 +1,28 @@
+# Deploys echo/ to https://echo-between-two-worlds.vercel.app on every push (incl. merges) to main.
+name: Deploy ECHO to Vercel
+
+on:
+  push:
+    branches: [main]
+    paths: ["echo/**", ".github/workflows/deploy-echo.yml"]
+  workflow_dispatch:
+
+# Queue deploys so an older commit never finishes last and overwrites a newer one.
+concurrency:
+  group: deploy-echo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Identifiers from echo/.vercel/project.json (not credentials).
+      VERCEL_ORG_ID: team_SexJ44ZF5FAzw0kqqM8CY3S0
+      VERCEL_PROJECT_ID: prj_nh53cAYlUGY7KgvSM0ywnIeFvy76
+    defaults:
+      run:
+        working-directory: echo
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy
+        run: npx --yes vercel@53.4.0 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
