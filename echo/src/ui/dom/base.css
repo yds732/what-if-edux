@@ -1,0 +1,28 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #07060c;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#view {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: block;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* The interface is above the picture by rule, not by where the two happen to sit in the document. */
+#ui {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}

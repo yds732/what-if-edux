@@ -1,0 +1,6 @@
+# The Vercel CLI uploads everything it is not told to leave behind: it does not read .gitignore.
+# (node_modules and .vercel are left behind by default.)
+shots
+dist
+.chrome-profile
+*.log
