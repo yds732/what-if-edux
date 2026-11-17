@@ -28,11 +28,11 @@ Graphics start on a tier picked for the device (headsets and phones low; tablets
 
 WebXR needs a secure origin: the deployed site has one; a copy you host needs HTTPS (or `localhost`) for *Play in VR* to appear in a headset's browser. To try a Quest against the dev server on your own machine, connect it by USB, run `adb reverse tcp:5173 tcp:5173`, and open `http://localhost:5173` in the headset's browser.
 
-To redeploy the site, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the `echo-two-worlds` project (it is deployed with the Vercel CLI, not from GitHub; `vercel.json` holds the build settings).
+To redeploy the site, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the `echo-two-worlds` project (it is deployed with the Vercel CLI, not from GitHub; `vercel.json` holds the build settings). The upload is about 85 MB, nearly all of it models; Vercel's Hobby plan accepts up to 100 MB from the CLI.
 
 ## How it is put together
 
-The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, grass, water, light and every effect are shaders, and everything you hear is synthesised: there are no audio files. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
+The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, water, light and every effect are shaders, and Haven's meadow (its grass, reeds, blossom tree and floating lanterns) is drawn by code. Sound is synthesised, apart from eight recorded keystrokes that people in the real world "type" their lines with. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
 
 | Path | What lives there |
 |---|---|
@@ -91,4 +91,4 @@ Useful URL parameters while developing: `?chapter=wednesday` starts at a day, `&
 
 ## Credits
 
-Models and pictures were generated for this game with OpenAI's image model (design sheets) and [Tripo](https://www.tripo3d.ai) (3D models and rigs). [three.js](https://threejs.org) (MIT); [glTF Transform](https://gltf-transform.dev) and [meshoptimizer](https://meshoptimizer.org) (MIT) in the asset tools. Typeface: [Lexend](https://www.lexend.com) (SIL Open Font Licence). VR emulation in tests: [IWER](https://github.com/meta-quest/immersive-web-emulation-runtime) (MIT).
+Models and pictures were generated for this game with OpenAI's image model (design sheets) and [Tripo](https://www.tripo3d.ai) (3D models and rigs). [three.js](https://threejs.org) (MIT); [glTF Transform](https://gltf-transform.dev) and [meshoptimizer](https://meshoptimizer.org) (MIT) in the asset tools. Typefaces: [Inter](https://rsms.me/inter/) and [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant) (SIL Open Font Licence). VR emulation in tests: [IWER](https://github.com/meta-quest/immersive-web-emulation-runtime) (MIT).

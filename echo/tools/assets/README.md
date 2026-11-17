@@ -1,7 +1,7 @@
 # Generated assets
 
-Everything the player looks at that is not a shader is generated: a design sheet first, then a 3D model from the
-sheet. The designs live in `assets/` and the tools that make things from them live here.
+The people, furniture and set pieces are generated: a design sheet first, then a 3D model from the sheet. The
+designs live in `assets/` and the tools that make things from them live here.
 
 ```
 assets/style.mjs      the art bible, as the words every sheet is asked for with

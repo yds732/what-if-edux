@@ -214,6 +214,7 @@ export const ASSETS = {
   },
 
   // ---------------------------------------------------------------------------------------------- Haven
+  // modelled but not placed at present: the meadow's tree is the one drawn in src/world/haven/flora.ts
   'blossom-tree': {
     kind: 'prop', world: 'haven', detail: 'hero', fit: ['y', 7.4],
     brief: 'A blossom tree: a gracefully twisting trunk of deep violet bark threaded with fine gold filigree that glows faintly, spreading into a broad, layered canopy made of dense sculpted clusters of pink blossom, with a few glowing blossoms among them. The trunk rises from a small mound of mossy violet rock.',

@@ -96,7 +96,6 @@ export class ClassroomWorld extends World {
   private voiceTarget: string | null = null;
   private screenPulse = 0;
   /** Dust turning in the light from the windows. */
-  private readonly sunDirection = new THREE.Vector3(-1, 0.6, -0.2).normalize();
   private markerRadius = 0.3;
   /** Obstacles that belong to the current arrangement of the room. */
   private sceneColliders: Obstacle[] = [];
@@ -110,8 +109,6 @@ export class ClassroomWorld extends World {
       shadowTint: new THREE.Color(0.0, 0.004, 0.012), highlightTint: new THREE.Color(0.012, 0.006, -0.004),
     }));
     this.clearColor.set(0xbfd0ea);
-    // the sun stands outside the window wall; whatever is further off than the room is long is the sky
-    this.shafts = { direction: this.sunDirection, skyFrom: 13 };
   }
 
   async build(ctx: BuildContext): Promise<void> {
@@ -343,10 +340,6 @@ export class ClassroomWorld extends World {
     this.sun.color.setRGB(1.0, 0.96 - 0.38 * m.warm, 0.9 - 0.66 * m.warm);
     // a low sun reaches right across the room
     this.sun.position.set(-12, 9 - 6.2 * m.warm, -3 + 2 * m.warm);
-    this.sunDirection.copy(this.sun.position).normalize();
-    // morning light is thin and white; late in the day it pours in gold
-    this.look.shafts = (0.5 + 0.75 * m.warm) * Math.min(1, m.sun / 3);
-    this.look.shaftColor.setRGB(1.0, 0.92 - 0.2 * m.warm, 0.8 - 0.38 * m.warm);
     this.fill.intensity = 0.26 + 0.52 * m.room + 0.12 * m.warm;
     this.fill.color.setRGB(0.87 + 0.13 * m.warm, 0.91 - 0.16 * m.warm, 1.0 - 0.44 * m.warm);
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);

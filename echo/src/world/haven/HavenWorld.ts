@@ -97,7 +97,7 @@ export class HavenWorld extends World {
     this.far = 3200;
     Object.assign(this.look, makeLook({
       exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.14, contrast: 0.22, vignette: 0.36, grain: 0.014, chroma: 0.005,
-      shafts: 0.6, shaftColor: new THREE.Color(1.0, 0.78, 0.9), dof: 0.5, streak: 0.4,
+      shafts: 0.22, shaftColor: new THREE.Color(1.0, 0.8, 0.62), dof: 0.5, streak: 0.1,
       // warm, glowing highlights over soft plum shadows: a magical golden hour
       shadowTint: new THREE.Color(0.018, 0.004, 0.024), highlightTint: new THREE.Color(0.08, 0.04, -0.03),
     }));
@@ -250,9 +250,20 @@ export class HavenWorld extends World {
 
     // ---- floating lanterns: lining the path from the arrival to the bridge, and scattered over the island ----
     const spots: LanternSpot[] = [];
+    // the challenge board is read from where the player arrives and from where they throw: a lantern that would
+    // hang between either place and the board floats higher, over the line of sight
+    const overBoard = (x: number, z: number): number => {
+      for (const { position: from } of [HAVEN.spawn, HAVEN.throwSpot]) {
+        const bx = BOARD.x - from.x, bz = BOARD.z - from.z, far = Math.hypot(bx, bz);
+        const along = ((x - from.x) * bx + (z - from.z) * bz) / far, aside = Math.abs((x - from.x) * bz - (z - from.z) * bx) / far;
+        // the view of the board is a wedge: a point at the eye, as wide as the frame where it stands
+        if (along > 0 && along < far && aside < 0.35 + 1.1 * (along / far)) return 1;
+      }
+      return 0;
+    };
     const spot = (x: number, z: number): void => {
       const y = this.mainIsland.heightAt(x, z);
-      if (y !== null) spots.push({ x, z, ground: y });
+      if (y !== null) spots.push({ x, z, ground: y, lift: overBoard(x, z) });
     };
     for (const z of [3.6, 1.4, -0.8]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
     for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 2.4) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
