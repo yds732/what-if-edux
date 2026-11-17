@@ -11,13 +11,15 @@ export interface Cityscape {
   readonly group: THREE.Group;
   /** 0 is a warm afternoon, 1 is night. */
   setNight(k: number): void;
+  /** 0 leaves the sky as setNight paints it; 1 is a flat grey overcast in which neither the day nor the night shows. */
+  setOvercast(k: number): void;
   update(time: number): void;
 }
 
 const SKY_VS = /* glsl */ `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const SKY_FS = /* glsl */ `
 ${GLSL_NOISE}
-uniform float uNight, uTime; uniform vec3 uSunDir;
+uniform float uNight, uTime, uOvercast; uniform vec3 uSunDir;
 varying vec3 vDir;
 void main(){
   vec3 d = normalize(vDir); float h = d.y;
@@ -31,6 +33,9 @@ void main(){
   c = mix(c, mix(vec3(1.0, 0.8, 0.68), vec3(0.16, 0.13, 0.3), uNight), smoothstep(0.45, 0.8, cl) * 0.55);
   float star = step(0.9965, hash12(floor(d.xy * 260.0 + d.z * 97.0))) * uNight * smoothstep(0.15, 0.5, h);
   c += vec3(star) * 1.4;
+  // overcast: one even grey lid of cloud, a little paler toward the horizon, soft lumps in it
+  vec3 grey = mix(vec3(0.5, 0.51, 0.53), vec3(0.37, 0.39, 0.42), smoothstep(-0.02, 0.6, h)) * (0.94 + 0.12 * cl);
+  c = mix(c, grey, uOvercast);
   gl_FragColor = vec4(c, 1.0);
   ${GLSL_OUTPUT}
 }`;
@@ -49,7 +54,7 @@ vTower = aTower;
 `;
 const TOWER_FS_PARS = /* glsl */ `
 ${GLSL_NOISE}
-uniform float uNight, uTime; uniform vec3 uSunDir;
+uniform float uNight, uTime, uOvercast; uniform vec3 uSunDir;
 varying vec3 vTowerPos, vTowerUnit, vTowerN, vTowerWN, vTowerAt; varying vec4 vTower;
 `;
 /**
@@ -77,15 +82,15 @@ const TOWER_FS = /* glsl */ `
   float glazed = wall * (1.0 - smoothstep(0.93, 0.95, vTowerUnit.y)) * (1.0 - smoothstep(0.465, 0.49, edge));
   float bay = mix(step(0.14, f.x) * step(f.x, 0.86), 1.0, ribbon);
   float pane = mix(mix(0.42, 0.58, ribbon), bay * step(0.22, f.y) * step(f.y, 0.8), detail) * glazed;
-  float chance = mix(0.07, vTower.y, uNight);
+  float chance = mix(mix(0.07, vTower.y, uNight), 0.1, uOvercast);
   float lit = mix(chance, step(hash12(id + vTower.x * 91.0), chance), detail);
 
-  float day = (1.0 - uNight) * (1.0 - uNight);
+  float day = (1.0 - uNight) * (1.0 - uNight) * (1.0 - uOvercast);
   float ndl = dot(n, normalize(uSunDir));
-  vec3 skyLight = mix(vec3(0.46, 0.56, 0.86), vec3(0.035, 0.045, 0.11), uNight) * mix(0.6, 1.0, n.y * 0.5 + 0.5);
+  vec3 skyLight = mix(mix(vec3(0.46, 0.56, 0.86), vec3(0.035, 0.045, 0.11), uNight), vec3(0.4, 0.41, 0.44), uOvercast) * mix(0.6, 1.0, n.y * 0.5 + 0.5);
   vec3 sunLight = vec3(2.1, 1.2, 0.62) * day * smoothstep(-0.15, 0.55, ndl);
   vec3 bounce = vec3(0.5, 0.34, 0.26) * day * 0.35;
-  vec3 glass = mix(albedo * 0.36 + vec3(0.07, 0.1, 0.17), vec3(0.02, 0.025, 0.05), uNight);
+  vec3 glass = mix(mix(albedo * 0.36 + vec3(0.07, 0.1, 0.17), vec3(0.02, 0.025, 0.05), uNight), albedo * 0.3 + vec3(0.07, 0.075, 0.085), uOvercast);
   vec3 c = mix(albedo, glass, pane) * (skyLight + sunLight + bounce);
   // shade gathers in the corners of a face, and a line of shadow sits under every floor
   c *= mix(1.0, 0.8, smoothstep(0.36, 0.5, edge) * wall);
@@ -95,17 +100,17 @@ const TOWER_FS = /* glsl */ `
   // rooms with their lights on
   vec3 room = mix(vec3(0.94, 0.8, 0.62), mix(vec3(1.0, 0.78, 0.5), vec3(0.6, 0.85, 1.0), step(0.72, hash12(id * 1.7 + vTower.x))), detail);
   float flicker = mix(1.0, 0.85 + 0.15 * sin(uTime * 0.4 + hash12(id) * 40.0), detail);
-  c += room * pane * lit * flicker * mix(0.22, 2.0, uNight);
+  c += room * pane * lit * flicker * mix(mix(0.22, 2.0, uNight), 0.2, uOvercast);
 
   float haze = 1.0 - exp(-length(vTowerAt.xz) * mix(0.0022, 0.0015, uNight));
   haze = clamp(haze + (1.0 - smoothstep(-110.0, 30.0, vTowerAt.y)) * 0.34, 0.0, 0.94);
-  outgoingLight = mix(c, mix(vec3(0.98, 0.72, 0.55), vec3(0.1, 0.075, 0.19), uNight), haze);
+  outgoingLight = mix(c, mix(mix(vec3(0.98, 0.72, 0.55), vec3(0.1, 0.075, 0.19), uNight), vec3(0.47, 0.48, 0.5), uOvercast), haze);
 }
 `;
 
 export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
   const group = new THREE.Group();
-  const u = { uNight: { value: 0 }, uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(-0.5, 0.16, -1).normalize() } };
+  const u = { uNight: { value: 0 }, uOvercast: { value: 0 }, uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(-0.5, 0.16, -1).normalize() } };
 
   const sky = new THREE.Mesh(new THREE.SphereGeometry(900, 32, 16), new THREE.ShaderMaterial({ vertexShader: SKY_VS, fragmentShader: SKY_FS, uniforms: u, side: THREE.BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -10;
@@ -201,11 +206,11 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
         gl_PointSize = clamp(520.0 * aSeed.z / max(-mv.z, 1.0), 1.5, 7.0);
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uNight; varying float vHue, vGlow;
+      uniform float uNight, uOvercast; varying float vHue, vGlow;
       void main(){
         float r = length(gl_PointCoord - 0.5) * 2.0;
         vec3 c = mix(vec3(1.0, 0.86, 0.6), vec3(1.0, 0.3, 0.3), step(0.6, vHue));
-        gl_FragColor = vec4(c * exp(-r * r * 4.0) * mix(0.5, 2.2, uNight) * vGlow, 1.0);
+        gl_FragColor = vec4(c * exp(-r * r * 4.0) * mix(mix(0.5, 2.2, uNight), 0.35, uOvercast) * vGlow, 1.0);
         ${GLSL_OUTPUT}
       }`,
   }));
@@ -216,6 +221,9 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
     group,
     setNight(k) {
       u.uNight.value = k;
+    },
+    setOvercast(k) {
+      u.uOvercast.value = k;
     },
     update(time) {
       u.uTime.value = time;

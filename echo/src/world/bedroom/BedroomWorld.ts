@@ -8,7 +8,7 @@ import { bakeRoomEnvironment } from '../../render/env';
 import { Panel } from '../../ui/Panel';
 import { THEMES, font, glass, roundRect, wrap } from '../../ui/draw';
 import { World, anchor, type Anchor, type BuildContext, type FrameContext } from '../World';
-import { dress, floorOf, framed, glowOf, sizeOf, type Spot } from '../dressing';
+import { dress, floorOf, framed, glowOf, sizeOf } from '../dressing';
 import { buildMotes, makeHalo, type Motes } from '../haven/atmosphere';
 import { buildCityscape, type Cityscape } from '../cityscape';
 import { Builder, makePoster } from '../interior';
@@ -37,8 +37,6 @@ const DESK = { x: 0.85, z: -2.2 }, CHAIR = { x: 0.62, z: -1.5 }, LAMP = { x: -0.
 const WARDROBE = { x: 1.7, z: 2.29 }, BEANBAG = { x: 1.62, z: 0.8 }, BAG = { x: -0.98, z: -0.22 };
 /** Toward the afternoon sun, and toward the middle of the city's glow at night: both beyond the window. */
 const SUN_DIRECTION = new THREE.Vector3(-0.28, 0.28, -0.96).normalize(), CITY_GLOW = new THREE.Vector3(0.12, 0.16, -1).normalize();
-/** Boxes still taped shut: they moved here not long ago. */
-const BOXES: readonly Spot[] = [[0.72, 0, 2.2, 14], [0.75, 0.44, 2.22, -20, 0.82], [0.12, 0, 2.26, -8, 0.9]];
 
 export class BedroomWorld extends World {
   readonly id = 'bedroom';
@@ -137,7 +135,6 @@ export class BedroomWorld extends World {
     const sx = W - 0.16;
     await dress(ctx, scene, 'wall-shelf', [[sx, 1.02, -0.72, -90], [sx, 1.6, -0.3, -90]]);
     await dress(ctx, scene, 'wardrobe', [[WARDROBE.x, 0, WARDROBE.z, 180]]);
-    await dress(ctx, scene, 'moving-box', BOXES);
     await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
     // school bag slumped by the bed
     await dress(ctx, scene, 'backpack', [[BAG.x, 0, BAG.z, 35]]);
@@ -173,6 +170,15 @@ export class BedroomWorld extends World {
     welcome.position.set(-W + 0.006, 1.5, -0.62);
     welcome.rotation.y = Math.PI / 2;
     scene.add(starMap, welcome);
+
+    // two posters on the back wall, between the door and the wardrobe: a band they like, and a tennis tournament
+    const band = makePoster(0.5, 0.72, paintBandPoster);
+    band.position.set(-0.3, 1.55, D - 0.006);
+    band.rotation.y = Math.PI;
+    const tennis = makePoster(0.62, 0.44, paintTennisPoster);
+    tennis.position.set(0.56, 1.62, D - 0.006);
+    tennis.rotation.y = Math.PI;
+    scene.add(band, tennis);
 
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xbfd4ff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, depthWrite: false });
     const pane = new THREE.Mesh(new THREE.PlaneGeometry(WX1 - WX0, WY1 - WY0), glassMat);
@@ -279,7 +285,7 @@ export class BedroomWorld extends World {
 
     this.colliders.bounds = { kind: 'rect', minX: -W, maxX: W, minZ: -D, maxZ: D };
     this.colliders.box(bx, bz, bedWide / 2, bedLong / 2).box(LAMP.x, LAMP.z, 0.28, 0.28).box(DESK.x, DESK.z, 0.97, 0.38).circle(CHAIR.x, CHAIR.z, 0.3)
-      .box(sx, -0.5, 0.16, 0.88).box(WARDROBE.x, WARDROBE.z, 0.57, 0.31).box(0.72, 2.2, 0.26, 0.28).box(0.12, 2.26, 0.22, 0.24)
+      .box(sx, -0.5, 0.16, 0.88).box(WARDROBE.x, WARDROBE.z, 0.57, 0.31)
       .circle(BEANBAG.x, BEANBAG.z, 0.42).circle(BAG.x, BAG.z, 0.2);
     this.setNight(1, true);
   }
@@ -295,21 +301,23 @@ export class BedroomWorld extends World {
 
   private applyNight(): void {
     const n = this.night;
-    this.city.setNight(n);
-    this.sun.intensity = 3.0 * (1 - n) + 0.3 * n;
-    this.sun.color.setRGB(1.0, 0.76 - 0.2 * n, 0.55 + 0.4 * n);
-    this.skyFill.intensity = 1.7 * (1 - n) + 0.34 * n;
-    this.skyFill.color.setRGB(0.6 - 0.25 * n, 0.66 - 0.2 * n, 0.9);
+    // the view is always the same flat overcast, so the window never says whether it is day or night:
+    // a soft, neutral grey light comes through it and the room's own lamps carry the time of day
+    this.city.setNight(0.5);
+    this.city.setOvercast(1);
+    this.sun.intensity = 0.55;
+    this.sun.color.setRGB(0.93, 0.95, 1.0);
+    this.skyFill.intensity = 0.6;
+    this.skyFill.color.setRGB(0.64, 0.67, 0.74);
     this.lamp.intensity = 0.4 + 2.6 * n;
     this.lampGlow.value = this.lampFull * (0.2 + 0.8 * n);
-    (this.cove.material as THREE.MeshBasicMaterial).color.setRGB(0.55, 0.72, 1.0).multiplyScalar(0.3 + 1.6 * n);
-    (this.rain.material as THREE.ShaderMaterial).uniforms.uAmount!.value = n;
-    this.look.exposure = 1.0 + 0.22 * n;
-    // by day the low sun comes straight in; at night it is the glow of the city through the rain
-    this.lightDirection.copy(SUN_DIRECTION).lerp(CITY_GLOW, n).normalize();
-    this.look.shafts = 0.85 * (1 - n) + 0.2 * n;
-    this.look.shaftColor.setRGB(1.0 - 0.45 * n, 0.8 - 0.1 * n, 0.55 + 0.45 * n);
-    this.scene.environmentIntensity = 0.62 - 0.46 * n;
+    (this.cove.material as THREE.MeshBasicMaterial).color.setRGB(0.8, 0.84, 0.92).multiplyScalar(0.3 + 0.5 * n);
+    (this.rain.material as THREE.ShaderMaterial).uniforms.uAmount!.value = n * 0.6;
+    this.look.exposure = 1.0 + 0.12 * n;
+    this.lightDirection.copy(SUN_DIRECTION).lerp(CITY_GLOW, 0.5).normalize();
+    this.look.shafts = 0.12;
+    this.look.shaftColor.setRGB(0.82, 0.85, 0.9);
+    this.scene.environmentIntensity = 0.3;
   }
 
   /** The phone pulses when a message is waiting. */
@@ -420,3 +428,68 @@ export class BedroomWorld extends World {
   }
 }
 
+
+/** A gig poster for a band: a big setting sun over the sea, the band's name in heavy type. */
+const paintBandPoster = (c: CanvasRenderingContext2D, w: number, h: number): void => {
+  c.fillStyle = '#1f2a44';
+  c.fillRect(0, 0, w, h);
+  const sun = c.createLinearGradient(0, h * 0.18, 0, h * 0.58);
+  sun.addColorStop(0, '#ffcf6b');
+  sun.addColorStop(1, '#f2665a');
+  c.fillStyle = sun;
+  c.beginPath();
+  c.arc(w / 2, h * 0.42, w * 0.32, Math.PI, 0);
+  c.fill();
+  c.fillStyle = '#1f2a44';
+  for (let i = 0; i < 5; i++) c.fillRect(w * 0.15, h * (0.3 + i * 0.026), w * 0.7, 2 + i * 1.5);
+  c.fillStyle = '#3fa7a3';
+  c.fillRect(0, h * 0.42, w, h * 0.12);
+  c.fillStyle = '#7fd0c4';
+  for (let i = 0; i < 4; i++) c.fillRect(w * (0.2 + i * 0.08), h * (0.45 + i * 0.022), w * (0.6 - i * 0.16), 3);
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = '#ffe9c8';
+  c.font = font(800, 62);
+  c.fillText('THE LOW', w / 2, h * 0.64);
+  c.fillText('TIDES', w / 2, h * 0.73);
+  c.fillStyle = '#f2665a';
+  c.font = font(600, 22);
+  c.fillText('LIVE · HARBOUR HALL', w / 2, h * 0.83);
+  c.fillStyle = '#9fb0d0';
+  c.font = font(400, 17);
+  c.fillText('SAT 14 SEPT · DOORS 7PM', w / 2, h * 0.89);
+};
+
+/** A tennis poster: a ball over the lines of a clay court, in flat colour. */
+const paintTennisPoster = (c: CanvasRenderingContext2D, w: number, h: number): void => {
+  c.fillStyle = '#d9774a';
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = '#fbeee0';
+  c.lineWidth = 5;
+  c.strokeRect(w * 0.08, h * 0.12, w * 0.84, h * 0.76);
+  c.beginPath();
+  c.moveTo(w * 0.08, h * 0.5);
+  c.lineTo(w * 0.92, h * 0.5);
+  c.moveTo(w * 0.5, h * 0.12);
+  c.lineTo(w * 0.5, h * 0.88);
+  c.stroke();
+  c.fillStyle = '#d8f04a';
+  c.beginPath();
+  c.arc(w * 0.72, h * 0.33, h * 0.14, 0, TAU);
+  c.fill();
+  c.strokeStyle = '#fbfbf2';
+  c.lineWidth = 4;
+  c.beginPath();
+  c.arc(w * 0.72 - h * 0.17, h * 0.33, h * 0.14, -0.7, 0.7);
+  c.arc(w * 0.72 + h * 0.17, h * 0.33, h * 0.14, Math.PI - 0.7, Math.PI + 0.7);
+  c.stroke();
+  c.textAlign = 'left';
+  c.textBaseline = 'middle';
+  c.fillStyle = '#fff8ee';
+  c.font = font(800, 54);
+  c.fillText('MATCH', w * 0.12, h * 0.62);
+  c.fillText('POINT', w * 0.12, h * 0.76);
+  c.fillStyle = '#5a2a18';
+  c.font = font(500, 18);
+  c.fillText('HARBOUR JUNIOR OPEN', w * 0.12, h * 0.9);
+};
