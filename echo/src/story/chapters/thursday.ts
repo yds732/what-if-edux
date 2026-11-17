@@ -134,7 +134,7 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   await playRings(game, haven, { rings: [last!], orbs: null, label: 'Starlight', total: 3, done: 2, onHit: () => board(3) });
   d.objective(null);
   // the gateway opens
-  haven.gateway.setOpen(1);
+  haven.openGateway();
   audio.sfx('gateOpen');
   game.app.fx.flash = 0.5;
   haven.fireworks(18, 6);

@@ -32,7 +32,7 @@ export class App {
   /** Called after a resize with the canvas size in CSS pixels and the buffer's pixel ratio. */
   onResize: ((width: number, height: number, dpr: number) => void) | null = null;
   readonly tasks = new Tasks();
-  readonly fx: ScreenFx = { fade: 0, fadeColor: new THREE.Color(0, 0, 0), dim: 0, flash: 0, kick: 0 };
+  readonly fx: ScreenFx = { fade: 0, fadeColor: new THREE.Color(0, 0, 0), dim: 0, flash: 0, kick: 0, focus: 7 };
   readonly post: PostPipeline;
   /** Whatever reads the player's hands. These run first, so the story sees this frame's presses as the systems do. */
   readonly senses: System[] = [];
@@ -45,6 +45,8 @@ export class App {
   wipe: WorldWipe | null = null;
   /** When set, replaces the active world's look (transitions blend two worlds' looks here). */
   lookOverride: Look | null = null;
+  /** How far away the story wants the lens focused, in metres: a speaker's face. Null lets it rest. */
+  focus: number | null = null;
   /** Added to the base field of view by gameplay (drawing back a throw). */
   fovKick = 0;
   /** 1, or less where the player's device asks for reduced motion: flashes and camera punches step down. */
@@ -172,7 +174,9 @@ export class App {
       r.setRenderTarget(null);
       r.render(world.scene, this.camera);
     } else {
-      this.post.render({ scene: world.scene, camera: this.camera, look, time: this.time, fx: this.fx, wipe: this.wipe, overlay: this.overlay, prepass: world.prepass });
+      // the lens follows whatever the story is looking at, and rests on the middle distance otherwise
+      this.fx.focus += ((this.focus ?? world.restFocus) - this.fx.focus) * (1 - Math.exp(-3 * this.lastDt));
+      this.post.render({ scene: world.scene, camera: this.camera, look, time: this.time, fx: this.fx, wipe: this.wipe, overlay: this.overlay, prepass: world.prepass, shafts: world.shafts });
       // flashes and lens kicks are impulses: whoever raises them need not lower them
       this.fx.flash *= Math.exp(-5 * this.lastDt);
       this.fx.kick *= Math.exp(-6 * this.lastDt);

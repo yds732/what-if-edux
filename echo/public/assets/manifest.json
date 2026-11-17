@@ -1,0 +1,1919 @@
+{
+  "assets": {
+    "alex": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/alex.high.glb",
+          "triangles": 60000,
+          "bytes": 941616
+        },
+        "medium": {
+          "file": "models/alex.medium.glb",
+          "triangles": 27999,
+          "bytes": 660880
+        },
+        "low": {
+          "file": "models/alex.low.glb",
+          "triangles": 11999,
+          "bytes": 281096
+        }
+      },
+      "height": 1.36,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          26,
+          27,
+          28
+        ],
+        "legL": [
+          44,
+          45,
+          46
+        ],
+        "legR": [
+          48,
+          49,
+          50
+        ]
+      }
+    },
+    "amara": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/amara.high.glb",
+          "triangles": 59998,
+          "bytes": 890300
+        },
+        "medium": {
+          "file": "models/amara.medium.glb",
+          "triangles": 28000,
+          "bytes": 617796
+        },
+        "low": {
+          "file": "models/amara.low.glb",
+          "triangles": 12000,
+          "bytes": 277980
+        }
+      },
+      "height": 1.36,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          22,
+          23,
+          24
+        ],
+        "legL": [
+          32,
+          33,
+          34
+        ],
+        "legR": [
+          35,
+          36,
+          37
+        ]
+      }
+    },
+    "art-supplies": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/art-supplies.high.glb",
+          "triangles": 6997,
+          "bytes": 338616
+        },
+        "medium": {
+          "file": "models/art-supplies.medium.glb",
+          "triangles": 3499,
+          "bytes": 138008
+        },
+        "low": {
+          "file": "models/art-supplies.low.glb",
+          "triangles": 1799,
+          "bytes": 117100
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.42,
+        0.3336,
+        0.4191
+      ]
+    },
+    "backpack": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/backpack.high.glb",
+          "triangles": 6998,
+          "bytes": 561500
+        },
+        "medium": {
+          "file": "models/backpack.medium.glb",
+          "triangles": 3500,
+          "bytes": 180008
+        },
+        "low": {
+          "file": "models/backpack.low.glb",
+          "triangles": 1800,
+          "bytes": 160392
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.3376,
+        0.42,
+        0.3535
+      ]
+    },
+    "beanbag": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/beanbag.high.glb",
+          "triangles": 21999,
+          "bytes": 1041372
+        },
+        "medium": {
+          "file": "models/beanbag.medium.glb",
+          "triangles": 10999,
+          "bytes": 286376
+        },
+        "low": {
+          "file": "models/beanbag.low.glb",
+          "triangles": 4999,
+          "bytes": 228232
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.9,
+        0.8088,
+        0.8993
+      ]
+    },
+    "bed": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/bed.high.glb",
+          "triangles": 59999,
+          "bytes": 1799208
+        },
+        "medium": {
+          "file": "models/bed.medium.glb",
+          "triangles": 24999,
+          "bytes": 666752
+        },
+        "low": {
+          "file": "models/bed.low.glb",
+          "triangles": 9999,
+          "bytes": 260256
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.1783,
+        1.1684,
+        2
+      ]
+    },
+    "bedside": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/bedside.high.glb",
+          "triangles": 22000,
+          "bytes": 560672
+        },
+        "medium": {
+          "file": "models/bedside.medium.glb",
+          "triangles": 10992,
+          "bytes": 227868
+        },
+        "low": {
+          "file": "models/bedside.low.glb",
+          "triangles": 4998,
+          "bytes": 167316
+        }
+      },
+      "glow": {
+        "color": "#ffd27a",
+        "strength": 3,
+        "from": 0.82
+      },
+      "size": [
+        0.5557,
+        0.98,
+        0.5597
+      ]
+    },
+    "blossom-tree": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/blossom-tree.high.glb",
+          "triangles": 59976,
+          "bytes": 1769264
+        },
+        "medium": {
+          "file": "models/blossom-tree.medium.glb",
+          "triangles": 24984,
+          "bytes": 760720
+        },
+        "low": {
+          "file": "models/blossom-tree.low.glb",
+          "triangles": 9998,
+          "bytes": 333424
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        7.3026,
+        7.4,
+        4.4694
+      ]
+    },
+    "board-frame": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/board-frame.high.glb",
+          "triangles": 22000,
+          "bytes": 867612
+        },
+        "medium": {
+          "file": "models/board-frame.medium.glb",
+          "triangles": 11000,
+          "bytes": 366992
+        },
+        "low": {
+          "file": "models/board-frame.low.glb",
+          "triangles": 5000,
+          "bytes": 303512
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        1.355,
+        2,
+        0.3
+      ]
+    },
+    "bookshelf": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/bookshelf.high.glb",
+          "triangles": 21999,
+          "bytes": 471448
+        },
+        "medium": {
+          "file": "models/bookshelf.medium.glb",
+          "triangles": 11000,
+          "bytes": 226380
+        },
+        "low": {
+          "file": "models/bookshelf.low.glb",
+          "triangles": 5000,
+          "bytes": 158796
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.101,
+        1.7,
+        0.5333
+      ]
+    },
+    "chair": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/chair.high.glb",
+          "triangles": 6999,
+          "bytes": 489920
+        },
+        "medium": {
+          "file": "models/chair.medium.glb",
+          "triangles": 3499,
+          "bytes": 155796
+        },
+        "low": {
+          "file": "models/chair.low.glb",
+          "triangles": 1799,
+          "bytes": 135824
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.4121,
+        0.6396,
+        0.4375
+      ]
+    },
+    "craft-table": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/craft-table.high.glb",
+          "triangles": 22000,
+          "bytes": 413064
+        },
+        "medium": {
+          "file": "models/craft-table.medium.glb",
+          "triangles": 11000,
+          "bytes": 208116
+        },
+        "low": {
+          "file": "models/craft-table.low.glb",
+          "triangles": 4992,
+          "bytes": 144164
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        2.3,
+        0.75,
+        1.2
+      ]
+    },
+    "crystals-a": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/crystals-a.high.glb",
+          "triangles": 6999,
+          "bytes": 464324
+        },
+        "medium": {
+          "file": "models/crystals-a.medium.glb",
+          "triangles": 3499,
+          "bytes": 195256
+        },
+        "low": {
+          "file": "models/crystals-a.low.glb",
+          "triangles": 1911,
+          "bytes": 175452
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        0.9743,
+        1.5,
+        0.9482
+      ]
+    },
+    "crystals-b": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/crystals-b.high.glb",
+          "triangles": 6989,
+          "bytes": 490656
+        },
+        "medium": {
+          "file": "models/crystals-b.medium.glb",
+          "triangles": 3499,
+          "bytes": 201808
+        },
+        "low": {
+          "file": "models/crystals-b.low.glb",
+          "triangles": 2187,
+          "bytes": 185480
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        1.1108,
+        1.9,
+        1.1188
+      ]
+    },
+    "dais": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/dais.high.glb",
+          "triangles": 60000,
+          "bytes": 1481140
+        },
+        "medium": {
+          "file": "models/dais.medium.glb",
+          "triangles": 24998,
+          "bytes": 613728
+        },
+        "low": {
+          "file": "models/dais.low.glb",
+          "triangles": 9998,
+          "bytes": 239788
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        5.2,
+        0.4,
+        5.2
+      ]
+    },
+    "desk": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/desk.high.glb",
+          "triangles": 7000,
+          "bytes": 361104
+        },
+        "medium": {
+          "file": "models/desk.medium.glb",
+          "triangles": 3500,
+          "bytes": 142892
+        },
+        "low": {
+          "file": "models/desk.low.glb",
+          "triangles": 1800,
+          "bytes": 122512
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.56,
+        0.66,
+        0.72
+      ]
+    },
+    "desk-chair": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/desk-chair.high.glb",
+          "triangles": 22000,
+          "bytes": 503780
+        },
+        "medium": {
+          "file": "models/desk-chair.medium.glb",
+          "triangles": 11000,
+          "bytes": 231208
+        },
+        "low": {
+          "file": "models/desk-chair.low.glb",
+          "triangles": 5000,
+          "bytes": 168668
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.6267,
+        0.86,
+        0.6207
+      ]
+    },
+    "dock": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/dock.high.glb",
+          "triangles": 22000,
+          "bytes": 380364
+        },
+        "medium": {
+          "file": "models/dock.medium.glb",
+          "triangles": 10999,
+          "bytes": 179864
+        },
+        "low": {
+          "file": "models/dock.low.glb",
+          "triangles": 4999,
+          "bytes": 116952
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.3,
+        0.07,
+        0.3
+      ]
+    },
+    "door": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/door.high.glb",
+          "triangles": 21999,
+          "bytes": 426700
+        },
+        "medium": {
+          "file": "models/door.medium.glb",
+          "triangles": 10999,
+          "bytes": 196736
+        },
+        "low": {
+          "file": "models/door.low.glb",
+          "triangles": 5000,
+          "bytes": 138276
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1,
+        2.1,
+        0.14
+      ]
+    },
+    "gateway": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/gateway.high.glb",
+          "triangles": 59998,
+          "bytes": 1944804
+        },
+        "medium": {
+          "file": "models/gateway.medium.glb",
+          "triangles": 24996,
+          "bytes": 825800
+        },
+        "low": {
+          "file": "models/gateway.low.glb",
+          "triangles": 9998,
+          "bytes": 334620
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        4.6915,
+        6.2,
+        4.5808
+      ]
+    },
+    "hand": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/hand.high.glb",
+          "triangles": 60000,
+          "bytes": 1922488
+        },
+        "medium": {
+          "file": "models/hand.medium.glb",
+          "triangles": 25000,
+          "bytes": 759760
+        },
+        "low": {
+          "file": "models/hand.low.glb",
+          "triangles": 10000,
+          "bytes": 267476
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.1331,
+        0.1301,
+        0.776
+      ]
+    },
+    "headset": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/headset.high.glb",
+          "triangles": 59996,
+          "bytes": 1471028
+        },
+        "medium": {
+          "file": "models/headset.medium.glb",
+          "triangles": 25000,
+          "bytes": 607676
+        },
+        "low": {
+          "file": "models/headset.low.glb",
+          "triangles": 10000,
+          "bytes": 241008
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.2,
+        0.0721,
+        0.2041
+      ]
+    },
+    "island-a": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/island-a.high.glb",
+          "triangles": 6994,
+          "bytes": 647200
+        },
+        "medium": {
+          "file": "models/island-a.medium.glb",
+          "triangles": 3498,
+          "bytes": 254496
+        },
+        "low": {
+          "file": "models/island-a.low.glb",
+          "triangles": 2938,
+          "bytes": 247060
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        14,
+        17.0412,
+        14.5038
+      ]
+    },
+    "island-b": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/island-b.high.glb",
+          "triangles": 7000,
+          "bytes": 627036
+        },
+        "medium": {
+          "file": "models/island-b.medium.glb",
+          "triangles": 3500,
+          "bytes": 263080
+        },
+        "low": {
+          "file": "models/island-b.low.glb",
+          "triangles": 2056,
+          "bytes": 245256
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        10,
+        20.1942,
+        10.1665
+      ]
+    },
+    "jamie": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/jamie.high.glb",
+          "triangles": 90000,
+          "bytes": 1922484
+        },
+        "medium": {
+          "file": "models/jamie.medium.glb",
+          "triangles": 40000,
+          "bytes": 834940
+        },
+        "low": {
+          "file": "models/jamie.low.glb",
+          "triangles": 15996,
+          "bytes": 352028
+        }
+      },
+      "height": 1.38,
+      "rig": {
+        "hips": 0,
+        "spine": 12,
+        "chest": 13,
+        "neck": 22,
+        "head": 23,
+        "armL": [
+          15,
+          16,
+          17
+        ],
+        "armR": [
+          28,
+          29,
+          30
+        ],
+        "legL": [
+          2,
+          3,
+          4
+        ],
+        "legR": [
+          7,
+          8,
+          9
+        ]
+      }
+    },
+    "kai": {
+      "kind": "character",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/kai.high.glb",
+          "triangles": 89992,
+          "bytes": 1967952
+        },
+        "medium": {
+          "file": "models/kai.medium.glb",
+          "triangles": 39990,
+          "bytes": 875588
+        },
+        "low": {
+          "file": "models/kai.low.glb",
+          "triangles": 16000,
+          "bytes": 372228
+        }
+      },
+      "height": 1.4,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 5,
+        "head": 6,
+        "armL": [
+          8,
+          9,
+          10
+        ],
+        "armR": [
+          17,
+          18,
+          19
+        ],
+        "legL": [
+          32,
+          33,
+          34
+        ],
+        "legR": [
+          36,
+          37,
+          38
+        ]
+      },
+      "glow": {
+        "color": "#ffc063",
+        "strength": 2.6
+      }
+    },
+    "lamp-post": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/lamp-post.high.glb",
+          "triangles": 22000,
+          "bytes": 736756
+        },
+        "medium": {
+          "file": "models/lamp-post.medium.glb",
+          "triangles": 11000,
+          "bytes": 320484
+        },
+        "low": {
+          "file": "models/lamp-post.low.glb",
+          "triangles": 5000,
+          "bytes": 256416
+        }
+      },
+      "glow": {
+        "strength": 2.6,
+        "vivid": 0.22
+      },
+      "size": [
+        0.7667,
+        2.6,
+        0.7677
+      ]
+    },
+    "lantern": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/lantern.high.glb",
+          "triangles": 6997,
+          "bytes": 594128
+        },
+        "medium": {
+          "file": "models/lantern.medium.glb",
+          "triangles": 3499,
+          "bytes": 235116
+        },
+        "low": {
+          "file": "models/lantern.low.glb",
+          "triangles": 1797,
+          "bytes": 217040
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        0.2499,
+        0.5,
+        0.2491
+      ]
+    },
+    "leo": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/leo.high.glb",
+          "triangles": 60000,
+          "bytes": 918856
+        },
+        "medium": {
+          "file": "models/leo.medium.glb",
+          "triangles": 28000,
+          "bytes": 639620
+        },
+        "low": {
+          "file": "models/leo.low.glb",
+          "triangles": 12000,
+          "bytes": 282360
+        }
+      },
+      "height": 1.39,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          26,
+          27,
+          28
+        ],
+        "legL": [
+          44,
+          45,
+          46
+        ],
+        "legR": [
+          48,
+          49,
+          50
+        ]
+      }
+    },
+    "lockers": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/lockers.high.glb",
+          "triangles": 7000,
+          "bytes": 378780
+        },
+        "medium": {
+          "file": "models/lockers.medium.glb",
+          "triangles": 3500,
+          "bytes": 157044
+        },
+        "low": {
+          "file": "models/lockers.low.glb",
+          "triangles": 1800,
+          "bytes": 136204
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.72,
+        1.5,
+        0.42
+      ]
+    },
+    "lumi": {
+      "kind": "character",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/lumi.high.glb",
+          "triangles": 89998,
+          "bytes": 1828880
+        },
+        "medium": {
+          "file": "models/lumi.medium.glb",
+          "triangles": 39996,
+          "bytes": 831804
+        },
+        "low": {
+          "file": "models/lumi.low.glb",
+          "triangles": 16000,
+          "bytes": 352456
+        }
+      },
+      "height": 1.36,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          17,
+          18,
+          19
+        ],
+        "legL": [
+          24,
+          25,
+          26
+        ],
+        "legR": [
+          28,
+          29,
+          30
+        ]
+      },
+      "glow": {
+        "color": "#6fe6ff",
+        "strength": 2.6
+      }
+    },
+    "mina": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/mina.high.glb",
+          "triangles": 60000,
+          "bytes": 972188
+        },
+        "medium": {
+          "file": "models/mina.medium.glb",
+          "triangles": 28000,
+          "bytes": 700528
+        },
+        "low": {
+          "file": "models/mina.low.glb",
+          "triangles": 12000,
+          "bytes": 298792
+        }
+      },
+      "height": 1.33,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          16,
+          17,
+          18
+        ],
+        "legL": [
+          27,
+          28,
+          29
+        ],
+        "legR": [
+          30,
+          31,
+          32
+        ]
+      }
+    },
+    "monitor": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/monitor.high.glb",
+          "triangles": 21999,
+          "bytes": 380268
+        },
+        "medium": {
+          "file": "models/monitor.medium.glb",
+          "triangles": 10999,
+          "bytes": 185580
+        },
+        "low": {
+          "file": "models/monitor.low.glb",
+          "triangles": 4999,
+          "bytes": 123908
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.62,
+        0.6141,
+        0.3436
+      ]
+    },
+    "moving-box": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/moving-box.high.glb",
+          "triangles": 7000,
+          "bytes": 244992
+        },
+        "medium": {
+          "file": "models/moving-box.medium.glb",
+          "triangles": 3500,
+          "bytes": 96576
+        },
+        "low": {
+          "file": "models/moving-box.low.glb",
+          "triangles": 1800,
+          "bytes": 76384
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.4343,
+        0.44,
+        0.4728
+      ]
+    },
+    "nova": {
+      "kind": "character",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/nova.high.glb",
+          "triangles": 89999,
+          "bytes": 1745764
+        },
+        "medium": {
+          "file": "models/nova.medium.glb",
+          "triangles": 39998,
+          "bytes": 785912
+        },
+        "low": {
+          "file": "models/nova.low.glb",
+          "triangles": 16000,
+          "bytes": 330624
+        }
+      },
+      "height": 1.34,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          13,
+          14,
+          15
+        ],
+        "legL": [
+          19,
+          20,
+          21
+        ],
+        "legR": [
+          23,
+          24,
+          25
+        ]
+      },
+      "glow": {
+        "color": "#ff7fd8",
+        "strength": 2.6
+      }
+    },
+    "phone": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/phone.high.glb",
+          "triangles": 60000,
+          "bytes": 925140
+        },
+        "medium": {
+          "file": "models/phone.medium.glb",
+          "triangles": 25000,
+          "bytes": 430824
+        },
+        "low": {
+          "file": "models/phone.low.glb",
+          "triangles": 10000,
+          "bytes": 193076
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.075,
+        0.012,
+        0.155
+      ]
+    },
+    "plant-small": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/plant-small.high.glb",
+          "triangles": 6998,
+          "bytes": 343068
+        },
+        "medium": {
+          "file": "models/plant-small.medium.glb",
+          "triangles": 3500,
+          "bytes": 131368
+        },
+        "low": {
+          "file": "models/plant-small.low.glb",
+          "triangles": 1800,
+          "bytes": 111292
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.1499,
+        0.2,
+        0.1416
+      ]
+    },
+    "plant-tall": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/plant-tall.high.glb",
+          "triangles": 22000,
+          "bytes": 380856
+        },
+        "medium": {
+          "file": "models/plant-tall.medium.glb",
+          "triangles": 11000,
+          "bytes": 182056
+        },
+        "low": {
+          "file": "models/plant-tall.low.glb",
+          "triangles": 5000,
+          "bytes": 121772
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.8683,
+        1.35,
+        0.8
+      ]
+    },
+    "plinth": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/plinth.high.glb",
+          "triangles": 22000,
+          "bytes": 312400
+        },
+        "medium": {
+          "file": "models/plinth.medium.glb",
+          "triangles": 10998,
+          "bytes": 157744
+        },
+        "low": {
+          "file": "models/plinth.low.glb",
+          "triangles": 4994,
+          "bytes": 101056
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.58,
+        0.99,
+        0.58
+      ]
+    },
+    "priya": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/priya.high.glb",
+          "triangles": 60000,
+          "bytes": 959760
+        },
+        "medium": {
+          "file": "models/priya.medium.glb",
+          "triangles": 28000,
+          "bytes": 684112
+        },
+        "low": {
+          "file": "models/priya.low.glb",
+          "triangles": 12000,
+          "bytes": 298252
+        }
+      },
+      "height": 1.35,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          23,
+          24,
+          25
+        ],
+        "legL": [
+          37,
+          38,
+          39
+        ],
+        "legR": [
+          41,
+          42,
+          43
+        ]
+      }
+    },
+    "riley": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/riley.high.glb",
+          "triangles": 60000,
+          "bytes": 923400
+        },
+        "medium": {
+          "file": "models/riley.medium.glb",
+          "triangles": 28000,
+          "bytes": 644956
+        },
+        "low": {
+          "file": "models/riley.low.glb",
+          "triangles": 12000,
+          "bytes": 283752
+        }
+      },
+      "height": 1.34,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          24,
+          25,
+          26
+        ],
+        "legL": [
+          38,
+          39,
+          40
+        ],
+        "legR": [
+          42,
+          43,
+          44
+        ]
+      }
+    },
+    "ring": {
+      "kind": "prop",
+      "world": "haven",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "high": {
+          "file": "models/ring.high.glb",
+          "triangles": 60000,
+          "bytes": 1575268
+        },
+        "medium": {
+          "file": "models/ring.medium.glb",
+          "triangles": 24994,
+          "bytes": 679028
+        },
+        "low": {
+          "file": "models/ring.low.glb",
+          "triangles": 9992,
+          "bytes": 269588
+        }
+      },
+      "size": [
+        2.304,
+        2.3039,
+        0.3
+      ]
+    },
+    "sam": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/sam.high.glb",
+          "triangles": 60000,
+          "bytes": 987820
+        },
+        "medium": {
+          "file": "models/sam.medium.glb",
+          "triangles": 28000,
+          "bytes": 708832
+        },
+        "low": {
+          "file": "models/sam.low.glb",
+          "triangles": 12000,
+          "bytes": 303988
+        }
+      },
+      "height": 1.4,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          26,
+          27,
+          28
+        ],
+        "legL": [
+          44,
+          45,
+          46
+        ],
+        "legR": [
+          48,
+          49,
+          50
+        ]
+      }
+    },
+    "slate": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/slate.high.glb",
+          "triangles": 7000,
+          "bytes": 627572
+        },
+        "medium": {
+          "file": "models/slate.medium.glb",
+          "triangles": 3500,
+          "bytes": 194144
+        },
+        "low": {
+          "file": "models/slate.low.glb",
+          "triangles": 1800,
+          "bytes": 174056
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.3,
+        0.0433,
+        0.2995
+      ]
+    },
+    "stepping-stone": {
+      "kind": "prop",
+      "world": "haven",
+      "tiers": {
+        "high": {
+          "file": "models/stepping-stone.high.glb",
+          "triangles": 6993,
+          "bytes": 355516
+        },
+        "medium": {
+          "file": "models/stepping-stone.medium.glb",
+          "triangles": 3497,
+          "bytes": 147228
+        },
+        "low": {
+          "file": "models/stepping-stone.low.glb",
+          "triangles": 1799,
+          "bytes": 127864
+        }
+      },
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "size": [
+        1,
+        0.2399,
+        1.0298
+      ]
+    },
+    "study-desk": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/study-desk.high.glb",
+          "triangles": 59996,
+          "bytes": 1363268
+        },
+        "medium": {
+          "file": "models/study-desk.medium.glb",
+          "triangles": 25000,
+          "bytes": 640232
+        },
+        "low": {
+          "file": "models/study-desk.low.glb",
+          "triangles": 10000,
+          "bytes": 297276
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.9,
+        0.74,
+        0.72
+      ]
+    },
+    "teacher": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/teacher.high.glb",
+          "triangles": 90000,
+          "bytes": 1800624
+        },
+        "medium": {
+          "file": "models/teacher.medium.glb",
+          "triangles": 39997,
+          "bytes": 807128
+        },
+        "low": {
+          "file": "models/teacher.low.glb",
+          "triangles": 16000,
+          "bytes": 347856
+        }
+      },
+      "height": 1.64,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 2,
+        "neck": 3,
+        "head": 4,
+        "armL": [
+          6,
+          7,
+          8
+        ],
+        "armR": [
+          16,
+          17,
+          18
+        ],
+        "legL": [
+          27,
+          28,
+          29
+        ],
+        "legR": [
+          31,
+          32,
+          33
+        ]
+      }
+    },
+    "teacher-desk": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/teacher-desk.high.glb",
+          "triangles": 21998,
+          "bytes": 568588
+        },
+        "medium": {
+          "file": "models/teacher-desk.medium.glb",
+          "triangles": 10994,
+          "bytes": 266804
+        },
+        "low": {
+          "file": "models/teacher-desk.low.glb",
+          "triangles": 4998,
+          "bytes": 197160
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        0.8085,
+        0.76,
+        0.4707
+      ]
+    },
+    "theo": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/theo.high.glb",
+          "triangles": 59998,
+          "bytes": 962872
+        },
+        "medium": {
+          "file": "models/theo.medium.glb",
+          "triangles": 28000,
+          "bytes": 681628
+        },
+        "low": {
+          "file": "models/theo.low.glb",
+          "triangles": 12000,
+          "bytes": 292144
+        }
+      },
+      "height": 1.41,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          26,
+          27,
+          28
+        ],
+        "legL": [
+          44,
+          45,
+          46
+        ],
+        "legR": [
+          48,
+          49,
+          50
+        ]
+      }
+    },
+    "wall-shelf": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/wall-shelf.high.glb",
+          "triangles": 21999,
+          "bytes": 637820
+        },
+        "medium": {
+          "file": "models/wall-shelf.medium.glb",
+          "triangles": 10999,
+          "bytes": 279024
+        },
+        "low": {
+          "file": "models/wall-shelf.low.glb",
+          "triangles": 4999,
+          "bytes": 214184
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.2,
+        0.56,
+        0.3
+      ]
+    },
+    "wardrobe": {
+      "kind": "prop",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/wardrobe.high.glb",
+          "triangles": 22000,
+          "bytes": 420456
+        },
+        "medium": {
+          "file": "models/wardrobe.medium.glb",
+          "triangles": 10999,
+          "bytes": 185840
+        },
+        "low": {
+          "file": "models/wardrobe.low.glb",
+          "triangles": 4998,
+          "bytes": 128608
+        }
+      },
+      "glow": {
+        "color": "#9fe8ff",
+        "strength": 2
+      },
+      "size": [
+        1.1,
+        1.9,
+        0.58
+      ]
+    },
+    "yusra": {
+      "kind": "character",
+      "world": "real",
+      "tiers": {
+        "high": {
+          "file": "models/yusra.high.glb",
+          "triangles": 60000,
+          "bytes": 985520
+        },
+        "medium": {
+          "file": "models/yusra.medium.glb",
+          "triangles": 28000,
+          "bytes": 708540
+        },
+        "low": {
+          "file": "models/yusra.low.glb",
+          "triangles": 12000,
+          "bytes": 296176
+        }
+      },
+      "height": 1.35,
+      "rig": {
+        "hips": 0,
+        "spine": 1,
+        "chest": 3,
+        "neck": 4,
+        "head": 5,
+        "armL": [
+          7,
+          8,
+          9
+        ],
+        "armR": [
+          23,
+          24,
+          25
+        ],
+        "legL": [
+          38,
+          39,
+          40
+        ],
+        "legR": [
+          42,
+          43,
+          44
+        ]
+      }
+    }
+  },
+  "pictures": {
+    "floor-bedroom": {
+      "world": "real",
+      "file": "pictures/floor-bedroom.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "tile": true,
+      "normal": "pictures/floor-bedroom.normal.webp"
+    },
+    "floor-classroom": {
+      "world": "real",
+      "file": "pictures/floor-classroom.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "tile": true,
+      "normal": "pictures/floor-classroom.normal.webp"
+    },
+    "pinboard": {
+      "world": "real",
+      "file": "pictures/pinboard.webp",
+      "size": [
+        2048,
+        832
+      ],
+      "tile": false
+    },
+    "poster-harbour": {
+      "world": "real",
+      "file": "pictures/poster-harbour.webp",
+      "size": [
+        1024,
+        683
+      ],
+      "tile": false
+    },
+    "poster-newstart": {
+      "world": "real",
+      "file": "pictures/poster-newstart.webp",
+      "size": [
+        1024,
+        683
+      ],
+      "tile": false
+    },
+    "poster-planets": {
+      "world": "real",
+      "file": "pictures/poster-planets.webp",
+      "size": [
+        683,
+        1024
+      ],
+      "tile": false
+    },
+    "poster-stars": {
+      "world": "real",
+      "file": "pictures/poster-stars.webp",
+      "size": [
+        683,
+        1024
+      ],
+      "tile": false
+    },
+    "rug": {
+      "world": "real",
+      "file": "pictures/rug.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "tile": false
+    }
+  }
+}

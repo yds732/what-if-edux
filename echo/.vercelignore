@@ -4,3 +4,7 @@ shots
 dist
 .chrome-profile
 *.log
+assets/.cache
+assets/sheets
+tools
+tests

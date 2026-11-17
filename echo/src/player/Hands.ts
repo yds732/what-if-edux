@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import type { App } from '../app/App';
-import { handGeometry, mirrorX } from '../characters/body';
-import { merge, sweep, tint, v3 } from '../core/geo';
+import type { AssetLibrary } from '../assets/AssetLibrary';
 import { damp } from '../core/math';
 import type { Input } from '../input/Input';
 import type { Player } from './Player';
@@ -39,7 +38,7 @@ const POSES: Record<HandPose, Pose> = {
 
 export type HandStyle = 'real' | 'haven';
 
-const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _m = new THREE.Matrix4();
+const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 
 const orientation = (pose: Pose, side: 1 | -1, out: THREE.Quaternion): THREE.Quaternion => {
   // the hand mesh has fingers along -Y; a right hand's palm faces +X
@@ -50,28 +49,98 @@ const orientation = (pose: Pose, side: 1 | -1, out: THREE.Quaternion): THREE.Qua
   return out.setFromRotationMatrix(_m.makeBasis(_x, _y, _z));
 };
 
+/** Where the wrist is in the hand model, in metres from its origin. */
+const WRIST = new THREE.Vector3(0, 0.064, 0.085);
+/** The skin as the model's texture has it painted: what the player's chosen tone is measured against. */
+const PAINTED_SKIN = new THREE.Color(0xe7a671);
+
+/** Where the player's elbows are, about the camera: the sleeves run back to them, out of sight. */
+const ELBOW = new THREE.Vector3(0.27, -0.5, 0.16);
+const BACK = new THREE.Vector3(0, 0, -1);
+
+/**
+ * Gives the hand model a wrist. The model is one stiff piece; with two bones, and every vertex given to the hand,
+ * the forearm or (through the cuff) a share of each, the sleeve can turn where the hand does not.
+ *
+ * @returns the forearm's bone, which lies along -Z from the wrist until it is turned
+ */
+const articulate = (model: THREE.Object3D): THREE.Bone => {
+  const hand = new THREE.Bone(), forearm = new THREE.Bone();
+  hand.position.copy(WRIST);
+  hand.add(forearm);
+  model.add(hand);
+  model.updateMatrixWorld(true);
+  const skeleton = new THREE.Skeleton([hand, forearm]);
+  const meshes: THREE.Mesh[] = [];
+  model.traverse((o) => {
+    if (o instanceof THREE.Mesh) meshes.push(o);
+  });
+  for (const mesh of meshes) {
+    const geometry = mesh.geometry as THREE.BufferGeometry;
+    // the two hands share their geometry: the first to arrive works the weights out
+    if (!geometry.getAttribute('skinIndex')) {
+      const position = geometry.getAttribute('position');
+      const index = new Uint8Array(position.count * 4), weight = new Float32Array(position.count * 4);
+      for (let i = 0; i < position.count; i++) {
+        const z = _v.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).z;
+        const w = 1 - THREE.MathUtils.smoothstep(z, WRIST.z - 0.09, WRIST.z - 0.01);
+        index[i * 4 + 1] = 1;
+        weight[i * 4] = 1 - w;
+        weight[i * 4 + 1] = w;
+      }
+      geometry.setAttribute('skinIndex', new THREE.BufferAttribute(index, 4));
+      geometry.setAttribute('skinWeight', new THREE.BufferAttribute(weight, 4));
+    }
+    const skinned = new THREE.SkinnedMesh(geometry, mesh.material);
+    skinned.position.copy(mesh.position);
+    skinned.quaternion.copy(mesh.quaternion);
+    skinned.scale.copy(mesh.scale);
+    skinned.castShadow = mesh.castShadow;
+    skinned.frustumCulled = mesh.frustumCulled;
+    mesh.parent!.add(skinned);
+    mesh.parent!.remove(mesh);
+    skinned.updateMatrixWorld(true);
+    skinned.bind(skeleton);
+  }
+  return forearm;
+};
+
 class Hand {
   readonly group = new THREE.Group();
   /** A point just above the palm, for things the hand carries. */
   readonly palm = new THREE.Group();
   pose: HandPose = 'rest';
+  private forearm: THREE.Bone | null = null;
   private readonly targetQ = new THREE.Quaternion();
   private readonly targetP = new THREE.Vector3();
 
-  constructor(readonly side: 1 | -1, material: THREE.Material) {
-    const hand = handGeometry(1.0);
-    const sleeve = merge([
-      tint(sweep([v3(0, 0.012, 0), v3(0, 0.4, 0.02)], (t) => 0.039 + 0.016 * t, { radial: 12, steps: 6, startCap: 'flat', endCap: 'flat' }), 0xffffff),
-      tint(sweep([v3(0, 0.0, 0), v3(0, 0.04, 0)], () => 0.043, { radial: 12, steps: 2, startCap: 'flat', endCap: 'flat' }), 0x999999),
-    ]);
-    // vertex colour marks what is skin (red channel 0) and what is cloth, so one material can dress both
-    const geo = merge([tint(hand, 0x000000), sleeve]);
-    if (side > 0) mirrorX(geo);
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.frustumCulled = false;
-    mesh.castShadow = false;
-    this.group.add(mesh, this.palm);
+  constructor(readonly side: 1 | -1) {
+    this.group.add(this.palm);
     this.palm.position.set(side * 0.062, -0.052, 0.004);
+  }
+
+  /**
+   * Puts the generated hand and sleeve on. The model is a right hand lying along Z, fingers to +Z and palm down;
+   * here a hand has its wrist on the origin, its fingers along -Y and, on the right, its palm to +X. The left
+   * hand is the right one in a mirror.
+   */
+  wear(model: THREE.Object3D): void {
+    this.forearm = articulate(model);
+    const fitted = new THREE.Group();
+    fitted.quaternion.setFromRotationMatrix(_m.makeBasis(_x.set(0, 0, 1), _y.set(-1, 0, 0), _z.set(0, -1, 0)));
+    model.position.copy(WRIST).negate();
+    fitted.add(model);
+    const sided = new THREE.Group();
+    sided.scale.x = this.side;
+    sided.add(fitted);
+    this.group.add(sided);
+  }
+
+  /** Turns the forearm at the wrist to run back to the elbow, a point in the world. */
+  aim(elbow: THREE.Vector3): void {
+    if (!this.forearm) return;
+    this.forearm.parent!.worldToLocal(_v.copy(elbow));
+    this.forearm.quaternion.setFromUnitVectors(BACK, _v.normalize());
   }
 
   snap(): void {
@@ -100,39 +169,67 @@ export class Hands {
   readonly left: Hand;
   /** Higher is snappier. */
   rate = 11;
-  private readonly material: THREE.MeshStandardMaterial;
-  private readonly uniforms = { uSkin: { value: new THREE.Color(0xf7efe6) }, uSleeve: { value: new THREE.Color(0x3f6b6a) }, uCuff: { value: new THREE.Color(0xe9e4d8) }, uGlow: { value: 0 } };
+  /** Settles once the hands have their models on. */
+  readonly ready: Promise<void>;
+  private readonly uniforms = { uSkin: { value: new THREE.Color(0xf7efe6) }, uPainted: { value: PAINTED_SKIN }, uGlow: { value: 0 } };
   private swayX = 0;
   private swayY = 0;
   private glow = 0;
   private glowTarget = 0;
   private gripped = false;
 
-  constructor(app: App, private readonly input: Input, private readonly player: Player) {
-    this.material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
-    this.material.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, this.uniforms);
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSkin, uSleeve, uCuff; uniform float uGlow;')
-        .replace('#include <color_fragment>', `#include <color_fragment>
-          float cloth = smoothstep(0.05, 0.3, vColor.r), cuff = cloth * (1.0 - smoothstep(0.5, 0.9, vColor.r));
-          vec3 real = mix(uSkin, mix(uSleeve, uCuff, cuff), cloth);
-          // in Haven the same hands are made of pale light
-          vec3 haven = mix(vec3(0.9, 0.92, 1.0), mix(vec3(0.95, 0.94, 1.0), vec3(1.0, 0.82, 0.45), cuff), cloth);
-          diffuseColor.rgb = mix(real, haven, uGlow);`)
-        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-          float rimLight = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.2);
-          totalEmissiveRadiance += uGlow * (vec3(0.5, 0.62, 1.0) * (0.16 + 1.1 * rimLight) + vec3(1.0, 0.75, 0.35) * 1.4 * cuff);
-          // in the real world the hands are a neutral warm white that glows softly, so they belong to any player
-          totalEmissiveRadiance += (1.0 - uGlow) * (1.0 - cloth) * vec3(1.0, 0.86, 0.68) * (0.14 + 0.55 * rimLight);`);
-    };
-    this.material.customProgramCacheKey = () => 'echo-hands';
-    this.right = new Hand(1, this.material);
-    this.left = new Hand(-1, this.material);
+  constructor(app: App, private readonly input: Input, private readonly player: Player, assets: AssetLibrary) {
+    this.right = new Hand(1);
+    this.left = new Hand(-1);
     this.root.add(this.right.group, this.left.group);
     this.right.snap();
     this.left.snap();
+    // a little of the room's light comes back off the player's own body: without it, hands in a dark room go grey
+    const bounce = new THREE.PointLight(0xffe6d0, 0.09, 1.3, 2);
+    bounce.position.set(0, -0.1, -0.16);
+    this.root.add(bounce);
     app.camera.add(this.root);
+    this.ready = this.dress(assets);
+  }
+
+  private async dress(assets: AssetLibrary): Promise<void> {
+    let material: THREE.MeshStandardMaterial | null = null;
+    for (const hand of [this.right, this.left]) {
+      const model = await assets.instance('hand');
+      model.traverse((o) => {
+        if (!(o instanceof THREE.Mesh)) return;
+        material ??= this.tone(o.material as THREE.MeshStandardMaterial);
+        o.material = material;
+        o.frustumCulled = false;
+        o.castShadow = false;
+      });
+      hand.wear(model);
+    }
+  }
+
+  /** One material for both hands: the painted skin takes the player's tone, and in Haven the hands turn to light. */
+  private tone(painted: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
+    const material = painted.clone();
+    material.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, this.uniforms);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSkin, uPainted; uniform float uGlow;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          // skin is the warm paint and the sleeve the cool: the skin is retinted, keeping its shading
+          float skin = smoothstep(0.03, 0.14, diffuseColor.r - diffuseColor.b);
+          vec3 real = mix(diffuseColor.rgb, diffuseColor.rgb * uSkin / uPainted, skin);
+          // in Haven the same hands are made of pale light
+          float shade = 0.62 + 0.5 * dot(diffuseColor.rgb, vec3(0.3, 0.5, 0.2)) / mix(0.2, 0.5, skin);
+          vec3 haven = mix(vec3(0.84, 0.85, 1.0), vec3(0.9, 0.92, 1.0), skin) * min(shade, 1.1);
+          diffuseColor.rgb = mix(real, haven, uGlow);`)
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+          float rimLight = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.2);
+          totalEmissiveRadiance += uGlow * vec3(0.5, 0.62, 1.0) * (0.16 + 1.1 * rimLight);
+          // in the real world the hands are a neutral warm white that glows softly, so they belong to any player
+          totalEmissiveRadiance += (1.0 - uGlow) * skin * vec3(1.0, 0.86, 0.68) * (0.14 + 0.55 * rimLight);`);
+    };
+    material.customProgramCacheKey = () => 'echo-hands';
+    return material;
   }
 
   /** The real world's hand colour: a neutral warm white by default. */
@@ -176,6 +273,7 @@ export class Hands {
   snap(): void {
     this.right.snap();
     this.left.snap();
+    this.aimForearms();
   }
 
   update(dt: number): void {
@@ -189,5 +287,12 @@ export class Hands {
     }
     this.glow = damp(this.glow, this.glowTarget, 3, dt);
     this.uniforms.uGlow.value = this.glow;
+    this.aimForearms();
+  }
+
+  /** The sleeves run back from wherever the hands are to the player's elbows. */
+  private aimForearms(): void {
+    this.root.updateWorldMatrix(true, true);
+    for (const hand of [this.right, this.left]) hand.aim(this.root.localToWorld(_x.set(ELBOW.x * hand.side, ELBOW.y, ELBOW.z)));
   }
 }

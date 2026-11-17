@@ -1,9 +1,8 @@
 import * as THREE from 'three';
-import { blob, merge, place } from '../core/geo';
 
 /**
- * A head is one smooth mesh; its face is drawn by the fragment shader straight onto the skin from a handful of
- * numbers (how open each eye is, how the mouth curves...). Expressions are therefore continuous, crisp at any
+ * A figure's head is modelled blank; its face is drawn by the fragment shader straight onto the skin from a handful
+ * of numbers (how open each eye is, how the mouth curves...). Expressions are therefore continuous, crisp at any
  * distance, lit like the rest of the head, and cost nothing beyond the head's own draw call.
  */
 export interface FaceState {
@@ -34,7 +33,6 @@ export const neutralFace = (): FaceState => ({
 });
 
 export interface FaceLook {
-  skin: THREE.ColorRepresentation;
   eyeColor?: THREE.ColorRepresentation;
   browColor?: THREE.ColorRepresentation;
   /** Companions carry a glint of their own light in the eye. */
@@ -45,7 +43,7 @@ export interface FaceLook {
 
 const FACE_PARS = /* glsl */ `
 varying vec3 vHeadPos;
-uniform float uHeadR, uEyeScale, uBlush;
+uniform float uEyeScale, uBlush;
 uniform vec4 uEyes;    // openL, openR, smile, -
 uniform vec2 uGaze;
 uniform vec4 uMouth;   // open, smile, width, -
@@ -70,8 +68,9 @@ float fSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; return length(p
 
 const FACE_COLOR = /* glsl */ `
 {
-  vec2 f = vHeadPos.xy / uHeadR;
-  float front = smoothstep(0.05, 0.3, vHeadPos.z / uHeadR);
+  vec2 f = vHeadPos.xy;
+  // the face is on the front of the head, and nowhere else on the body
+  float front = smoothstep(0.05, 0.3, vHeadPos.z) * (1.0 - smoothstep(1.25, 1.45, length(vHeadPos)));
   if (front > 0.0) {
     vec3 skin = diffuseColor.rgb;
     // cheeks
@@ -121,36 +120,50 @@ const FACE_COLOR = /* glsl */ `
 }
 `;
 
-export class FaceMaterial extends THREE.MeshStandardMaterial {
+/**
+ * A face drawn onto whatever material covers a head. The material's vertices are taken into "face space" by
+ * `toFace`: origin at the middle of the head, +Z out of the face, +X toward the character's left, one unit per
+ * head radius. A generated head keeps its own textures; the features go on top of them.
+ */
+export class FaceLayer {
   private readonly u = {
-    uHeadR: { value: 0.135 }, uEyeScale: { value: 1 }, uBlush: { value: 0.25 },
+    uFaceMatrix: { value: new THREE.Matrix4() }, uEyeScale: { value: 1 }, uBlush: { value: 0.25 },
     uEyes: { value: new THREE.Vector4(1, 1, 0, 0) }, uGaze: { value: new THREE.Vector2() },
     uMouth: { value: new THREE.Vector4(0, 0.35, 1, 0) }, uBrow: { value: new THREE.Vector2() },
     uEyeColor: { value: new THREE.Color(0x15121a) }, uBrowColor: { value: new THREE.Color(0x3a2a22) }, uGlintColor: { value: new THREE.Color(0xffffff) },
   };
 
-  constructor(headRadius: number, look: FaceLook) {
-    super({ color: look.skin, roughness: 0.62, metalness: 0 });
-    this.u.uHeadR.value = headRadius;
+  constructor(look: Partial<FaceLook>, toFace: THREE.Matrix4) {
+    this.u.uFaceMatrix.value.copy(toFace);
     this.u.uEyeScale.value = look.eyeScale ?? 1;
     if (look.eyeColor !== undefined) this.u.uEyeColor.value.set(look.eyeColor);
     if (look.browColor !== undefined) this.u.uBrowColor.value.set(look.browColor);
     if (look.glintColor !== undefined) this.u.uGlintColor.value.set(look.glintColor);
-    this.onBeforeCompile = (shader) => {
+  }
+
+  /** Changes where the face sits on the head (for fitting it to a generated head). */
+  setPlacement(toFace: THREE.Matrix4): void {
+    this.u.uFaceMatrix.value.copy(toFace);
+  }
+
+  /** Adds the face to a material. Call before the material is first used. */
+  install(material: THREE.MeshStandardMaterial): void {
+    const before = material.onBeforeCompile.bind(material);
+    material.onBeforeCompile = (shader, renderer) => {
+      before(shader, renderer);
       Object.assign(shader.uniforms, this.u);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vHeadPos;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHeadPos = position;');
+        .replace('#include <common>', '#include <common>\nvarying vec3 vHeadPos;\nuniform mat4 uFaceMatrix;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvHeadPos = (uFaceMatrix * vec4(position, 1.0)).xyz;');
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${FACE_PARS}`)
         .replace('#include <color_fragment>', `#include <color_fragment>\n${FACE_COLOR}`)
         .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.16, faceGloss);')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += faceGlint;');
     };
-  }
-
-  override customProgramCacheKey(): string {
-    return 'echo-face';
+    const key = material.customProgramCacheKey.bind(material);
+    material.customProgramCacheKey = () => `${key()}|echo-face`;
+    material.needsUpdate = true;
   }
 
   apply(s: FaceState): void {
@@ -161,22 +174,3 @@ export class FaceMaterial extends THREE.MeshStandardMaterial {
     this.u.uBlush.value = s.blush;
   }
 }
-
-/** Head centred on the origin, facing +Z: a soft egg with a narrower jaw, ears and the hint of a nose. */
-export const headGeometry = (R: number, detail = 1): THREE.BufferGeometry => {
-  const skull = blob(R, R * 1.03, R * 0.985, Math.round(6 + 6 * detail), (p) => {
-    if (p.y < 0) {
-      const k = p.y * p.y;
-      p.x *= 1 - 0.2 * k;
-      p.z *= 1 - 0.1 * k;
-    }
-    if (p.z > 0) p.z *= 0.955;
-    // cheeks: a little fullness low on the front sides
-    const cheek = Math.exp(-((p.y + 0.36) ** 2) / 0.07) * Math.max(0, p.z) * Math.abs(p.x);
-    p.x += Math.sign(p.x) * 0.05 * cheek;
-    p.z += 0.03 * cheek;
-  });
-  const parts = [skull, place(blob(R * 0.06, R * 0.05, R * 0.07, 3), [0, -R * 0.25, R * 0.9])];
-  for (const s of [-1, 1]) parts.push(place(blob(R * 0.12, R * 0.2, R * 0.15, 3), [s * R * 0.96, -R * 0.06, -R * 0.04], [0, s * 0.3, 0]));
-  return merge(parts);
-};

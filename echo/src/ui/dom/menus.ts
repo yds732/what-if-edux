@@ -130,8 +130,10 @@ class Menus {
     // taking the headset off mid-story pauses the game on the flat screen
     game.xr.onEnd.push(() => this.pause());
     this.applySettings();
-    game.onLoading = (label) => {
-      this.loading.innerHTML = label ? `Building ${label === 'haven' ? 'Haven' : `the ${label}`}<i></i>` : '';
+    game.onLoading = (label, bytes) => {
+      // the worlds are tens of megabytes of models: the count going up says the wait is going somewhere
+      const arrived = bytes ? ` · ${(bytes / 1e6).toFixed(1)} MB` : '';
+      this.loading.innerHTML = label ? `Building ${label === 'haven' ? 'Haven' : `the ${label}`}${arrived}<i></i>` : '';
       this.loading.style.opacity = label ? '1' : '0';
     };
     game.input.onLockLost.on(() => this.pause());

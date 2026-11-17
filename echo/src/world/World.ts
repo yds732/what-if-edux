@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import type { QualitySettings } from '../app/quality';
+import type { AssetLibrary } from '../assets/AssetLibrary';
 import type { Character } from '../characters/Character';
-import { makeLook, type FrameInput, type Look } from '../render/PostPipeline';
+import { makeLook, type FrameInput, type Look, type ShaftSource } from '../render/PostPipeline';
 import type { ThemeName } from '../ui/draw';
 import { Colliders } from './colliders';
 
 export interface BuildContext {
   readonly renderer: THREE.WebGLRenderer;
   readonly quality: QualitySettings;
+  /** The generated models. */
+  readonly assets: AssetLibrary;
   /** Yields to the browser so a loader can repaint; call between heavy build steps. */
   step(label?: string): Promise<void>;
 }
@@ -60,6 +63,10 @@ export abstract class World {
   /** Colour the XR path fades through and the flat path clears to. */
   readonly clearColor = new THREE.Color(0x000000);
   prepass: FrameInput['prepass'] = null;
+  /** Where the lens is focused when the story has nothing for it to look at, in metres: the room, or the far rings. */
+  restFocus = 7;
+  /** Where light shafts come from here, for the look's `shafts` to draw on. */
+  shafts: ShaftSource | null = null;
 
   abstract build(ctx: BuildContext): Promise<void>;
 

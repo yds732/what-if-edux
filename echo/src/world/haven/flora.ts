@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { blob, curve1, fill, merge, place, sweep, tint, tintBy, v3 } from '../../core/geo';
+import { blob, curve1, merge, place, sweep, tint, tintBy, v3 } from '../../core/geo';
 import { Rng, TAU, fbm3, lerp, smoothstep } from '../../core/math';
 
 /** Shared clock for everything that sways. */
@@ -247,39 +247,6 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   petalMesh.frustumCulled = false;
   group.add(petalMesh);
   return { group, canopy };
-};
-
-// ---------------------------------------------------------------------------------------------------- crystals
-
-/** A cluster of faceted prisms that hold their own light, brightest at the root. */
-export const buildCrystals = (rng: Rng, count: number, scale: number, color: THREE.ColorRepresentation): THREE.Mesh => {
-  const parts: THREE.BufferGeometry[] = [];
-  const base = new THREE.Color(color);
-  for (let i = 0; i < count; i++) {
-    const h = scale * rng.range(0.45, 1.25) * (i === 0 ? 1.35 : 1), r = h * rng.range(0.13, 0.2);
-    const body = new THREE.CylinderGeometry(r * 0.82, r, h * 0.78, 6, 1);
-    body.translate(0, h * 0.39, 0);
-    const tip = new THREE.ConeGeometry(r * 0.82, h * 0.26, 6, 1);
-    tip.translate(0, h * 0.78 + h * 0.13, 0);
-    const g = merge([body.toNonIndexed(), tip.toNonIndexed()]);
-    g.deleteAttribute('uv');
-    const lean = i === 0 ? 0.08 : rng.range(0.2, 0.75), a = rng.range(0, TAU), d = i === 0 ? 0 : scale * rng.range(0.12, 0.42);
-    place(g, [Math.cos(a) * d, -0.05 * scale, Math.sin(a) * d], [Math.sin(a) * lean, rng.range(0, 1), -Math.cos(a) * lean]);
-    const top = h * 1.04;
-    tintBy(g, (p, out) => void out.copy(base).multiplyScalar(lerp(1.5, 0.45, smoothstep(0, top, p.y))));
-    fill(g, 'glow', 1);
-    parts.push(g);
-  }
-  const geo = merge(parts);
-  geo.computeVertexNormals();
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.12, metalness: 0.1, flatShading: true });
-  mat.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.95;');
-  };
-  mat.customProgramCacheKey = () => 'echo-crystal';
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  return mesh;
 };
 
 // ---------------------------------------------------------------------------------------------------- glow flowers
