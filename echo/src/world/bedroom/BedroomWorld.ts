@@ -79,7 +79,7 @@ export class BedroomWorld extends World {
   private callTarget = 0;
   private rain!: THREE.Mesh;
   private dust!: Motes;
-  private holoDesk!: { group: THREE.Group; update(time: number): void };
+  private holoDesk!: { group: THREE.Group; update(time: number, hide: number): void };
   private readonly clock = { value: 0 };
   private readonly lightDirection = new THREE.Vector3();
 
@@ -88,7 +88,7 @@ export class BedroomWorld extends World {
     this.near = 0.05;
     this.far = 1200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 1.02, contrast: 0.2, vignette: 0.38, grain: 0.016, chroma: 0.004, dof: 0.75, streak: 0.3,
+      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 1.02, contrast: 0.2, vignette: 0.3, grain: 0.006, chroma: 0, dof: 0, streak: 0.3,
       shadowTint: new THREE.Color(0.0, 0.006, 0.02), highlightTint: new THREE.Color(0.02, 0.008, -0.01),
     }));
     this.clearColor.set(0x0b0d16);
@@ -430,6 +430,9 @@ export class BedroomWorld extends World {
     this.holoTarget = 1;
     const theme = THEMES.real;
     this.hologram.paint((ctx, w, h) => {
+      ctx.fillStyle = 'rgba(10, 14, 26, 0.94)';
+      roundRect(ctx, 24, 24, w - 48, h - 48, 0);
+      ctx.fill();
       glass(ctx, 24, 24, w - 48, h - 48, theme, { radius: 34, glow: 1.6, borderWidth: 2.5, border: 'rgba(160, 205, 255, 0.75)' });
       // header: who is writing
       ctx.fillStyle = '#9fc6ff';
@@ -450,16 +453,16 @@ export class BedroomWorld extends World {
       ctx.fillText('Classmate · Harbour District School', 126, 104);
       let y = 150;
       for (const m of messages) {
-        ctx.font = font(400, 25);
-        const lines = wrap(ctx, m.text, w - 250);
-        const bw = Math.min(w - 190, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh = lines.length * 33 + 26;
+        ctx.font = font(500, 28);
+        const lines = wrap(ctx, m.text, w - 230);
+        const bw = Math.min(w - 170, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh = lines.length * 36 + 26;
         const mine = m.from === 'you';
         const x = mine ? w - 60 - bw : 60;
-        ctx.fillStyle = mine ? 'rgba(120, 190, 255, 0.34)' : 'rgba(255, 255, 255, 0.13)';
+        ctx.fillStyle = mine ? 'rgba(70, 130, 220, 0.75)' : 'rgba(255, 255, 255, 0.16)';
         roundRect(ctx, x, y, bw, bh, 20);
         ctx.fill();
         ctx.fillStyle = theme.text;
-        lines.forEach((l, i) => ctx.fillText(l, x + 22, y + 30 + i * 33));
+        lines.forEach((l, i) => ctx.fillText(l, x + 22, y + 31 + i * 36));
         y += bh + 12;
       }
       if (footer) {
@@ -468,7 +471,7 @@ export class BedroomWorld extends World {
         ctx.fillStyle = 'rgba(255, 190, 120, 0.2)';
         roundRect(ctx, 54, fy, w - 108, 62, 16);
         ctx.fill();
-        ctx.font = font(600, 19);
+        ctx.font = font(600, 22);
         ctx.fillStyle = '#ffd9a8';
         ctx.fillText(footer.left, 76, fy + 32);
         ctx.textAlign = 'right';
@@ -493,7 +496,7 @@ export class BedroomWorld extends World {
     super.update(frame);
     const { dt, time } = frame;
     this.city.update(time);
-    this.holoDesk.update(time);
+    this.holoDesk.update(time, Math.max(this.holoShown, this.callShown));
     this.lampShade.emissiveIntensity = this.lampGlow.value;
     this.clock.value = time;
     this.dust.setPixelHeight(frame.pixelHeight);
@@ -1061,7 +1064,7 @@ const holoCard = (wide: number, tall: number, paint: (c: CanvasRenderingContext2
 };
 
 /** The study station on the desk: a lit puck, a beam, a floating glass screen with a ringed planet in front of it, and two side cards. */
-const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group; update(time: number): void } => {
+const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group; update(time: number, hide: number): void } => {
   const group = new THREE.Group();
   const puckMat = new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 0.35, metalness: 0.5 });
   const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.024, 48), puckMat);
@@ -1140,7 +1143,11 @@ const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group
   group.rotation.y = -0.22;
   return {
     group,
-    update(time) {
+    update(time, hide) {
+      // it steps aside while the phone is showing something, so the two never overlap
+      float.visible = hide < 0.98;
+      float.scale.setScalar(Math.max(0.001, 1 - hide));
+      light.intensity = 0.9 * (1 - hide);
       float.position.y = 0.52 + Math.sin(time * 1.1) * 0.006;
       globe.rotation.y = time * 0.4;
       band.rotation.z = time * 0.15;
@@ -1385,13 +1392,10 @@ const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group
   const throwMat = new THREE.MeshStandardMaterial({ map: knit(), roughness: 1, side: THREE.DoubleSide });
   const blanket = new THREE.Mesh(drape(mw + 0.02, 0.42, mTop + 0.075, 0.3, 0.2, { seed: 7, nz: 40 }), throwMat);
   blanket.position.set(0, 0, ml / 2 - 0.42);
-  // two pillows: one propped against the wall, one lying in front of it
+  // a plump pillow at the head
   const pillowMat = new THREE.MeshStandardMaterial({ color: 0xf6f5f2, roughness: 0.88 });
-  const back = new THREE.Mesh(pillowGeo(wide * 0.78, 0.22, 0.44), pillowMat);
-  back.position.set(0, mTop + 0.2, -long / 2 + 0.15);
-  back.rotation.x = -1.05;
   const front = new THREE.Mesh(pillowGeo(wide * 0.72, 0.13, 0.4), pillowMat);
-  front.position.set(0.03, mTop + 0.06, -long / 2 + 0.36);
+  front.position.set(0.03, mTop + 0.06, -long / 2 + 0.3);
   front.rotation.set(-0.08, 0.04, 0);
   // the star plush, resting on the front pillow
   const star = new THREE.Shape();
@@ -1400,9 +1404,9 @@ const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group
     if (k === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r); else star.lineTo(Math.cos(a) * r, Math.sin(a) * r);
   }
   const plush = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.022, bevelSegments: 5 }), new THREE.MeshStandardMaterial({ color: 0xf0c03a, roughness: 0.95 }));
-  plush.position.set(0.2, mTop + 0.16, -long / 2 + 0.34);
+  plush.position.set(0.2, mTop + 0.15, -long / 2 + 0.3);
   plush.rotation.set(-0.9, 0.25, 0.2);
-  group.add(plinth, base, ring(0.297), ring(0.103), under, mattress, duvet, turn, blanket, back, front, plush);
+  group.add(plinth, base, ring(0.297), ring(0.103), under, mattress, duvet, turn, blanket, front, plush);
   group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
   group.position.set(x, 0, z);
   return group;
