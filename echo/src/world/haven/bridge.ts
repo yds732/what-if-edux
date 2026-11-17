@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { merge, place, sweep, tint, v3 } from '../../core/geo';
+import { addGlow } from '../../assets/glow';
+import { merge, place, v3 } from '../../core/geo';
 import { TAU, damp } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
 
@@ -75,6 +76,24 @@ void main(){
 
 export type RingState = 'dormant' | 'target' | 'lit';
 
+const _v = new THREE.Vector3();
+
+/** Middle and size of the hole through a ring-shaped model that faces +Z and stands on its origin. */
+const openingOf = (model: THREE.Object3D): { centreY: number; radius: number } => {
+  model.updateMatrixWorld(true);
+  const centreY = new THREE.Box3().setFromObject(model).getCenter(_v).y;
+  let radius = Infinity;
+  model.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const position = (o.geometry as THREE.BufferGeometry).getAttribute('position');
+    for (let i = 0; i < position.count; i++) {
+      _v.fromBufferAttribute(position, i).applyMatrix4(o.matrixWorld);
+      radius = Math.min(radius, Math.hypot(_v.x, _v.y - centreY));
+    }
+  });
+  return { centreY, radius };
+};
+
 export class Ring {
   readonly group = new THREE.Group();
   readonly center: THREE.Vector3;
@@ -83,29 +102,42 @@ export class Ring {
   readonly radius: number;
   state: RingState = 'dormant';
   private readonly hoopMat: THREE.MeshStandardMaterial;
+  /** The hoop's painted gold and opal, which shine brighter as the ring wakes. */
+  private readonly paint: { value: number };
   private readonly filmU = { uTime: { value: 0 }, uPower: { value: 1 }, uColor: { value: GOLD.clone() } };
   private readonly dashes: THREE.Mesh;
   private pulse = 0;
   private glow = 0.5;
   private flash = 0;
 
-  constructor(center: THREE.Vector3, facing: THREE.Vector3, radius = RING_RADIUS) {
+  /** `hoop` is a copy of the ring model, which this ring keeps: it is sized so that its opening is `radius`. */
+  constructor(center: THREE.Vector3, facing: THREE.Vector3, hoop: THREE.Object3D, radius = RING_RADIUS) {
     this.center = center.clone();
     this.radius = radius;
     this.normal = facing.clone().sub(center).setY(0).normalize();
     this.group.position.copy(center);
     this.group.lookAt(center.clone().add(this.normal));
 
-    this.hoopMat = new THREE.MeshStandardMaterial({ color: 0x3a2a12, emissive: GOLD, emissiveIntensity: 1.2, roughness: 0.35, metalness: 0.6 });
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(radius + 0.11, 0.11, 14, 72), this.hoopMat);
+    const opening = openingOf(hoop);
+    const scale = radius / opening.radius;
+    hoop.scale.setScalar(scale);
+    hoop.position.y = -opening.centreY * scale;
+    let material: THREE.MeshStandardMaterial | null = null, paint: { value: number } | null = null;
+    hoop.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      // every ring wakes on its own, so each has a material of its own
+      if (!material) {
+        material = (o.material as THREE.MeshStandardMaterial).clone();
+        material.emissive.copy(GOLD);
+        paint = addGlow(material, { strength: 1, vivid: 0.46 });
+      }
+      o.material = material;
+      o.castShadow = false;
+    });
+    if (!material || !paint) throw new Error('the ring model has no mesh');
+    this.hoopMat = material;
+    this.paint = paint;
     this.group.add(hoop);
-    // four small star points on the hoop, like a compass
-    const studs: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * TAU + Math.PI / 4;
-      studs.push(place(new THREE.OctahedronGeometry(0.16, 0), [Math.cos(a) * (radius + 0.09), Math.sin(a) * (radius + 0.09), 0], [0, 0, a], [0.7, 1.5, 0.7]));
-    }
-    this.group.add(new THREE.Mesh(merge(studs.map((g) => { g.deleteAttribute('uv'); return g; })), this.hoopMat));
 
     const film = new THREE.Mesh(new THREE.CircleGeometry(radius, 48), new THREE.ShaderMaterial({
       vertexShader: FILM_VS, fragmentShader: FILM_FS, uniforms: this.filmU, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
@@ -140,7 +172,10 @@ export class Ring {
     const target = this.state === 'target' ? 2.6 + 1.1 * Math.sin(this.pulse * 3.2) : this.state === 'lit' ? 4.2 : 0.75;
     this.glow = damp(this.glow, target, 6, dt);
     this.flash = Math.max(0, this.flash - dt * 1.6);
-    this.hoopMat.emissiveIntensity = this.glow + this.flash * 14;
+    const level = this.glow + this.flash * 14;
+    // asleep, a ring is its own gold and opal; it only gives off light once it is the one to aim for
+    this.hoopMat.emissiveIntensity = 0.014 * Math.max(0, level - 0.75);
+    this.paint.value = 0.1 + 0.42 * Math.max(0, level - 0.75);
     this.filmU.uTime.value = time;
     this.filmU.uPower.value = damp(this.filmU.uPower.value, this.state === 'lit' ? 0.25 : this.state === 'target' ? 1.5 : 0.7, 5, dt) + this.flash * 3;
     const dashMat = this.dashes.material as THREE.MeshBasicMaterial;
@@ -163,9 +198,11 @@ export interface StarBridge {
   update(dt: number, time: number): void;
 }
 
-export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3): StarBridge => {
+/** `hoops` are three copies of the ring model, one for each ring. */
+export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops: readonly THREE.Object3D[]): StarBridge => {
   const group = new THREE.Group();
-  const under = (p: THREE.Vector3): THREE.Vector3 => v3(p.x, p.y - 2.3, p.z);
+  // the deck runs through the foot of each ring, like a road through a gate
+  const under = (p: THREE.Vector3): THREE.Vector3 => v3(p.x, p.y - 2.05, p.z);
   const path = new THREE.CatmullRomCurve3([
     start.clone(), under(RING_POINTS[0]), under(RING_POINTS[1]), under(RING_POINTS[2]), v3(0.4, lerpY(start, end, 0.68), start.z + (end.z - start.z) * 0.68), end.clone(),
   ], false, 'centripetal');
@@ -204,7 +241,7 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3): StarB
   deck.renderOrder = 2;
   group.add(deck);
 
-  const rings = RING_POINTS.map((p) => new Ring(p, start));
+  const rings = RING_POINTS.map((p, i) => new Ring(p, start, hoops[i]!));
   for (const r of rings) group.add(r.group);
 
   let target = 0;
@@ -261,48 +298,29 @@ export interface Gateway {
   update(dt: number, time: number): void;
 }
 
-export const buildGateway = (): Gateway => {
+/** The gateway model is made this many times its own size: it has to be seen from the far end of the bridge. */
+const GATEWAY_SCALE = 1.5;
+/** The arch's opening in the model, in its own metres: half its width, its threshold and its peak. */
+const ARCH = { halfWidth: 1.07, floor: 0.79, top: 5.05 };
+
+/** `model` is a copy of the gateway model, which the gateway keeps. */
+export const buildGateway = (model: THREE.Object3D): Gateway => {
   const group = new THREE.Group();
-  const stone = new THREE.Color(0xb9a9e6), stoneDark = new THREE.Color(0x6b5a9e);
-  const parts: THREE.BufferGeometry[] = [];
-  // two faceted pillars and the arch between them
-  for (const s of [-1, 1]) {
-    const pillar = new THREE.CylinderGeometry(0.42, 0.62, 5.6, 6, 1).toNonIndexed();
-    pillar.deleteAttribute('uv');
-    parts.push(tint(place(pillar, [s * 2.7, 2.8, 0]), stone));
-    const cap = new THREE.ConeGeometry(0.5, 1.5, 6, 1).toNonIndexed();
-    cap.deleteAttribute('uv');
-    parts.push(tint(place(cap, [s * 2.7, 6.35, 0]), stoneDark));
-  }
-  const archPts: THREE.Vector3[] = [];
-  for (let i = 0; i <= 12; i++) {
-    const a = (i / 12) * Math.PI;
-    archPts.push(v3(Math.cos(a) * 2.7, 4.6 + Math.sin(a) * 2.5, 0));
-  }
-  const arch = sweep(archPts, () => ({ rx: 0.26, ry: 0.34 }), { radial: 6, steps: 36, startCap: 'flat', endCap: 'flat', up: v3(0, 0, 1) }).toNonIndexed();
-  arch.deleteAttribute('uv');
-  parts.push(tint(arch, stone));
-  // steps up to the threshold
-  for (let i = 0; i < 4; i++) {
-    const step = new THREE.BoxGeometry(5.2 - i * 0.5, 0.2, 1.1).toNonIndexed();
-    step.deleteAttribute('uv');
-    parts.push(tint(place(step, [0, 0.1 + i * 0.2, 2.6 - i * 0.75]), i % 2 ? stone : stoneDark));
-  }
-  const body = merge(parts);
-  body.computeVertexNormals();
-  const mesh = new THREE.Mesh(body, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.15, flatShading: true, emissive: 0x5a3fb0, emissiveIntensity: 0.25 }));
-  group.add(mesh);
+  model.scale.setScalar(GATEWAY_SCALE);
+  group.add(model);
 
   const portalU = { uTime: { value: 0 }, uOpen: { value: 0 }, uColor: { value: new THREE.Color(0.55, 0.75, 1.0) } };
-  const portal = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 7.2), new THREE.ShaderMaterial({
+  // the portal fills the arch, a little over its edges so that no gap shows
+  const wide = ARCH.halfWidth * 2 * GATEWAY_SCALE * 1.12, tall = (ARCH.top - ARCH.floor) * GATEWAY_SCALE * 1.04;
+  const portal = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.ShaderMaterial({
     vertexShader: FILM_VS, fragmentShader: PORTAL_FS, uniforms: portalU, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   }));
-  portal.position.set(0, 4.35, 0);
+  portal.position.set(0, ARCH.floor * GATEWAY_SCALE + tall / 2, 0);
   group.add(portal);
 
-  // the keystone star
-  const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.85, 0.5).multiplyScalar(3) }));
-  star.position.set(0, 7.75, 0);
+  // a star turning above the keystone
+  const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.85, 0.5).multiplyScalar(3) }));
+  star.position.set(0, 6.2 * GATEWAY_SCALE + 0.7, 0);
   star.scale.set(0.7, 1.4, 0.7);
   group.add(star);
 

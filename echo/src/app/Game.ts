@@ -17,6 +17,7 @@ import { BedroomWorld } from '../world/bedroom/BedroomWorld';
 import { ClassroomWorld } from '../world/classroom/ClassroomWorld';
 import { HavenWorld } from '../world/haven/HavenWorld';
 import { buildHeadset, type HeadsetProp } from '../world/props';
+import { AssetLibrary } from '../assets/AssetLibrary';
 import { App, type AppOptions } from './App';
 
 export type WorldId = 'classroom' | 'bedroom' | 'haven';
@@ -58,12 +59,13 @@ export class Game {
   readonly interaction: Interaction;
   readonly director: Director;
   readonly autopilot = new Autopilot();
-  readonly headset: HeadsetProp = buildHeadset();
+  readonly headset: HeadsetProp;
   /** The headset session, when the device has one. */
   readonly xr: XRRig;
   /** Where characters look when they look at the player. */
   readonly playerEye = new THREE.Vector3();
   readonly worlds: Partial<Record<WorldId, World>> = {};
+  readonly assets: AssetLibrary;
   state: StoryState = freshState();
   chapter: ChapterId | null = null;
   /** In the story (not at the title, not paused): the mouse belongs to the game. */
@@ -77,8 +79,8 @@ export class Game {
   /** Called when a chapter begins and when the week ends. */
   onChapter: ((chapter: ChapterId | 'end') => void) | null = null;
   star: StarBridgeGame | null = null;
-  /** Shown while a world is being built mid-game. */
-  onLoading: ((label: string | null) => void) | null = null;
+  /** Shown while a world is being built: which one, and how many bytes of it have arrived so far. */
+  onLoading: ((label: string | null, bytes?: number) => void) | null = null;
 
   private readonly factories: Record<WorldId, () => World> = { classroom: () => new ClassroomWorld(), bedroom: () => new BedroomWorld(), haven: () => new HavenWorld() };
   private readonly building = new Map<WorldId, Promise<World>>();
@@ -86,10 +88,12 @@ export class Game {
   /** Without an `audio` the game runs silent, which is what captures and unit tests want. */
   constructor(options: AppOptions, readonly audio: GameAudio = new NullAudio()) {
     const app = (this.app = new App(options));
+    this.assets = new AssetLibrary(app.quality);
+    this.headset = buildHeadset(this.assets);
     this.input = new Input(options.canvas);
     this.hud = new Hud(this.input);
     this.player = new Player(app, this.input);
-    this.hands = new Hands(app, this.input, this.player);
+    this.hands = new Hands(app, this.input, this.player, this.assets);
     this.interaction = new Interaction(app, this.input, this.hud);
     this.director = new Director(this);
     app.overlay = { scene: this.hud.scene, camera: this.hud.camera };
@@ -122,7 +126,7 @@ export class Game {
   }
 
   private context(): BuildContext {
-    return { renderer: this.app.renderer, quality: this.app.quality, step: () => new Promise((r) => setTimeout(r, 0)) };
+    return { renderer: this.app.renderer, quality: this.app.quality, assets: this.assets, step: () => new Promise((r) => setTimeout(r, 0)) };
   }
 
   /** Returns a world, building it first if this is its first visit. */
@@ -133,14 +137,18 @@ export class Game {
     if (!pending) {
       pending = (async () => {
         this.onLoading?.(id);
+        const before = this.assets.loaded;
+        this.assets.onProgress = (loaded) => this.onLoading?.(id, loaded - before);
         const world = this.factories[id]();
-        await world.build(this.context());
+        // what the player carries from world to world is fetched alongside the first of them
+        await Promise.all([world.build(this.context()), this.hands.ready, this.headset.ready]);
         await this.app.renderer.compileAsync(world.scene, this.app.camera);
         this.worlds[id] = world;
         if (world instanceof HavenWorld) {
           this.star = new StarBridgeGame(this.app, this.input, this.player, this.hands, this.interaction, world.bursts, world.scene);
           world.onFirework = (at) => this.audio.sfx('firework', { at });
         }
+        this.assets.onProgress = null;
         this.onLoading?.(null);
         return world;
       })();
@@ -173,6 +181,7 @@ export class Game {
     const app = this.app;
     app.zoom = app.fovKick = 0;
     app.lookOverride = null;
+    app.focus = null;
     Object.assign(app.fx, { dim: 0, flash: 0, kick: 0 });
     this.hud.clear();
     this.star?.end();

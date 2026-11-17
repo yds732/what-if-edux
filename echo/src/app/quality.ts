@@ -9,6 +9,9 @@ export interface QualitySettings {
   readonly maxPixels: number;
   readonly msaa: 0 | 2 | 4;
   readonly ao: boolean;
+  /** Light shafts and depth of field: the cinematic lens. */
+  readonly shafts: boolean;
+  readonly dof: boolean;
   readonly bloomLevels: number;
   readonly shadowMapSize: number;
   /** 0..1 multiplier on instance counts: grass, petals, fireflies, far islands. */
@@ -16,15 +19,13 @@ export interface QualitySettings {
   readonly anisotropy: number;
   /** Real-time shadow maps. Without them, people stand on soft painted shadows instead. */
   readonly shadows: boolean;
-  /** 0.5..1 multiplier on the tessellation of heads and hair. */
-  readonly characterDetail: number;
 }
 
 const PRESETS: Record<Tier, QualitySettings> = {
-  low: { tier: 'low', maxPixels: 0.9e6, msaa: 0, ao: false, bloomLevels: 4, shadowMapSize: 1024, density: 0.4, anisotropy: 2, shadows: false, characterDetail: 0.5 },
-  medium: { tier: 'medium', maxPixels: 1.6e6, msaa: 2, ao: true, bloomLevels: 5, shadowMapSize: 2048, density: 0.7, anisotropy: 4, shadows: true, characterDetail: 0.7 },
-  high: { tier: 'high', maxPixels: 2.6e6, msaa: 4, ao: true, bloomLevels: 5, shadowMapSize: 2048, density: 1, anisotropy: 8, shadows: true, characterDetail: 1 },
-  ultra: { tier: 'ultra', maxPixels: 4.2e6, msaa: 4, ao: true, bloomLevels: 6, shadowMapSize: 4096, density: 1, anisotropy: 16, shadows: true, characterDetail: 1 },
+  low: { tier: 'low', shafts: false, dof: false, maxPixels: 0.9e6, msaa: 0, ao: false, bloomLevels: 4, shadowMapSize: 1024, density: 0.4, anisotropy: 2, shadows: false },
+  medium: { tier: 'medium', shafts: true, dof: true, maxPixels: 1.6e6, msaa: 2, ao: true, bloomLevels: 5, shadowMapSize: 2048, density: 0.7, anisotropy: 4, shadows: true },
+  high: { tier: 'high', shafts: true, dof: true, maxPixels: 2.6e6, msaa: 4, ao: true, bloomLevels: 5, shadowMapSize: 2048, density: 1, anisotropy: 8, shadows: true },
+  ultra: { tier: 'ultra', shafts: true, dof: true, maxPixels: 4.2e6, msaa: 4, ao: true, bloomLevels: 6, shadowMapSize: 4096, density: 1, anisotropy: 16, shadows: true },
 };
 
 export const isTier = (v: string | null): v is Tier => v !== null && (TIERS as readonly string[]).includes(v);

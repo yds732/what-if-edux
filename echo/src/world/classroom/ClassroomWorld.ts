@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Character } from '../../characters/Character';
 import { CAST, type CastName } from '../../characters/cast';
-import { lathe, place, sweep, torus, v3 } from '../../core/geo';
+import { place, sweep, torus, v3 } from '../../core/geo';
 import { Rng, TAU, damp } from '../../core/math';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
@@ -10,9 +10,10 @@ import { Panel } from '../../ui/Panel';
 import { THEMES, font, glass, roundRect, spaced, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, characterYaw, type Anchor, type BuildContext, type FrameContext } from '../World';
 import type { Obstacle } from '../colliders';
+import { dress, floorOf, framed, sizeOf, type Spot } from '../dressing';
 import { makeHalo } from '../haven/atmosphere';
 import { buildCityscape, type Cityscape } from '../cityscape';
-import { Builder, canvasTexture } from '../interior';
+import { Builder } from '../interior';
 import { buildSunbeams, type Sunbeams } from './sunbeams';
 
 /** Seat height of every chair, and the eye height of a child sitting on one. */
@@ -51,6 +52,8 @@ const W = 5, D = 6, H = 3.4;
 /** Height of a floor marker: just clear of the floor. */
 export const FLOOR_MARK = 0.02;
 const DESK_ROWS = [-1.6, 0.6, 2.8], DESK_COLS = [-2.8, 0, 2.8];
+/** The low stage along the front wall, the teacher's desk on it, and where the bookshelf stands along the right wall. */
+const STAGE_HEIGHT = 0.16, TEACHER_DESK = { x: -2.95, z: -4.75 }, BOOKSHELF_Z = -3.5;
 /** A desk and the chairs behind it, as one obstacle. */
 const DESK_COLLIDER = { dz: 0.1, hx: 0.8, hz: 0.52 };
 
@@ -92,6 +95,7 @@ export class ClassroomWorld extends World {
   private voiceShown: Record<string, number> = { alex: 0, sam: 0, riley: 0 };
   private voiceTarget: string | null = null;
   private screenPulse = 0;
+  /** Dust turning in the light from the windows. */
   private markerRadius = 0.3;
   /** Obstacles that belong to the current arrangement of the room. */
   private sceneColliders: Obstacle[] = [];
@@ -101,7 +105,7 @@ export class ClassroomWorld extends World {
     this.near = 0.05;
     this.far = 1400;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003,
+      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003, dof: 0.5,
       shadowTint: new THREE.Color(0.0, 0.004, 0.012), highlightTint: new THREE.Color(0.012, 0.006, -0.004),
     }));
     this.clearColor.set(0xbfd0ea);
@@ -120,29 +124,11 @@ export class ClassroomWorld extends World {
     await ctx.step('classroom: city');
 
     // ---- shell ----
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({
-      roughness: 0.42, metalness: 0.02,
-      map: canvasTexture(1024, (c, s) => {
-        c.fillStyle = '#d5d9e2';
-        c.fillRect(0, 0, s, s);
-        const r = new Rng(3);
-        for (let i = 0; i < 2600; i++) {
-          c.fillStyle = r.pick(['rgba(255,255,255,0.5)', 'rgba(150,160,185,0.35)', 'rgba(200,180,160,0.3)', 'rgba(120,130,150,0.25)']);
-          c.beginPath();
-          c.ellipse(r.range(0, s), r.range(0, s), r.range(1.5, 6), r.range(1.5, 5), r.range(0, 3), 0, TAU);
-          c.fill();
-        }
-        c.strokeStyle = 'rgba(120,130,150,0.35)';
-        c.lineWidth = 2;
-        c.strokeRect(0, 0, s, s);
-      }, [5, 6]),
-    }));
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
+    const floor = floorOf(await ctx.assets.picture('floor-classroom'), W * 2, D * 2, 2.4, 0.5);
     scene.add(floor);
 
     const b = new Builder();
-    const wall = 0xe9ecf3, trim = 0xc9cedb, accent = 0x7fa0c9, wood = 0xc9a57f;
+    const wall = 0xe9ecf3, trim = 0xc9cedb, accent = 0x7fa0c9;
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, -D - 0.08]);
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, D + 0.08]);
     b.box('matte', wall, [0.16, H, D * 2], [W + 0.08, H / 2, 0]);
@@ -168,72 +154,70 @@ export class ClassroomWorld extends World {
     b.box('satin', accent, [W * 2, 0.5, 0.02], [0, 0.35, -D + 0.012]);
 
     // ---- the front: a low stage, the display, the plinth ----
-    b.box('satin', 0xdfe3ec, [7.4, 0.16, 1.9], [0, 0.08, -5.05], { r: 0.05 });
+    b.box('satin', 0xdfe3ec, [7.4, STAGE_HEIGHT, 1.9], [0, STAGE_HEIGHT / 2, -5.05], { r: 0.05 });
     b.box('gloss', 0x1a1e2c, [5.0, 2.3, 0.07], [0.2, 2.05, -D + 0.05], { r: 0.035 });
     b.box('metal', 0xd9dde8, [5.16, 2.46, 0.04], [0.2, 2.05, -D + 0.022], { r: 0.05 });
-    b.add('gloss', 0xf2f3f7, place(lathe([[0.3, 0], [0.26, 0.05], [0.14, 0.4], [0.13, 0.82], [0.2, 0.93], [0.24, 0.95], [0.24, 0.97], [0.02, 0.975]], 40), [CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]));
-    // teacher's side table: a tablet and a cup
-    b.box('satin', wood, [0.9, 0.04, 0.5], [-2.9, 0.9, -4.5], { r: 0.012 });
-    b.cyl('metal', 0xb9bfcc, 0.03, 0.88, [-2.9, 0.16, -4.5]);
-    b.cyl('metal', 0xb9bfcc, 0.22, 0.02, [-2.9, 0.16, -4.5]);
-    b.box('gloss', 0x20232f, [0.26, 0.012, 0.19], [-2.82, 0.928, -4.48], { rot: [0, 0.3, 0], r: 0.004 });
-    b.cyl('gloss', 0xe0703f, 0.036, 0.09, [-3.15, 0.92, -4.56]);
-
-    // ---- desks for two, and their chairs ----
-    const front = new Builder();
-    const chair = (to: Builder, x: number, z: number, tucked: boolean): void => {
-      const cz = z + (tucked ? -0.12 : 0);
-      to.box('matte', 0x6f8fb8, [0.4, 0.06, 0.38], [x, SEAT - 0.03, cz], { r: 0.028 });
-      to.box('matte', 0x6f8fb8, [0.38, 0.34, 0.05], [x, SEAT + 0.3, cz + 0.2], { r: 0.024, rot: [0.1, 0, 0] });
-      for (const [lx, lz] of [[-0.16, -0.15], [0.16, -0.15], [-0.16, 0.16], [0.16, 0.16]] as const) to.cyl('metal', 0xb9bfcc, 0.013, SEAT - 0.05, [x + lx, 0, cz + lz], { radial: 8 });
-    };
+    // ---- desks for two, their chairs, and a slate at every place ----
     const taken = new Set(SEATING.map((s) => `${s.row}:${s.col}:${s.side}`));
     taken.add('2:1:1').add('1:2:-1');
+    const deskTop = (await sizeOf(ctx, 'desk'))[1];
+    // the front row stands in a group of its own: it is cleared away for the after-school club
+    const sets = [this.frontRow, scene].map((to) => ({ to, desks: [] as Spot[], chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[] }));
     DESK_ROWS.forEach((dz, row) => {
-      const to = row === 0 ? front : b;
+      const set = sets[row === 0 ? 0 : 1]!;
       DESK_COLS.forEach((dx, col) => {
-        to.box('satin', 0xf6f7fa, [1.56, 0.04, 0.62], [dx, 0.64, dz], { r: 0.02 });
-        to.box('satin', wood, [1.5, 0.012, 0.56], [dx, 0.664, dz], { r: 0.006 });
+        set.desks.push([dx, 0, dz]);
         for (const s of [-1, 1]) {
-          to.cyl('metal', 0xb9bfcc, 0.02, 0.62, [dx + s * 0.68, 0, dz - 0.2], { radial: 8 });
-          to.cyl('metal', 0xb9bfcc, 0.02, 0.62, [dx + s * 0.68, 0, dz + 0.2], { radial: 8 });
-          chair(to, dx + s * 0.38, dz + 0.62, !taken.has(`${row}:${col}:${s}`));
-          // a slate at every place
-          to.box('gloss', 0x20232f, [0.3, 0.008, 0.21], [dx + s * 0.38, 0.676, dz - 0.02], { r: 0.004, rot: [0, s * 0.06, 0] });
+          const used = taken.has(`${row}:${col}:${s}`);
+          // pupils face the front of the room; a chair nobody is sitting on is pushed in
+          set.chairs.push([dx + s * 0.38, 0, dz + (used ? 0.62 : 0.5), 180]);
+          set.slates.push([dx + s * 0.38, deskTop, dz - 0.06, 180 + s * 4 + rng.range(-6, 6)]);
+          if (used && rng.chance(0.7)) set.bags.push([dx + s * 0.74, 0, dz + 0.5 + rng.range(-0.06, 0.06), 180 + s * 70 + rng.range(-20, 20)]);
         }
         // the front row's obstacles come and go with it: see setScene
         if (row > 0) this.colliders.box(dx, dz + DESK_COLLIDER.dz, DESK_COLLIDER.hx, DESK_COLLIDER.hz);
       });
     });
-    front.finish(this.frontRow);
+    for (const set of sets) {
+      await dress(ctx, set.to, 'desk', set.desks);
+      await dress(ctx, set.to, 'chair', set.chairs);
+      await dress(ctx, set.to, 'slate', set.slates);
+      await dress(ctx, set.to, 'backpack', set.bags);
+    }
     scene.add(this.frontRow);
+    await ctx.step('classroom: desks');
 
+    // ---- the front: the headset's plinth, and the teacher's desk up on the stage ----
+    await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]]);
+    await dress(ctx, scene, 'teacher-desk', [[TEACHER_DESK.x, STAGE_HEIGHT, TEACHER_DESK.z, 24]]);
+
+    // ---- the back wall: cubbies with bags and jumpers ----
+    const [cubbyWide, , cubbyDeep] = await sizeOf(ctx, 'lockers');
+    const cubbies = Math.floor((W * 2 - 1.6) / (cubbyWide + 0.06));
+    await dress(ctx, scene, 'lockers', Array.from({ length: cubbies }, (_, i): Spot => [(i - (cubbies - 1) / 2) * (cubbyWide + 0.06), 0, D - cubbyDeep / 2 - 0.02, 180]));
+
+    // ---- the right wall: books, a pin board and the door ----
+    const [, , shelfDeep] = await sizeOf(ctx, 'bookshelf');
+    await dress(ctx, scene, 'bookshelf', [[W - shelfDeep / 2 - 0.02, 0, BOOKSHELF_Z, -90]]);
+    this.colliders.box(W - shelfDeep / 2, BOOKSHELF_Z, shelfDeep / 2 + 0.05, 0.55);
     // ---- the back wall: cubbies with bags; the right wall: a pin board and the door ----
-    for (let i = 0; i < 8; i++) {
-      const x = -3.5 + i * 1.0;
-      b.box('satin', 0xf6f7fa, [0.94, 1.5, 0.4], [x, 0.75, D - 0.2], { r: 0.02 });
-      b.box('matte', 0x2e3445, [0.8, 0.56, 0.3], [x, 1.1, D - 0.24], { r: 0.012 });
-      b.box('matte', 0x2e3445, [0.8, 0.56, 0.3], [x, 0.42, D - 0.24], { r: 0.012 });
-      if (i % 2 === 0) b.box('matte', rng.pick([0xc9694e, 0x5e8f72, 0xe0b34e, 0x566a9c]), [0.34, 0.4, 0.2], [x - 0.12, 0.36, D - 0.34], { r: 0.07, rot: [0, rng.range(-0.3, 0.3), 0] });
-      if (i % 3 === 1) b.box('matte', rng.pick([0xa98cc4, 0x6f8fb8, 0xd98a4e]), [0.3, 0.36, 0.2], [x + 0.14, 1.02, D - 0.34], { r: 0.07, rot: [0, rng.range(-0.3, 0.3), 0] });
-    }
-    b.box('satin', 0xb9c4d9, [0.05, 2.2, 1.0], [W - 0.03, 1.1, -1.9], { r: 0.012 });
-    b.cyl('metal', 0x9aa0b0, 0.02, 0.14, [W - 0.08, 1.02, -1.55], { rot: [0, 0, Math.PI / 2] });
-    b.box('matte', 0xc9a98a, [0.03, 1.3, 3.2], [W - 0.02, 1.75, 2.2], { r: 0.008 });
-    const sheets = [0xf4efe6, 0xfce4d0, 0xd9e8f5, 0xe6f0d6, 0xf5d9e6];
-    for (let i = 0; i < 11; i++) {
-      b.box('matte', rng.pick(sheets), [0.006, rng.range(0.26, 0.4), rng.range(0.22, 0.34)], [W - 0.04, rng.range(1.35, 2.15), 0.85 + i * 0.27 + rng.range(-0.04, 0.04)], { rot: [rng.range(-0.08, 0.08), 0, 0] });
-    }
-    // plants in the corners
-    for (const [x, z] of [[-4.5, -5.4], [4.5, -5.4], [-4.5, 5.2]] as const) {
-      b.add('satin', 0xf2f3f7, place(lathe([[0.2, 0], [0.25, 0.42], [0.23, 0.45], [0.02, 0.45]], 24), [x, 0, z]));
-      for (let i = 0; i < 9; i++) {
-        const a = (i / 9) * TAU + rng.range(-0.2, 0.2), lean = rng.range(0.25, 0.75);
-        const path = [v3(0, 0.42, 0), v3(Math.cos(a) * 0.2 * lean, 0.95, Math.sin(a) * 0.2 * lean), v3(Math.cos(a) * 0.62 * lean, 1.35 + rng.range(-0.2, 0.3), Math.sin(a) * 0.62 * lean)];
-        b.add('matte', rng.pick([0x4f8f6a, 0x5fa07a, 0x3f7d5c]), place(sweep(path, (t) => ({ rx: 0.012 + 0.11 * Math.sin(Math.min(1, t * 1.25) * Math.PI) ** 1.4, ry: 0.006 }), { radial: 6, steps: 14, endCap: 'point' }), [x, 0, z]));
-      }
-      this.colliders.circle(x, z, 0.4);
-    }
+    await dress(ctx, scene, 'door', [[W - 0.07, 0, -1.9, -90]]);
+    // the pin board of everyone's pictures, and posters either side of the display
+    const hang = async (id: string, wide: number, x: number, y: number, z: number, turn: number): Promise<void> => {
+      const picture = await ctx.assets.picture(id);
+      const hung = framed(picture.map, wide, (wide * picture.entry.size[1]) / picture.entry.size[0]);
+      hung.position.set(x, y, z);
+      hung.rotation.y = turn;
+      scene.add(hung);
+    };
+    await hang('pinboard', 3.4, W - 0.005, 1.72, 2.2, -Math.PI / 2);
+    await hang('poster-harbour', 1.5, -3.82, 1.95, -D + 0.005, 0);
+    await hang('poster-planets', 0.95, 3.95, 1.9, -D + 0.005, 0);
+    // plants in the corners, and a row of little ones along the window sills
+    const corners: Spot[] = [[-4.5, 0, -5.4], [4.5, 0, -5.4], [-4.5, 0, 5.2]];
+    await dress(ctx, scene, 'plant-tall', corners.map(([x, y, z]): Spot => [x, y, z, rng.range(0, 360)]));
+    for (const [x, , z] of corners) this.colliders.circle(x, z, 0.4);
+    await dress(ctx, scene, 'plant-small', centres.map((z): Spot => [-W + 0.13, WY0, z + rng.range(-0.6, 0.6), rng.range(0, 360), rng.range(0.9, 1.25)]));
     b.finish(scene);
     await ctx.step('classroom: furniture');
 
@@ -276,39 +260,32 @@ export class ClassroomWorld extends World {
     screenLight.position.set(0.2, 2.1, -4.9);
     scene.add(screenLight);
 
-    // the plinth's ring of light, and the mark on the empty chair
-    const ring = new THREE.Mesh(torus(0.2, 0.008, 6, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.45, 0.8, 1.0).multiplyScalar(2.4) }));
-    ring.position.set(CLASSROOM.plinth.x, CLASSROOM.plinth.y - 0.03, CLASSROOM.plinth.z);
-    scene.add(ring, makeHalo(0x7fc8ff, 1.1, 0.3).translateX(CLASSROOM.plinth.x).translateY(CLASSROOM.plinth.y + 0.1).translateZ(CLASSROOM.plinth.z));
+    // a soft light over the plinth, and the mark on the empty chair
+    scene.add(makeHalo(0x7fc8ff, 1.1, 0.3).translateX(CLASSROOM.plinth.x).translateY(CLASSROOM.plinth.y + 0.1).translateZ(CLASSROOM.plinth.z));
     this.marker = new THREE.Mesh(torus(1, 0.036, 6, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.82, 1.0).multiplyScalar(2.6), transparent: true, opacity: 0, depthWrite: false }));
     this.marker.visible = false;
     scene.add(this.marker);
 
     // ---- Tuesday's poster table ----
-    const pt = new Builder();
     const P = CLASSROOM.posterTable;
-    pt.box('satin', 0xf6f7fa, [2.3, 0.05, 1.2], [P.x, 0.72, P.z], { r: 0.03 });
-    for (const [lx, lz] of [[-1, -0.5], [1, -0.5], [-1, 0.5], [1, 0.5]] as const) pt.cyl('metal', 0xb9bfcc, 0.025, 0.7, [P.x + lx, 0, P.z + lz], { radial: 8 });
-    pt.box('matte', 0xfdfaf2, [1.76, 0.006, 0.96], [P.x, 0.75, P.z]);
-    for (const [i, c] of [0xe0703f, 0x4f8fd0, 0xe0b34e, 0x5fa07a, 0xa98cc4].entries()) pt.cyl('matte', c, 0.012, 0.15, [P.x + 0.98, 0.76, P.z - 0.3 + i * 0.07], { rot: [Math.PI / 2, 0, 0.2 * i], radial: 8 });
-    pt.cyl('gloss', 0x7fa0c9, 0.05, 0.1, [P.x - 1.0, 0.75, P.z + 0.38]);
-    pt.finish(this.posterGroup);
+    const tableTop = (await sizeOf(ctx, 'craft-table'))[1];
+    await dress(ctx, this.posterGroup, 'craft-table', [[P.x, 0, P.z]]);
+    await dress(ctx, this.posterGroup, 'art-supplies', [[P.x + 0.92, tableTop, P.z + 0.32, -30], [P.x - 0.98, tableTop, P.z - 0.34, 140, 0.8]]);
     this.poster = new Panel(1100, 600, { world: true });
     this.poster.mesh.scale.set(1.7, 0.927, 1);
     this.poster.mesh.rotation.x = -Math.PI / 2;
-    this.poster.mesh.position.set(P.x, 0.756, P.z);
+    this.poster.mesh.position.set(P.x, tableTop + 0.004, P.z);
     this.posterGroup.add(this.poster.mesh);
     this.posterGroup.visible = false;
     scene.add(this.posterGroup);
     this.setPoster(null);
 
     // ---- people ----
-    const { characterDetail, shadows } = ctx.quality;
-    const teacher = this.addPerson('teacher', new Character(CAST.teacher, characterDetail, shadows));
+    const teacher = this.addPerson('teacher', await Character.create(ctx, CAST.teacher, 'teacher'));
     teacher.placeAt(CLASSROOM.teacher);
     this.colliders.circle(CLASSROOM.teacher.position.x, CLASSROOM.teacher.position.z, 0.4);
     for (const s of SEATING) {
-      const person = this.addPerson(s.who, new Character(CAST[s.who], characterDetail * (s.who === 'jamie' ? 1 : 0.8), shadows));
+      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who));
       person.placeAt(seatOf(s)).setPose(s.who === 'jamie' || s.who === 'mina' ? 'sitLean' : 'sitDesk', { immediate: true, seat: SEAT });
       if (s.who !== 'jamie') person.setLiveliness(0.7);
     }
@@ -318,9 +295,9 @@ export class ClassroomWorld extends World {
     this.stageGlow.position.copy(CLASSROOM.stage).add(v3(0, 0.006, 0));
     scene.add(this.stageGlow);
     for (const who of ['alex', 'sam', 'riley'] as const) {
-      const voice = this.addPerson(who, new Character(CAST[who], characterDetail * 0.8));
+      const voice = this.addPerson(who, await Character.create(ctx, CAST[who], who, true));
       voice.place(CLASSROOM.stage.x, CLASSROOM.stage.y, CLASSROOM.stage.z, characterYaw(anchorToward(CLASSROOM.stage.x, 0, CLASSROOM.stage.z, 0.4, 3)));
-      voice.setProjected(0x4fb4ff, 0.42);
+      voice.setProjected(0x4fb4ff);
       voice.root.visible = false;
     }
     const beamGeo = new THREE.CylinderGeometry(0.62, 0.5, 2.3, 32, 1, true);
@@ -338,7 +315,7 @@ export class ClassroomWorld extends World {
     scene.add(this.stageLight);
 
     this.colliders.bounds = { kind: 'rect', minX: -W, maxX: W, minZ: -D + 0.2, maxZ: D - 0.45 };
-    this.colliders.box(0, -5.05, 3.7, 0.95).circle(CLASSROOM.plinth.x, CLASSROOM.plinth.z, 0.36).box(-2.9, -4.5, 0.5, 0.3);
+    this.colliders.box(0, -5.05, 3.7, 0.95).circle(CLASSROOM.plinth.x, CLASSROOM.plinth.z, 0.36);
     this.setVariant('morning', true);
     this.setScene('class');
     this.setScreen({ kind: 'title', eyebrow: '', title: '', body: '' });

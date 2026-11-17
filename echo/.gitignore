@@ -4,3 +4,4 @@ shots
 .chrome-profile
 *.log
 .vercel
+assets/.cache

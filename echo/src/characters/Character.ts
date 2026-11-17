@@ -1,22 +1,22 @@
 import * as THREE from 'three';
 import { DEG, Rng, clamp, damp, lerp } from '../core/math';
-import { buildBody, type Outfit } from './body';
+import type { Model } from '../assets/AssetLibrary';
+import type { BuildContext } from '../world/World';
+import { addGlow } from '../assets/glow';
+import { GeneratedBody } from './GeneratedBody';
+import { addHologram, type Hologram } from './hologram';
 import { GESTURES, POSES, type GestureName, type PoseName } from './motion';
-import { buildHair, type HairLook } from './hair';
-import { FaceMaterial, headGeometry, neutralFace, type FaceLook, type FaceState } from './head';
-import { BONES, buildRig, type BoneName, type Proportions, type Rig } from './skeleton';
+import { FaceLayer, neutralFace, type FaceLook, type FaceState } from './head';
+import { BONES, type BoneName, type Rig } from './skeleton';
 import { characterYaw, type Anchor } from '../world/World';
 import { getHaloTexture } from '../world/haven/atmosphere';
 
 export interface CharacterSpec {
   readonly name: string;
-  readonly proportions: Proportions;
-  readonly skin: THREE.ColorRepresentation;
-  readonly hair: HairLook;
-  readonly outfit: Outfit;
+  /** How the face the game draws on them looks: the colour of eyes and brows, the size of the eyes. */
   readonly face?: Partial<FaceLook>;
-  /** Haven's companions: they hover a little and carry their own light. */
-  readonly luminous?: boolean;
+  /** Haven's companions hover a little and carry a light of this colour about them. */
+  readonly aura?: THREE.ColorRepresentation;
   /** Resting expression the face returns to. */
   readonly rest?: Partial<FaceState>;
   /** Uniform scale on the finished character. */
@@ -45,9 +45,9 @@ const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
 /**
- * A procedural person: skinned body, a head whose face is drawn by shader, sculpted hair, and an animator that
- * layers a base pose, idle life, one gesture, a look-at and speech. There are no animation files; every motion
- * is a few numbers eased toward their targets.
+ * A person: a generated figure with a face drawn on it by shader, and an animator that layers a base pose, idle
+ * life, one gesture, a look-at and speech. There are no animation files; every motion is a few numbers eased
+ * toward their targets.
  */
 export class Character {
   readonly root = new THREE.Group();
@@ -56,8 +56,9 @@ export class Character {
   /** Height of the eyes above the character's origin when standing. */
   readonly eyeHeight: number;
 
-  private readonly faceMat: FaceMaterial;
-  private readonly tinted: THREE.MeshStandardMaterial[] = [];
+  private readonly faceMat: FaceLayer;
+  private readonly body: GeneratedBody;
+  private readonly hologram: Hologram;
   private readonly face: FaceState;
   private readonly faceTarget: FaceState;
   private readonly restFace: FaceState;
@@ -83,45 +84,27 @@ export class Character {
   private liveliness = 1;
   private seatHeight = 0.36;
 
-  /** `detail` (0.5..1) thins the mesh for slower devices; `shadowMaps` false paints a soft shadow at the feet instead. */
-  constructor(spec: CharacterSpec, detail = 1, shadowMaps = true) {
+  /** `shadowMaps` false paints a soft shadow at the feet instead. */
+  constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {
     this.spec = spec;
     this.rng = new Rng(hashName(spec.name));
     this.phase = this.rng.range(0, 10);
     this.blinkIn = this.rng.range(1, 4);
-    const p = spec.proportions;
-    this.rig = buildRig(p);
+    this.head = new THREE.Group();
+    const body = (this.body = new GeneratedBody(model));
+    this.rig = body.rig;
+    this.root.add(body.root);
+    const { centre, radius } = body.face;
+    const toFace = new THREE.Matrix4().makeScale(1 / radius, 1 / radius, 1 / radius).multiply(_m.makeTranslation(-centre.x, -centre.y, -centre.z)).multiply(body.toCharacter);
+    this.faceMat = new FaceLayer(spec.face ?? {}, toFace);
+    this.faceMat.install(body.material);
+    if (model.entry.glow) addGlow(body.material, model.entry.glow);
+    this.hologram = addHologram(body.material);
+    this.head.position.copy(centre).sub(this.rig.joints.head);
+    this.eyeHeight = (centre.y - radius * 0.07) * (spec.scale ?? 1);
+    this.rig.bones.head.add(this.head);
     for (const name of BONES) this.offsets[name] = this.rig.bones[name].position.clone();
     this.bindY = this.rig.bones.hips.position.y;
-
-    const parts = buildBody(p, this.rig.joints, spec.outfit, spec.skin);
-    const bodyMat = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.82, metalness: 0, sheen: 0.22, sheenRoughness: 0.5, sheenColor: new THREE.Color(0xd8dcf0) });
-    const body = new THREE.SkinnedMesh(parts.body, bodyMat);
-    this.skin(body);
-    this.tinted.push(bodyMat);
-    if (parts.trim) {
-      const trimMat = new THREE.MeshStandardMaterial({ color: 0x000000, emissive: spec.outfit.trimColor ?? 0xffffff, emissiveIntensity: 3.2, roughness: 0.4 });
-      const trim = new THREE.SkinnedMesh(parts.trim, trimMat);
-      this.skin(trim);
-      trim.castShadow = false;
-    }
-
-    // head and hair ride the head bone as plain meshes: the face shader reads their untouched local positions
-    const R = p.headRadius;
-    this.head = new THREE.Group();
-    this.head.position.set(0, R * 0.9, R * 0.05);
-    this.rig.bones.head.add(this.head);
-    this.faceMat = new FaceMaterial(R, { skin: spec.skin, ...spec.face });
-    const headMesh = new THREE.Mesh(headGeometry(R, detail), this.faceMat);
-    const hairMat = hairMaterial(spec.luminous ? 1.1 : 0);
-    const hairMesh = new THREE.Mesh(buildHair(R, spec.hair, detail), hairMat);
-    this.tinted.push(hairMat, this.faceMat);
-    for (const m of [headMesh, hairMesh]) {
-      m.castShadow = true;
-      m.receiveShadow = true;
-      this.head.add(m);
-    }
-    this.eyeHeight = (this.rig.joints.head.y + R * 0.8) * (spec.scale ?? 1);
 
     this.root.add(this.rig.root);
     this.root.name = spec.name;
@@ -141,13 +124,9 @@ export class Character {
     this.applyPose(1e6);
   }
 
-  private skin(mesh: THREE.SkinnedMesh): void {
-    mesh.bind(this.rig.skeleton, _m.identity());
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.8, 0), 1.4);
-    mesh.boundingBox = new THREE.Box3(new THREE.Vector3(-1, -0.2, -1), new THREE.Vector3(1, 2, 1));
-    this.root.add(mesh);
+  /** Makes a member of the cast for a world, fetching their figure. */
+  static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows): Promise<Character> {
+    return new Character(spec, await ctx.assets.model(id), shadowMaps);
   }
 
   /** Places the character at a point with `rotation.y` = `yawRad` (0 faces +Z). */
@@ -198,12 +177,10 @@ export class Character {
     return this;
   }
 
-  /** Washes the whole figure in a projector's light: someone present only as a hologram. */
-  setProjected(color: THREE.ColorRepresentation, amount: number): this {
-    for (const m of this.tinted) {
-      m.emissive.set(color);
-      m.emissiveIntensity = amount;
-    }
+  /** Shows the figure as a projection in this colour: someone present only as a hologram. Null brings them back. */
+  setProjected(color: THREE.ColorRepresentation | null): this {
+    this.hologram.amount.value = color === null ? 0 : 1;
+    if (color !== null) this.hologram.color.set(color).multiplyScalar(2.6);
     return this;
   }
 
@@ -246,7 +223,8 @@ export class Character {
     this.faceMat.apply(shown);
 
     // ---- body ----
-    this.hover = this.spec.luminous ? Math.sin(t * 1.1) * 0.018 + 0.03 : 0;
+    this.hover = this.spec.aura === undefined ? 0 : Math.sin(t * 1.1) * 0.018 + 0.03;
+    this.hologram.time.value = t;
     this.applyPose(dt, t);
   }
 
@@ -320,26 +298,10 @@ export class Character {
     hips.position.y = lerp(hips.position.y, targetY, k);
     hips.position.x = lerp(hips.position.x, sway * 0.006 * (this.pose === 'stand' ? 1 : 0), k);
     hips.position.z = lerp(hips.position.z, base.hipsZ, k);
+    // the figure's own skeleton is turned to match this one
+    this.body.retarget();
   }
 }
-
-/** Glossy sculpted hair; `tipGlow` lets the tips of a companion's hair give off their own colour. */
-const hairMaterial = (tipGlow: number): THREE.MeshStandardMaterial => {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0 });
-  if (tipGlow > 0) {
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.uTipGlow = { value: tipGlow };
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float glow;\nvarying float vGlow;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = glow;');
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vGlow;\nuniform float uTipGlow;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vGlow * uTipGlow;');
-    };
-    m.customProgramCacheKey = () => 'echo-hair-glow';
-  }
-  return m;
-};
 
 type Track = readonly (readonly [number, number, number, number])[];
 

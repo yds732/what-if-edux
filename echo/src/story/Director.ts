@@ -6,6 +6,8 @@ import type { ChoiceOption } from '../ui/Hud';
 import { cameraYaw, type Anchor, type World } from '../world/World';
 import { DAYS, SPEAKERS, type Line } from './script';
 
+const _head = new THREE.Vector3();
+
 /** Characters per second of the typewriter. */
 const TYPE_SPEED = 46;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -71,6 +73,8 @@ export class Director {
     const { hud, audio, app } = this.game;
     const speaker = SPEAKERS[line.who];
     const person = app.world?.cast[line.who];
+    // the lens goes to whoever is speaking, and back to rest for a line with no face to it
+    app.focus = person ? person.headWorld(_head).distanceTo(this.game.playerEye) : null;
     if (person) {
       if (line.mood) person.setMood(line.mood);
       if (line.gesture) person.play(line.gesture);

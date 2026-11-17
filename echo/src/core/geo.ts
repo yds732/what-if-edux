@@ -94,14 +94,6 @@ export const place = (
   return g;
 };
 
-/** Rotates a geometry so its +Y axis points along `direction`, then moves it to `position`. */
-export const orient = (g: THREE.BufferGeometry, position: THREE.Vector3, direction: THREE.Vector3, spin = 0): THREE.BufferGeometry => {
-  if (spin) g.rotateY(spin);
-  _q.setFromUnitVectors(_a.set(0, 1, 0), _b.copy(direction).normalize());
-  g.applyMatrix4(new THREE.Matrix4().compose(position.clone(), _q, new THREE.Vector3(1, 1, 1)));
-  return g;
-};
-
 /** Fills a one-component attribute with a constant; `merge` needs every part to carry the same attributes. */
 export const fill = (g: THREE.BufferGeometry, name: string, value: number): THREE.BufferGeometry => {
   g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(value), 1));
@@ -274,22 +266,6 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
   g.computeBoundingSphere();
   g.computeBoundingBox();
   return g;
-};
-
-/** Spins a profile of [radius, height] pairs about +Y, optionally squashed to an ellipse. */
-export const lathe = (profile: readonly (readonly [number, number])[], segments = 32, scaleX = 1, scaleZ = 1): THREE.BufferGeometry => {
-  const pts = profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 0), y));
-  if (pts[0]!.y > pts[pts.length - 1]!.y) pts.reverse(); // LatheGeometry faces outward only for a rising profile
-  const g = new THREE.LatheGeometry(pts, segments);
-  g.deleteAttribute('uv');
-  g.deleteAttribute('normal');
-  const merged = mergeVertices(g, 1e-5);
-  g.dispose();
-  if (scaleX !== 1 || scaleZ !== 1) merged.scale(scaleX, 1, scaleZ);
-  merged.computeVertexNormals();
-  merged.computeBoundingSphere();
-  merged.computeBoundingBox();
-  return merged;
 };
 
 /** Smooth interpolation through [t, value] keys; the workhorse for limb and lock profiles. */

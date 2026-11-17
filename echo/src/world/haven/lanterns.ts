@@ -13,6 +13,8 @@ export interface LanternSpot {
   readonly z: number;
   /** Ground height under the lantern. */
   readonly ground: number;
+  /** Metres to float above the usual height: for a lantern that would otherwise hang in front of something. */
+  readonly lift?: number;
 }
 
 export interface Lanterns {
@@ -71,7 +73,7 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
   let lit = 0;
   for (const [i, s] of spots.entries()) {
     const object = new THREE.Group();
-    const home = new THREE.Vector3(s.x, s.ground + rng.range(1.55, 2.45), s.z);
+    const home = new THREE.Vector3(s.x, s.ground + (s.lift ?? 0) + rng.range(1.55, 2.45), s.z);
     object.position.copy(home);
     object.add(new THREE.Mesh(geo, mat));
     object.add(makeHalo(0xffb866, rng.range(1.5, 1.9), 0.42));

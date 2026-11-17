@@ -4,6 +4,7 @@ import { BedroomWorld } from '../world/bedroom/BedroomWorld';
 import { ClassroomWorld } from '../world/classroom/ClassroomWorld';
 import { HavenWorld } from '../world/haven/HavenWorld';
 import { StudioWorld } from '../world/studio/StudioWorld';
+import { AssetLibrary } from '../assets/AssetLibrary';
 import { App } from './App';
 import { numberParam } from './params';
 import { isTier } from './quality';
@@ -35,7 +36,7 @@ export const runShot = async (canvas: HTMLCanvasElement, params: URLSearchParams
   const app = new App({ canvas, tier: isTier(q) ? q : 'high', fixedScale: params.has('live') ? null : 1, maxDpr: numberParam(params, 'dpr', 1, 0.5, 3) });
 
   const world = factory(params);
-  const ctx: BuildContext = { renderer: app.renderer, quality: app.quality, step: () => new Promise((r) => setTimeout(r, 0)) };
+  const ctx: BuildContext = { renderer: app.renderer, quality: app.quality, assets: new AssetLibrary(app.quality), step: () => new Promise((r) => setTimeout(r, 0)) };
   const t0 = performance.now();
   await world.build(ctx);
   app.setWorld(world);

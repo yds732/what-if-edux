@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Character } from '../../characters/Character';
 import { CAST } from '../../characters/cast';
-import { blob, lathe, merge, place, sweep, tint, tintBy, torus, v3 } from '../../core/geo';
-import { Rng, TAU, damp, fbm3 } from '../../core/math';
+import { blob, merge, place, tint, v3 } from '../../core/geo';
+import { Rng, TAU, damp } from '../../core/math';
 import { Bursts } from '../../render/Bursts';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeEnvironment } from '../../render/env';
@@ -12,9 +12,10 @@ import { World, anchor, anchorToward, type Anchor, type BuildContext, type Frame
 import { buildLanterns, type Lanterns, type LanternSpot } from './lanterns';
 import { buildReeds, type ReedClump } from './reeds';
 import { buildShootingStars, type ShootingStars } from './shootingStars';
+import { dress, glowOf, sizeOf, type Spot } from '../dressing';
 import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo, type Motes } from './atmosphere';
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
-import { buildBlossomTree, buildCrystals, buildGlowFlowers, buildGrass, windUniforms } from './flora';
+import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
 
@@ -48,7 +49,10 @@ export const HAVEN = {
 
 export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title';
 
-const GOLD_HDR = new THREE.Color(1.0, 0.74, 0.32).multiplyScalar(2.6);
+/** The floating islands as modelled: how wide each is and how far up from its lowest point its turf lies, in metres. */
+const ISLANDS = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;
+/** The challenge board stands in a frame planted in the meadow, turned to the plaza. */
+const BOARD = { x: -3.7, z: -5.6, eye: 1.75, frameScale: 1.9, opening: { wide: 1.04, tall: 0.42, y: 1.4365 } };
 const FIREWORK_HUES = [0xffd27a, 0xff8fd6, 0x7fe9ff, 0xb59bff, 0x9dffb0, 0xffffff];
 
 interface Rocket {
@@ -84,6 +88,8 @@ export class HavenWorld extends World {
   private festivalK = 0;
   private festivalTarget = 0;
   private readonly rng = new Rng(77);
+  /** The painted light of each kind of crystal, and its strength at rest. */
+  private readonly crystalGlow: { glow: { value: number }; rest: number; phase: number }[] = [];
 
   constructor() {
     super();
@@ -91,10 +97,15 @@ export class HavenWorld extends World {
     this.far = 3200;
     Object.assign(this.look, makeLook({
       exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.14, contrast: 0.22, vignette: 0.36, grain: 0.014, chroma: 0.005,
+      shafts: 0.22, shaftColor: new THREE.Color(1.0, 0.8, 0.62), dof: 0.5, streak: 0.1,
       // warm, glowing highlights over soft plum shadows: a magical golden hour
       shadowTint: new THREE.Color(0.018, 0.004, 0.024), highlightTint: new THREE.Color(0.08, 0.04, -0.03),
     }));
     this.clearColor.set(0x1a1038);
+    // the planet and the bright sky around it: everything past the furthest island
+    this.shafts = { direction: PLANET_DIR, skyFrom: 700 };
+    // the rings out over the bridge are what there is to aim at: they stay sharp
+    this.restFocus = 26;
   }
 
   async build(ctx: BuildContext): Promise<void> {
@@ -140,48 +151,30 @@ export class HavenWorld extends World {
       [-26, -6, -18, 4.5, 8], [30, -4, 6, 5, 9], [110, 34, -200, 22, 34], [-130, 40, -230, 26, 40], [150, 60, -330, 30, 44],
       [-60, 12, 30, 9, 15], [70, 20, 44, 11, 18], [-210, 70, -420, 40, 60],
     ];
-    far.forEach(([x, y, z, radius, depth], i) => {
-      const island = buildIsland({ radius, depth, seed: 10 + i, lump: 0.2, hills: i === 0 ? 0.5 : 1.6, flat: i === 0 ? 0.75 : 0.3, detail: radius > 15 ? 0.6 : 0.45 });
-      const mesh = new THREE.Mesh(island.geometry, rock);
-      mesh.position.set(x, y, z);
-      if (i > 0) mesh.rotation.y = i * 1.7;
-      scene.add(mesh);
-      if (i > 0) this.drifting.push({ object: mesh, baseY: y, phase: i * 2.1, amp: 0.4 + (i % 3) * 0.25 });
-      // each distant island wears a crown of crystal so it never reads as bare rock
-      if (i > 0 && q.density > 0.5) {
-        const crown = buildCrystals(rng, 5, radius * 0.42, rng.pick([0x59d8ff, 0x9a6bff, 0xff7ad0]));
-        crown.position.set(rng.range(-0.3, 0.3) * radius, 0.4, rng.range(-0.3, 0.3) * radius);
-        crown.castShadow = false;
-        mesh.add(crown);
-      }
-    });
+    for (const [i, [x, y, z, radius]] of far.entries()) {
+      // the first is the gateway's island: it stays where it is, with the bridge at its rim
+      const kind = ISLANDS[i === 0 ? 0 : i % ISLANDS.length]!;
+      const island = await ctx.assets.instance(kind.id);
+      const scale = (radius * 2) / (await sizeOf(ctx, kind.id))[0];
+      island.scale.setScalar(scale);
+      island.rotation.y = i === 0 ? 5.2 : i * 1.7;
+      const baseY = y - kind.turf * scale;
+      island.position.set(x, baseY, z);
+      island.traverse((o) => {
+        o.castShadow = o.receiveShadow = false;
+      });
+      scene.add(island);
+      if (i > 0) this.drifting.push({ object: island, baseY, phase: i * 2.1, amp: 0.4 + (i % 3) * 0.25 });
+    }
     await ctx.step('haven: far islands');
 
-    // ---- the plaza: a stone disc with a star inlaid in light ----
-    const plaza = new THREE.Group();
-    plaza.position.copy(HAVEN.plaza);
+    // ---- the plaza: a moonstone dais with a star inlaid in gold, and stepping stones up to it ----
     const R = HAVEN.plazaRadius;
-    const disc = lathe([[0, 0.07], [R - 0.22, 0.07], [R - 0.05, 0.045], [R, -0.02], [R + 0.03, -0.2]], 72);
-    tintBy(disc, (p, out) => {
-      const ring = Math.floor(Math.hypot(p.x, p.z) / 0.62), wedge = Math.floor((Math.atan2(p.z, p.x) / TAU + 0.5) * (6 + ring * 4));
-      out.set(0x8f88bd).multiplyScalar(0.82 + 0.18 * (((ring * 7 + wedge * 13) % 5) / 4) + 0.05 * fbm3(p.x * 2, 0, p.z * 2, 2));
-    });
-    const discMesh = new THREE.Mesh(disc, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.05 }));
-    discMesh.receiveShadow = true;
-    plaza.add(discMesh);
-    const inlay: THREE.BufferGeometry[] = [place(torus(R - 0.5, 0.028, 6, 72), [0, 0.078, 0]), place(torus(0.62, 0.024, 6, 40), [0, 0.078, 0])];
-    for (let i = 0; i < 5; i++) {
-      const a0 = (i / 5) * TAU + Math.PI / 2, a1 = ((i + 2) / 5) * TAU + Math.PI / 2;
-      inlay.push(sweep([v3(Math.cos(a0) * 1.55, 0.078, -Math.sin(a0) * 1.55), v3(Math.cos(a1) * 1.55, 0.078, -Math.sin(a1) * 1.55)], () => ({ rx: 0.022, ry: 0.012 }), { radial: 4, steps: 2 }));
-    }
-    plaza.add(new THREE.Mesh(merge(inlay), new THREE.MeshBasicMaterial({ color: GOLD_HDR })));
-    scene.add(plaza);
-    const stones: THREE.BufferGeometry[] = [];
+    const daisTall = (await sizeOf(ctx, 'dais'))[1];
+    await dress(ctx, scene, 'dais', [[HAVEN.plaza.x, 0.07 - daisTall, HAVEN.plaza.z]]);
     const stoneSpots: [number, number, number][] = [[0.25, 3.0, 0.5], [-0.3, 1.75, 0.46], [0.22, 0.55, 0.52], [-0.18, -0.7, 0.45], [0.1, -1.55, 0.4]];
-    for (const [x, z, r] of stoneSpots) stones.push(tint(place(blob(r, 0.07, r * 0.86, 3), [x, 0.015, z], [0, x * 3, 0]), 0x8a84b4));
-    const stoneMesh = new THREE.Mesh(merge(stones), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }));
-    stoneMesh.receiveShadow = true;
-    scene.add(stoneMesh);
+    const stoneTall = (await sizeOf(ctx, 'stepping-stone'))[1];
+    await dress(ctx, scene, 'stepping-stone', stoneSpots.map(([x, z, r]): Spot => [x, 0.075 - stoneTall * r * 2.1, z, x * 170, r * 2.1]));
     await ctx.step('haven: plaza');
 
     // ---- grass, flowers, crystals ----
@@ -206,18 +199,24 @@ export class HavenWorld extends World {
       flowers.push({ x, y: g.y, z, h: rng.range(0.18, 0.5), color: rng.pick(flowerColors) });
     }
     scene.add(buildGlowFlowers(flowers));
-    const clusters: [x: number, z: number, scale: number, color: number, count: number][] = [
-      [4.9, -7.0, 1.5, 0x59d8ff, 7], [-4.4, -7.9, 1.2, 0x9a6bff, 6], [7.6, -1.6, 0.95, 0xff7ad0, 5], [-9.0, 3.6, 1.3, 0x59d8ff, 6],
-      [6.0, 5.4, 0.8, 0x9a6bff, 5], [-2.4, 8.2, 0.9, 0xff7ad0, 5], [9.6, -5.2, 1.1, 0x9a6bff, 5], [-8.4, -5.6, 0.85, 0x59d8ff, 4],
+    const clusters: [x: number, z: number, scale: number, color: number][] = [
+      [4.9, -7.0, 1.5, 0x59d8ff], [-6.3, -8.2, 1.2, 0x9a6bff], [7.6, -1.6, 0.95, 0xff7ad0], [-8.3, 5.9, 1.3, 0x59d8ff],
+      [6.0, 5.4, 0.8, 0x9a6bff], [-2.4, 8.2, 0.9, 0xff7ad0], [9.6, -5.2, 1.1, 0x9a6bff], [-8.4, -5.6, 0.85, 0x59d8ff],
     ];
-    for (const [x, z, scale, color, count] of clusters) {
-      const c = buildCrystals(rng, count, scale, color);
-      c.position.set(x, (this.mainIsland.heightAt(x, z) ?? 0) - 0.05, z);
-      scene.add(c);
+    const crystals: Record<'crystals-a' | 'crystals-b', Spot[]> = { 'crystals-a': [], 'crystals-b': [] };
+    for (const [x, z, scale, color] of clusters) {
+      const y = (this.mainIsland.heightAt(x, z) ?? 0) - 0.12;
+      // the cyan clusters are the tall slender kind
+      if (color === 0x59d8ff) crystals['crystals-b'].push([x, y, z, rng.range(0, 360), scale * 0.8]);
+      else crystals['crystals-a'].push([x, y, z, rng.range(0, 360), scale * 0.95]);
       const halo = makeHalo(color, scale * 3.2, 0.5);
-      halo.position.set(x, c.position.y + scale * 0.55, z);
+      halo.position.set(x, y + scale * 0.6, z);
       scene.add(halo);
-      this.colliders.circle(x, z, scale * 0.42);
+      this.colliders.circle(x, z, scale * 0.5);
+    }
+    for (const [n, id] of (['crystals-a', 'crystals-b'] as const).entries()) {
+      const glow = glowOf(await dress(ctx, scene, id, crystals[id]));
+      this.crystalGlow.push({ glow, rest: glow.value, phase: n * 2.1 });
     }
     await ctx.step('haven: flora');
 
@@ -233,34 +232,38 @@ export class HavenWorld extends World {
 
     // ---- lantern posts flanking the bridge ----
     const edgeZ = -this.mainIsland.outline(Math.PI) * 0.965;
+    const posts: Spot[] = [];
+    const lampTall = (await sizeOf(ctx, 'lamp-post'))[1];
     for (const s of [-1, 1]) {
-      const x = s * 2.35, z = edgeZ + 1.5, y = this.mainIsland.heightAt(x, z) ?? 0;
-      const post = merge([
-        tint(sweep([v3(0, -0.1, 0), v3(0, 1.5, 0)], (t) => 0.1 - 0.035 * t, { radial: 6, steps: 4, endCap: 'flat' }), 0x7d74ac),
-        tint(place(blob(0.2, 0.05, 0.2, 2), [0, 1.52, 0]), 0x9a92c8),
-        tint(place(blob(0.24, 0.045, 0.24, 2), [0, 2.02, 0]), 0x7d74ac),
-      ]);
-      const postMesh = new THREE.Mesh(post, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }));
-      postMesh.position.set(x, y, z);
-      postMesh.castShadow = true;
-      const flame = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.72, 0.36).multiplyScalar(3.4) }));
-      flame.position.set(0, 1.78, 0);
-      postMesh.add(flame, makeHalo(0xffb866, 2.4, 0.55).translateY(1.78));
+      const x = s * 2.35, z = edgeZ + 1.5, y = (this.mainIsland.heightAt(x, z) ?? 0) - 0.06;
+      posts.push([x, y, z, s * 20]);
+      // the lantern is the top fifth of the post
       const lamp = new THREE.PointLight(0xffb070, 9, 11, 1.8);
-      lamp.position.set(0, 1.8, 0);
-      postMesh.add(lamp);
-      scene.add(postMesh);
-      this.colliders.circle(x, z, 0.28);
+      lamp.position.set(x, y + lampTall * 0.82, z);
+      scene.add(lamp, makeHalo(0xffb866, 3.6, 0.9).translateX(x).translateY(y + lampTall * 0.82).translateZ(z));
+      this.colliders.circle(x, z, 0.34);
     }
+    await dress(ctx, scene, 'lamp-post', posts);
 
     // the lanterns, reeds and shooting stars draw on their own seed, so everything else in Haven stays where it was
     const extra = new Rng(4081);
 
     // ---- floating lanterns: lining the path from the arrival to the bridge, and scattered over the island ----
     const spots: LanternSpot[] = [];
+    // the challenge board is read from where the player arrives and from where they throw: a lantern that would
+    // hang between either place and the board floats higher, over the line of sight
+    const overBoard = (x: number, z: number): number => {
+      for (const { position: from } of [HAVEN.spawn, HAVEN.throwSpot]) {
+        const bx = BOARD.x - from.x, bz = BOARD.z - from.z, far = Math.hypot(bx, bz);
+        const along = ((x - from.x) * bx + (z - from.z) * bz) / far, aside = Math.abs((x - from.x) * bz - (z - from.z) * bx) / far;
+        // the view of the board is a wedge: a point at the eye, as wide as the frame where it stands
+        if (along > 0 && along < far && aside < 0.35 + 1.1 * (along / far)) return 1;
+      }
+      return 0;
+    };
     const spot = (x: number, z: number): void => {
       const y = this.mainIsland.heightAt(x, z);
-      if (y !== null) spots.push({ x, z, ground: y });
+      if (y !== null) spots.push({ x, z, ground: y, lift: overBoard(x, z) });
     };
     for (const z of [3.6, 1.4, -0.8]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
     for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 2.4) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
@@ -300,14 +303,15 @@ export class HavenWorld extends World {
     scene.add(this.shootingStars.mesh);
 
     // ---- bridge, rings, gateway ----
-    this.bridge = buildStarBridge(v3(0, 0.14, edgeZ), HAVEN.bridgeEnd);
+    const hoops = await Promise.all([0, 1, 2, 3].map(() => ctx.assets.instance('ring')));
+    this.bridge = buildStarBridge(v3(0, 0.14, edgeZ), HAVEN.bridgeEnd, hoops);
     scene.add(this.bridge.group);
-    this.bonusRing = new Ring(HAVEN.bonusRing, v3(0, 0, edgeZ), 1.2);
+    this.bonusRing = new Ring(HAVEN.bonusRing, v3(0, 0, edgeZ), hoops[3]!, 1.2);
     this.bonusRing.group.visible = false;
     scene.add(this.bonusRing.group);
-    this.gateway = buildGateway();
-    this.gateway.group.position.set(gi.x, gi.y + 0.05, gi.z + 3.5);
-    this.gateway.group.scale.setScalar(1.3);
+    this.gateway = buildGateway(await ctx.assets.instance('gateway'));
+    // forward on its island and a little proud of the turf, to stand clear of the blossom around it
+    this.gateway.group.position.set(gi.x, gi.y + 0.9, gi.z + 4.6);
     scene.add(this.gateway.group);
     const gateGlow = makeHalo(0x8fb4ff, 22, 0.42);
     gateGlow.position.set(gi.x, gi.y + 6, gi.z + 3.5);
@@ -327,30 +331,39 @@ export class HavenWorld extends World {
     for (const m of this.motes) scene.add(m.points);
     scene.add(this.bursts.points);
 
-    // ---- the challenge board: a pane of light beside the star circle ----
-    this.board = new Panel(620, 400, { world: true });
-    this.board.mesh.scale.set(2.05, 1.32, 1);
-    this.board.mesh.position.set(-3.7, 1.75, -5.6);
-    this.board.mesh.lookAt(0.2, 1.5, 1.0);
+    // ---- the challenge board: a pane of light in a gold frame planted beside the star circle ----
+    const frame = await ctx.assets.instance('board-frame');
+    const boardGroup = new THREE.Group();
+    const boardY = this.mainIsland.heightAt(BOARD.x, BOARD.z) ?? 0;
+    boardGroup.position.set(BOARD.x, boardY, BOARD.z);
+    boardGroup.lookAt(0.2, boardY, 1.0);
+    // the frame goes into the ground as far as it takes to bring its opening to eye level
+    frame.scale.setScalar(BOARD.frameScale);
+    frame.position.y = BOARD.eye - BOARD.opening.y * BOARD.frameScale;
+    this.board = new Panel(800, 320, { world: true });
+    this.board.mesh.scale.set(BOARD.opening.wide * BOARD.frameScale * 0.97, BOARD.opening.tall * BOARD.frameScale * 0.97, 1);
+    this.board.mesh.position.y = BOARD.eye;
     this.board.opacity = 0;
-    scene.add(this.board.mesh);
+    boardGroup.add(frame, this.board.mesh);
+    scene.add(boardGroup);
+    this.colliders.circle(BOARD.x, BOARD.z, 0.3);
 
     // ---- companions ----
     for (const name of ['lumi', 'kai', 'nova'] as const) {
-      const c = this.addPerson(name, new Character(CAST[name], q.characterDetail, q.shadows));
+      const c = this.addPerson(name, await Character.create(ctx, CAST[name], name));
       c.placeAt(HAVEN[name]).setPose('standOpen', { immediate: true });
-      const aura = makeHalo(CAST[name].outfit.trimColor ?? 0xffffff, 2.3, 0.2);
+      const aura = makeHalo(CAST[name].aura, 2.3, 0.2);
       aura.position.set(0, 0.95, -0.15);
       c.root.add(aura);
     }
 
-    this.buildFestival(rng.fork(), edgeZ);
+    await this.buildFestival(ctx, rng.fork(), edgeZ);
     this.colliders.bounds = { kind: 'circle', cx: 0, cz: -0.6, r: 9.4 };
     this.setVariant('arrival');
   }
 
   /** Strings of lights along the bridge and paper lanterns adrift: hidden until the festival. */
-  private buildFestival(rng: Rng, edgeZ: number): void {
+  private async buildFestival(ctx: BuildContext, rng: Rng, edgeZ: number): Promise<void> {
     const bulbs: THREE.BufferGeometry[] = [];
     const colors = [0xffd27a, 0xff8fd6, 0x7fe9ff, 0xfff1c9];
     const p = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3();
@@ -368,18 +381,15 @@ export class HavenWorld extends World {
     const bulbMat = new THREE.MeshBasicMaterial({ vertexColors: true });
     bulbMat.color.setScalar(3.0);
     this.festival.add(new THREE.Mesh(merge(bulbs), bulbMat));
-    // lanterns: a warm paper box with a light inside, drifting up and around
-    const lanternGeo = merge([
-      tint(sweep([v3(0, 0, 0), v3(0, 0.34, 0)], (k) => 0.13 + 0.05 * Math.sin(k * Math.PI), { radial: 8, steps: 6, startCap: 'flat', endCap: 'flat' }), 0xffc98a),
-      tint(place(blob(0.1, 0.02, 0.1, 1), [0, 0.35, 0]), 0x8a4a3a),
-      tint(place(blob(0.1, 0.02, 0.1, 1), [0, -0.01, 0]), 0x8a4a3a),
-    ]);
-    const lanternMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-    lanternMat.color.setScalar(2.4);
+    // paper lanterns with a light inside, drifting up and around
     for (let i = 0; i < 34; i++) {
-      const mesh = new THREE.Mesh(lanternGeo, lanternMat);
+      const mesh = await ctx.assets.instance('lantern');
+      mesh.traverse((o) => {
+        o.castShadow = o.receiveShadow = false;
+      });
+      mesh.scale.setScalar(rng.range(1.0, 1.7));
       const x = rng.range(-22, 22), z = rng.range(edgeZ - 34, 6);
-      mesh.add(makeHalo(0xffb866, 1.6, 0.35).translateY(0.17));
+      mesh.add(makeHalo(0xffb866, 1.6, 0.35).translateY(0.3));
       this.festival.add(mesh);
       this.lanterns.push({ mesh, x, z, speed: rng.range(0.25, 0.6), phase: rng.range(0, 40) });
     }
@@ -425,30 +435,39 @@ export class HavenWorld extends World {
     if (!data) return;
     const theme = THEMES.haven;
     this.board.paint((ctx, w, h) => {
-      glass(ctx, 26, 26, w - 52, h - 52, theme, { radius: 34, glow: 1.4, borderWidth: 2.5 });
+      glass(ctx, 10, 10, w - 20, h - 20, theme, { radius: 22, glow: 1.4, borderWidth: 2.5 });
       ctx.fillStyle = theme.accent;
-      sparkle(ctx, 78, 92, 17);
+      sparkle(ctx, 60, 66, 16);
       ctx.fillStyle = theme.text;
-      ctx.font = font(600, 38);
+      ctx.font = font(600, 36);
       ctx.textBaseline = 'middle';
-      ctx.fillText(data.title, 110, 94);
-      ctx.font = font(400, 26);
+      ctx.fillText(data.title, 92, 68);
+      ctx.font = font(400, 25);
       ctx.fillStyle = theme.dim;
-      wrap(ctx, data.body, w - 140).forEach((line, i) => ctx.fillText(line, 70, 160 + i * 36));
+      wrap(ctx, data.body, w - 110).forEach((line, i) => ctx.fillText(line, 52, 128 + i * 34));
       for (let i = 0; i < data.total; i++) {
-        const x = w / 2 + (i - (data.total - 1) / 2) * 76 - 40, y = h - 96;
+        const x = w / 2 + (i - (data.total - 1) / 2) * 70 - 40, y = h - 66;
         ctx.lineWidth = 3;
         ctx.strokeStyle = theme.accent;
         ctx.fillStyle = theme.accent;
         ctx.beginPath();
-        ctx.arc(x, y, 24, 0, TAU);
+        ctx.arc(x, y, 22, 0, TAU);
         ctx.stroke();
-        if (i < data.value) sparkle(ctx, x, y, 17);
+        if (i < data.value) sparkle(ctx, x, y, 16);
       }
       ctx.font = font(600, 22);
       ctx.fillStyle = theme.text;
-      spaced(ctx, `${data.value} / ${data.total}`, w - 170, h - 96, 3);
+      spaced(ctx, `${data.value} / ${data.total}`, w - 170, h - 66, 3);
     });
+  }
+
+  /** Opens the gateway at the bridge's end: the arch fills with light, which bursts out over the island. */
+  openGateway(): void {
+    this.gateway.setOpen(1);
+    const at = this.gateway.group.position.clone().add(v3(0, 5, 0));
+    this.bursts.emit(at, { count: 240, color: new THREE.Color(0x9fd4ff), color2: _white, speed: 11, spread: 1, life: 2.6, size: 0.9, gravity: 0.6 });
+    this.bursts.emit(at, { count: 90, color: new THREE.Color(0xffd27a), color2: _white, speed: 5, life: 3.2, size: 0.7, gravity: -0.4 });
+    this.onFirework?.(at);
   }
 
   /** Sends `count` fireworks up over the bridge. */
@@ -478,6 +497,7 @@ export class HavenWorld extends World {
       this.bonusRing.update(dt, time);
     }
     for (const d of this.drifting) d.object.position.y = d.baseY + Math.sin(time * 0.17 + d.phase) * d.amp;
+    for (const c of this.crystalGlow) c.glow.value = c.rest * (1 + 0.45 * Math.sin(time * 0.9 + c.phase));
     for (const m of this.motes) m.setPixelHeight(frame.pixelHeight);
 
     // fireworks: a shell bursts, then crackles
@@ -503,7 +523,7 @@ export class HavenWorld extends World {
     }
     this.boardShown = damp(this.boardShown, this.boardData ? 1 : 0, 5, dt);
     this.board.opacity = this.boardShown;
-    this.board.mesh.position.y = 1.75 + Math.sin(time * 0.9) * 0.03 - (1 - this.boardShown) * 0.2;
+    this.board.mesh.position.y = BOARD.eye + Math.sin(time * 0.9) * 0.012;
   }
 }
 

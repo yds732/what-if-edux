@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { merge, place, roundBox, tint, type V3 } from '../core/geo';
-import { Rng } from '../core/math';
 
 /** Surface finishes shared by every piece of furniture; one draw call each per room. */
 export type Finish = 'matte' | 'satin' | 'gloss' | 'metal' | 'glow';
@@ -61,50 +60,6 @@ export class Builder {
     return out;
   }
 }
-
-/** A tiling texture painted on a canvas once. */
-export const canvasTexture = (size: number, paint: (ctx: CanvasRenderingContext2D, size: number) => void, repeat: [number, number] = [1, 1]): THREE.CanvasTexture => {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('2D canvas is unavailable');
-  paint(ctx, size);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(repeat[0], repeat[1]);
-  texture.anisotropy = 8;
-  return texture;
-};
-
-/** Floorboards: staggered planks with grain, in a base colour. */
-export const plankTexture = (base: THREE.ColorRepresentation, rng: Rng, repeat: [number, number]): THREE.CanvasTexture =>
-  canvasTexture(1024, (ctx, size) => {
-    const c = new THREE.Color(base);
-    const rows = 8, h = size / rows;
-    for (let r = 0; r < rows; r++) {
-      let x = -rng.range(0, 300);
-      while (x < size) {
-        const w = rng.range(260, 520);
-        const k = rng.range(0.82, 1.12);
-        ctx.fillStyle = `rgb(${Math.round(c.r * 255 * k)}, ${Math.round(c.g * 255 * k)}, ${Math.round(c.b * 255 * k)})`;
-        ctx.fillRect(x, r * h, w - 2, h - 2);
-        // grain
-        ctx.strokeStyle = 'rgba(0,0,0,0.07)';
-        ctx.lineWidth = 1;
-        for (let i = 0; i < 9; i++) {
-          const y = r * h + rng.range(4, h - 6);
-          ctx.beginPath();
-          ctx.moveTo(x, y);
-          ctx.bezierCurveTo(x + w * 0.3, y + rng.range(-4, 4), x + w * 0.7, y + rng.range(-4, 4), x + w, y);
-          ctx.stroke();
-        }
-        x += w;
-      }
-    }
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    for (let r = 0; r <= rows; r++) ctx.fillRect(0, r * h - 2, size, 2);
-  }, repeat);
 
 /** A simple wall poster, drawn; returns a quad of the given size in metres. */
 export const makePoster = (width: number, height: number, paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): THREE.Mesh => {
