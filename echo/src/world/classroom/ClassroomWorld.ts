@@ -13,9 +13,11 @@ import type { Obstacle } from '../colliders';
 import { makeHalo } from '../haven/atmosphere';
 import { buildCityscape, type Cityscape } from '../cityscape';
 import { Builder, canvasTexture } from '../interior';
+import { buildSunbeams, type Sunbeams } from './sunbeams';
 
 /** Seat height of every chair, and the eye height of a child sitting on one. */
 export const SEAT = 0.36;
+const _sunDir = new THREE.Vector3();
 export const EYE_SEATED = 1.0;
 
 /** The classroom: 10 m wide (x), 12 m deep (z). The display and teacher are on the -Z wall, windows on -X. */
@@ -83,6 +85,7 @@ export class ClassroomWorld extends World {
   private stageGlow!: THREE.Mesh;
   private stageBeam!: THREE.Mesh;
   private stageLight!: THREE.PointLight;
+  private beams!: Sunbeams;
   private variant: ClassroomVariant = 'morning';
   private mood = { sun: 3, warm: 0, room: 1, night: 0 };
   private readonly target = { sun: 3, warm: 0, room: 1, night: 0 };
@@ -247,6 +250,10 @@ export class ClassroomWorld extends World {
     this.sun.shadow.normalBias = 0.04;
     this.sun.shadow.radius = 5;
     scene.add(this.fill, this.sun, this.sun.target);
+    // light you can see: a shaft from each window, and dust that glints where it drifts through one
+    this.beams = buildSunbeams(new Rng(2081), centres.map((z) => ({ x: -W, y0: WY0, y1: WY1, z0: z - WW / 2, z1: z + WW / 2 })),
+      { min: new THREE.Vector3(-W, 0.05, -D), max: new THREE.Vector3(W, H - 0.05, D) }, ctx.quality.density);
+    scene.add(this.beams.group);
     // ceiling panels: soft rectangles of light over each column of desks
     const panels = new Builder();
     for (const x of DESK_COLS) for (const z of [-3.6, -0.6, 2.4]) panels.box('glow', 0xffffff, [1.5, 0.02, 0.5], [x, H - 0.012, z], { r: 0.01 });
@@ -361,6 +368,7 @@ export class ClassroomWorld extends World {
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);
     this.scene.environmentIntensity = 0.14 + 0.36 * m.room + 0.1 * m.warm;
     this.city.setNight(m.night);
+    this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (m.sun / 4.4) * (1.2 + 0.2 * m.warm));
     this.look.exposure = this.variant === 'viewer' ? 1.15 : 1.0;
     this.look.saturation = 1.06 + 0.16 * m.warm;
     this.look.highlightTint.setRGB(0.012 + 0.03 * m.warm, 0.006 + 0.01 * m.warm, -0.004 - 0.02 * m.warm);
@@ -552,6 +560,7 @@ export class ClassroomWorld extends World {
     super.update(frame);
     const { dt, time } = frame;
     this.city.update(time);
+    this.beams.update(time, frame.pixelHeight);
     const m = this.mood, t = this.target;
     if (Math.abs(m.sun - t.sun) + Math.abs(m.warm - t.warm) + Math.abs(m.room - t.room) + Math.abs(m.night - t.night) > 0.002) {
       m.sun = damp(m.sun, t.sun, 1.4, dt);

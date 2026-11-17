@@ -107,6 +107,29 @@ const vowelWave = (kit: Kit, speaker: SpeakerId, v: RealVoice, vowel: VowelLette
     }),
   );
 
+// ---------------------------------------------------------------------------------------- recorded keystrokes
+
+/** Single keystrokes cut from the team's keyboard recording: real-world people "type" their lines. */
+const KEY_URLS = Array.from({ length: 8 }, (_, i) => new URL(`./keys/key-${i + 1}.wav`, import.meta.url).href);
+let keyBuffers: AudioBuffer[] | null = null;
+let keysLoading: Promise<void> | null = null;
+
+/** Starts loading the keystroke samples; until they arrive, people speak with the synthesised voice. */
+export const loadKeySamples = (ctx: BaseAudioContext): Promise<void> =>
+  (keysLoading ??= Promise.all(KEY_URLS.map(async (url) => ctx.decodeAudioData(await (await fetch(url)).arrayBuffer())))
+    .then((buffers) => void (keyBuffers = buffers))
+    .catch((e: unknown) => console.warn('Keystroke samples did not load; using the synthesised voice.', e)));
+
+/** One syllable as one keystroke, chosen by the letter and pitched by the speaker, so each person types in their own key. */
+const speakKey = (p: Patch, speaker: SpeakerId, v: RealVoice, char: string, keys: AudioBuffer[]): void => {
+  const code = char.toLowerCase().charCodeAt(0) || 0;
+  const buffer = keys[(code * 5 + PHASE[speaker] * 3) % keys.length | 0]!;
+  // the speaker's pitch moves the keystroke gently: higher voices type a little brighter, lower ones a little deeper
+  const rate = (syllablePitch(speaker, char) / 260) ** 0.45;
+  const amp = p.gain(dB(v.level + 4));
+  p.play(buffer, p.t, rate).connect(amp).connect(p.mix(0.12));
+};
+
 const speakReal = (p: Patch, speaker: SpeakerId, v: RealVoice, char: string): void => {
   const t = p.t, letter = char.toLowerCase(), f = syllablePitch(speaker, char);
   const vowel = vowelOf(letter), open = VOWEL_LETTERS.includes(letter), level = dB(v.level);
@@ -148,6 +171,9 @@ const speakHaven = (p: Patch, speaker: SpeakerId, v: HavenVoice, char: string): 
 /** Adds one syllable of `speaker` saying `char` to a patch. */
 export const speak = (p: Patch, speaker: SpeakerId, char: string): void => {
   const v = VOICES[speaker];
-  if (v.kind === 'real') speakReal(p, speaker, v, char);
+  if (v.kind === 'real') {
+    if (keyBuffers) speakKey(p, speaker, v, char, keyBuffers);
+    else speakReal(p, speaker, v, char);
+  }
   else speakHaven(p, speaker, v, char);
 };

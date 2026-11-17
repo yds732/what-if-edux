@@ -5,7 +5,7 @@ import type { SfxName } from './GameAudio';
 import { MAX_ONE_SHOTS, Mixer, type Space } from './mixer';
 import { SFX } from './sfx';
 import { dB } from './synth';
-import { VOICES, syllablePitch } from './voices';
+import { VOICES, loadKeySamples, syllablePitch } from './voices';
 import { WebAudio } from './WebAudio';
 
 /**
@@ -325,6 +325,8 @@ const SAMPLE_LINES: Record<SpeakerId, Line> = {
 const TYPE_SPEED = 46;
 
 const voice = async (speaker: SpeakerId): Promise<Row> => {
+  // real-world speakers type with the recorded keystrokes: have them ready before the line is rendered
+  await loadKeySamples(new OfflineAudioContext(1, 1, 48000));
   const text = SAMPLE_LINES[speaker].text, frameSeconds = 1 / 60, seconds = round(text.length / TYPE_SPEED + 1.5, 2);
   let typed = 0, spoken = 0;
   const pitches: number[] = [];

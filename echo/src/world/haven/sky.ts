@@ -12,19 +12,22 @@ uniform float uTime, uFestival; uniform vec3 uPlanetDir;
 varying vec3 vDir;
 vec3 skyColor(vec3 d){
   float h = d.y;
-  vec3 zenith = vec3(0.006, 0.009, 0.05), mid = vec3(0.035, 0.03, 0.17), low = vec3(0.17, 0.08, 0.3), horizon = vec3(0.6, 0.24, 0.42);
+  // a warm, painterly dusk: gold at the horizon, rose and peach above it, deep violet overhead
+  vec3 zenith = vec3(0.03, 0.02, 0.08), mid = vec3(0.24, 0.11, 0.22), low = vec3(0.72, 0.34, 0.28), horizon = vec3(1.0, 0.62, 0.28);
   vec3 c = mix(horizon, low, smoothstep(-0.02, 0.1, h));
   c = mix(c, mid, smoothstep(0.06, 0.34, h));
   c = mix(c, zenith, smoothstep(0.28, 0.9, h));
   // the glow of the hidden sun gathers under the planet
   float toward = max(dot(normalize(vec3(d.x, 0.0, d.z)), normalize(vec3(uPlanetDir.x, 0.0, uPlanetDir.z))), 0.0);
-  c += vec3(1.0, 0.46, 0.34) * pow(toward, 5.0) * exp(-max(h, 0.0) * 7.0) * 0.5;
+  c += vec3(1.0, 0.62, 0.3) * pow(toward, 4.0) * exp(-max(h, 0.0) * 5.0) * 0.8;
+  // a golden veil low across the whole sky
+  c += vec3(0.5, 0.3, 0.12) * exp(-max(h, 0.0) * 9.0) * 0.35;
   // nebula: two soft bands of dust across the sky
   float n = fbm3(d * 2.4 + vec3(0.0, 0.0, uTime * 0.004));
   float band = exp(-pow((d.y - 0.42 - 0.25 * d.x) * 3.2, 2.0));
   c += (vec3(0.42, 0.16, 0.6) * smoothstep(0.42, 0.8, n) + vec3(0.1, 0.3, 0.6) * smoothstep(0.5, 0.9, fbm3(d * 4.1 + 7.0))) * band * 0.3;
   // below the horizon: the cloud sea's own haze
-  c = mix(c, vec3(0.2, 0.11, 0.3), smoothstep(0.0, -0.22, h));
+  c = mix(c, vec3(0.42, 0.22, 0.24), smoothstep(0.0, -0.22, h));
   return c;
 }
 void main(){

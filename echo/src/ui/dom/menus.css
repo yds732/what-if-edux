@@ -3,7 +3,14 @@
   --dim: rgba(232, 226, 255, 0.72);
   --gold: #ffd98a;
   --glass: rgba(26, 18, 54, 0.62);
-  --line: rgba(255, 226, 180, 0.34);
+  --line: rgba(255, 226, 180, 0.16);
+  --line-hover: rgba(255, 217, 138, 0.5);
+  /* buttons: squarer, with a little softness left at the corners */
+  --r-btn: 10px;
+  /* motion tokens: press and hover answer at once, the sheen and sparkle are a touch longer */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 150ms;
+  --dur-sheen: 520ms;
   --font: 'Lexend Variable', 'Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -137,28 +144,48 @@
 }
 .btn {
   appearance: none;
+  position: relative;
+  overflow: hidden;
   font: 500 17px/1 var(--font);
   letter-spacing: 0.06em;
   color: var(--ink);
   padding: 16px 26px;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
+  border-radius: var(--r-btn);
+  border: 1px solid var(--line);
   background: var(--glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-press) ease, background-color var(--dur-press) ease, box-shadow var(--dur-press) ease;
 }
-.btn:hover,
+/* a soft band of light that sweeps across on hover */
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 240, 210, 0.22) 50%, transparent 70%);
+  transform: translateX(-110%);
+  pointer-events: none;
+}
 .btn:focus-visible {
   outline: none;
-  transform: translateY(-1px) scale(1.02);
-  border-color: var(--gold);
-  background: rgba(60, 40, 104, 0.72);
-  box-shadow: 0 0 28px rgba(255, 196, 120, 0.28);
+  border-color: var(--line-hover);
+  box-shadow: 0 0 0 2px rgba(255, 217, 138, 0.35), 0 0 24px rgba(255, 196, 120, 0.22);
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--line-hover);
+    background-color: rgba(60, 40, 104, 0.72);
+    box-shadow: 0 6px 24px rgba(255, 196, 120, 0.22);
+  }
+  .btn:hover::before {
+    transform: translateX(110%);
+    transition: transform var(--dur-sheen) var(--ease-out);
+  }
 }
 .btn:active {
-  transform: scale(0.98);
+  transform: scale(0.96);
 }
 .btn--primary {
   background: linear-gradient(180deg, #ffe2a6, #ffc56f);
@@ -167,8 +194,8 @@
   font-weight: 600;
   box-shadow: 0 0 34px rgba(255, 196, 120, 0.42);
 }
-.btn--primary:hover,
-.btn--primary:focus-visible {
+.btn--primary:focus-visible,
+.btn--primary:hover {
   background: linear-gradient(180deg, #fff0cc, #ffd086);
   box-shadow: 0 0 46px rgba(255, 206, 140, 0.62);
 }
@@ -228,13 +255,17 @@
   gap: 12px;
   text-align: left;
   padding: 14px 18px;
-  border-radius: 16px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-btn);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.05);
   color: var(--ink);
   font: 400 15px/1.35 var(--font);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  /* a wide surface: hover and press change the background instead of scaling */
+  transition: border-color var(--dur-press) ease, background-color var(--dur-press) ease;
+}
+.day:active {
+  background-color: rgba(255, 255, 255, 0.14);
 }
 .day:hover,
 .day:focus-visible {
@@ -273,8 +304,8 @@
 }
 .seg {
   display: inline-flex;
-  border-radius: 999px;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-btn);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   overflow: hidden;
 }
 .seg button {
@@ -441,8 +472,8 @@
   right: max(18px, env(safe-area-inset-right));
   bottom: max(28px, env(safe-area-inset-bottom));
   padding: 16px 22px;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
+  border-radius: var(--r-btn);
+  border: 1px solid var(--line);
   background: var(--glass);
   color: var(--ink);
   font: 500 15px/1 var(--font);
@@ -496,5 +527,37 @@
   .btn {
     padding: 13px 20px;
     font-size: 15px;
+  }
+}
+
+/* the click's sparkle: a few motes thrown out from where the button was pressed (menus.ts) */
+.sparkles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+.sparkles i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  background: radial-gradient(circle, #ffffff 0%, #fff0c4 40%, rgba(255, 217, 138, 0) 75%);
+  box-shadow: 0 0 8px 2px rgba(255, 210, 130, 0.7);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn::before,
+  .day {
+    transition: none;
+  }
+  .btn:hover,
+  .btn:active {
+    transform: none;
+  }
+  .btn::before {
+    display: none;
   }
 }

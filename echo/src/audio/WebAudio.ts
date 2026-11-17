@@ -7,7 +7,7 @@ import { shape } from './instruments';
 import { Mixer } from './mixer';
 import { SFX } from './sfx';
 import { Patch, dB, mtof } from './synth';
-import { speak } from './voices';
+import { loadKeySamples, speak } from './voices';
 
 /** Syllables closer together than this run into a buzz, so the later one is dropped. */
 const SYLLABLE_GAP = 0.045;
@@ -67,6 +67,7 @@ export class WebAudio implements GameAudio {
         console.warn('ECHO: sound is unavailable on this device.', e);
         return;
       }
+      void loadKeySamples(this.mixer.ctx);
       this.mixer.setVolume(this.volume);
       if (this.paused) this.mixer.setPaused(true);
       const scape = this.scape;

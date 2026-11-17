@@ -101,7 +101,7 @@ export class Hands {
   /** Higher is snappier. */
   rate = 11;
   private readonly material: THREE.MeshStandardMaterial;
-  private readonly uniforms = { uSkin: { value: new THREE.Color(0xd9a27e) }, uSleeve: { value: new THREE.Color(0x3f6b6a) }, uCuff: { value: new THREE.Color(0xe9e4d8) }, uGlow: { value: 0 } };
+  private readonly uniforms = { uSkin: { value: new THREE.Color(0xf7efe6) }, uSleeve: { value: new THREE.Color(0x3f6b6a) }, uCuff: { value: new THREE.Color(0xe9e4d8) }, uGlow: { value: 0 } };
   private swayX = 0;
   private swayY = 0;
   private glow = 0;
@@ -122,7 +122,9 @@ export class Hands {
           diffuseColor.rgb = mix(real, haven, uGlow);`)
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           float rimLight = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.2);
-          totalEmissiveRadiance += uGlow * (vec3(0.5, 0.62, 1.0) * (0.16 + 1.1 * rimLight) + vec3(1.0, 0.75, 0.35) * 1.4 * cuff);`);
+          totalEmissiveRadiance += uGlow * (vec3(0.5, 0.62, 1.0) * (0.16 + 1.1 * rimLight) + vec3(1.0, 0.75, 0.35) * 1.4 * cuff);
+          // in the real world the hands are a neutral warm white that glows softly, so they belong to any player
+          totalEmissiveRadiance += (1.0 - uGlow) * (1.0 - cloth) * vec3(1.0, 0.86, 0.68) * (0.14 + 0.55 * rimLight);`);
     };
     this.material.customProgramCacheKey = () => 'echo-hands';
     this.right = new Hand(1, this.material);
@@ -133,6 +135,7 @@ export class Hands {
     app.camera.add(this.root);
   }
 
+  /** The real world's hand colour: a neutral warm white by default. */
   setSkin(color: THREE.ColorRepresentation): void {
     this.uniforms.uSkin.value.set(color);
   }

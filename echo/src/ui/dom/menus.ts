@@ -1,12 +1,11 @@
 import './menus.css';
 import type { Game } from '../../app/Game';
 import { TIERS } from '../../app/quality';
-import { SKIN_TONES, saveSettings, tierFor, type Settings } from '../../app/settings';
+import { saveSettings, tierFor, type Settings } from '../../app/settings';
 import { FRIDAY, THURSDAY, TUESDAY } from '../../story/script';
 import { CHAPTERS, clearProgress, freshState, loadProgress, type ChapterId, type StoryState } from '../../story/state';
 import { XRRig } from '../../input/XRRig';
 import type { Character } from '../../characters/Character';
-import { cameraYaw } from '../../world/World';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
 
 /** Two framings of Haven behind the title: words on the left of a wide screen, or above and below the bridge on a tall one. */
@@ -15,6 +14,9 @@ const TITLE_VIEWS = {
   tall: { at: HAVEN.titleTall, pitch: 0.16, lumi: HAVEN.lumi },
 } as const;
 type TitleView = keyof typeof TITLE_VIEWS;
+
+/** The title camera's orbit: around the plaza and the bridge, 45 degrees above them. */
+const TITLE_ORBIT = { centre: { x: 0, y: 0.5, z: -13 }, radius: 30, tilt: Math.PI / 4, speed: 0.015, start: 0.6 } as const;
 
 /** What the title screen keeps while it is open. */
 interface TitleScene {
@@ -46,6 +48,34 @@ const button = (label: string, className: string, onClick: () => void): HTMLButt
   return b;
 };
 
+/** Timing of the click sparkle: it starts with the press and is gone shortly after the button settles. */
+const SPARKLE = { count: 6, ms: 420, reach: [16, 28] as const };
+const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+/** A few motes of light thrown out from where a button was pressed: a small secondary touch on the click. */
+const sparkle = (button: HTMLElement, event: MouseEvent): void => {
+  if (reducedMotion()) return;
+  const box = button.getBoundingClientRect();
+  // a keyboard press has no pointer position: sparkle from the middle of the button
+  const x = event.detail > 0 ? event.clientX : box.left + box.width / 2, y = event.detail > 0 ? event.clientY : box.top + box.height / 2;
+  const layer = el('div', 'sparkles');
+  document.body.append(layer);
+  const turn = Math.random() * Math.PI * 2;
+  const motes = Array.from({ length: SPARKLE.count }, (_, i) => {
+    const mote = document.createElement('i');
+    mote.style.left = `${x}px`;
+    mote.style.top = `${y}px`;
+    layer.append(mote);
+    const a = turn + (i / SPARKLE.count) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const r = SPARKLE.reach[0] + Math.random() * (SPARKLE.reach[1] - SPARKLE.reach[0]);
+    return mote.animate([
+      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+      { transform: `translate(${Math.cos(a) * r}px, ${Math.sin(a) * r}px) scale(0.2)`, opacity: 0 },
+    ], { duration: SPARKLE.ms * (0.8 + Math.random() * 0.4), easing: 'cubic-bezier(0.32, 0.72, 0, 1)', fill: 'forwards' }).finished;
+  });
+  void Promise.allSettled(motes).then(() => layer.remove());
+};
+
 /** Title, pause, settings, chapter select and the end-of-week summary: ordinary DOM, laid over the canvas. */
 class Menus {
   private readonly root = document.getElementById('ui') as HTMLElement;
@@ -59,6 +89,11 @@ class Menus {
   constructor(private readonly game: Game, private readonly settings: Settings, private readonly tierPinned: boolean) {
     this.loading.style.opacity = '0';
     this.root.append(this.loading);
+    // every menu button answers a click with a little sparkle
+    this.root.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement | null)?.closest('button');
+      if (b && !b.disabled) sparkle(b, e);
+    });
     void XRRig.supported().then((ok) => {
       this.xrSupported = ok;
       if (ok && this.title) void this.showTitle();
@@ -96,7 +131,6 @@ class Menus {
     game.audio.setVolume(settings.volume);
     game.director.autoAdvance = settings.autoAdvance;
     game.input.sensitivity = settings.sensitivity;
-    game.hands.setSkin(SKIN_TONES[settings.skin] ?? SKIN_TONES[1]);
     saveSettings(settings);
   }
 
@@ -169,7 +203,10 @@ class Menus {
     void game.ensureWorld('classroom');
   }
 
-  /** A slow drift of the title's camera, in whichever framing suits the screen's shape; Lumi waves now and then. */
+  /**
+   * The title's camera: high above Haven, looking down at 45 degrees, circling the whole island very slowly.
+   * Lumi stands on the plaza below; the framing for the screen's shape only decides where she stands.
+   */
   private driftCamera(title: TitleScene): void {
     const { player, app } = this.game;
     const name: TitleView = app.camera.aspect >= 1.15 ? 'wide' : 'tall';
@@ -179,15 +216,15 @@ class Menus {
       title.haven.stand(title.lumi, view.lumi);
       document.querySelector('.menu--title')?.classList.toggle('tall', name === 'tall');
     }
-    const t = app.time * 0.045;
-    player.position.set(view.at.position.x + Math.sin(t) * 0.45, 0, view.at.position.z + Math.cos(t * 0.8) * 0.4);
-    player.eyeHeight = 1.5;
-    player.yaw = cameraYaw(view.at) + Math.sin(t * 0.7) * 0.025;
-    player.pitch = view.pitch + Math.sin(t * 0.5) * 0.012;
-    if (app.time >= title.nextWave) {
-      title.lumi.play('wave');
-      title.nextWave = app.time + 11;
-    }
+    // one full turn every ~7 minutes, with a gentle breathing in distance so the orbit never feels mechanical
+    const t = app.time * TITLE_ORBIT.speed + TITLE_ORBIT.start;
+    const radius = TITLE_ORBIT.radius * (1 + 0.04 * Math.sin(app.time * 0.05));
+    const cx = TITLE_ORBIT.centre.x, cz = TITLE_ORBIT.centre.z;
+    const x = cx + Math.sin(t) * radius, z = cz + Math.cos(t) * radius;
+    player.position.set(x, 0, z);
+    player.eyeHeight = radius * Math.tan(TITLE_ORBIT.tilt) + TITLE_ORBIT.centre.y;
+    player.yaw = Math.atan2(-(cx - x), -(cz - z));
+    player.pitch = -TITLE_ORBIT.tilt;
   }
 
   private begin(chapter: ChapterId, state: StoryState): void {
@@ -274,22 +311,6 @@ class Menus {
     row('Volume', '', range(0, 1, s.volume, (v) => (s.volume = v)));
     row('Dialogue', 'Lines move on by themselves after a reading pause.', seg(['auto', 'manual'] as const, s.autoAdvance ? 'auto' : 'manual', (v) => (s.autoAdvance = v === 'auto')));
     row('Look sensitivity', '', range(0.4, 2, s.sensitivity, (v) => (s.sensitivity = v)));
-    const swatches = el('div', 'swatches');
-    SKIN_TONES.forEach((tone, i) => {
-      const b = el('button');
-      b.type = 'button';
-      b.style.background = `#${tone.toString(16).padStart(6, '0')}`;
-      b.setAttribute('aria-label', `Hand tone ${i + 1}`);
-      b.setAttribute('aria-pressed', String(i === s.skin));
-      b.addEventListener('click', () => {
-        for (const other of Array.from(swatches.children)) other.setAttribute('aria-pressed', 'false');
-        b.setAttribute('aria-pressed', 'true');
-        s.skin = i;
-        this.applySettings();
-      });
-      swatches.append(b);
-    });
-    row('Your hands', 'As they look in the real world.', swatches);
     const done = button('Done', 'btn--primary', back);
     done.style.marginTop = '20px';
     card.append(done);

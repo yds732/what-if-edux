@@ -85,8 +85,9 @@ export class HavenWorld extends World {
     this.near = 0.08;
     this.far = 3200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.15, ao: 0.8, saturation: 1.2, contrast: 0.26, vignette: 0.36, grain: 0.01, chroma: 0.005,
-      shadowTint: new THREE.Color(0.01, 0.0, 0.03), highlightTint: new THREE.Color(0.03, 0.012, -0.012),
+      exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.14, contrast: 0.22, vignette: 0.36, grain: 0.014, chroma: 0.005,
+      // warm, glowing highlights over soft plum shadows: a magical golden hour
+      shadowTint: new THREE.Color(0.018, 0.004, 0.024), highlightTint: new THREE.Color(0.08, 0.04, -0.03),
     }));
     this.clearColor.set(0x1a1038);
   }
@@ -101,12 +102,12 @@ export class HavenWorld extends World {
     scene.add(this.sky.group);
     scene.environment = bakeEnvironment(ctx.renderer, this.sky.envScene, 0.02);
     scene.environmentIntensity = 1.1;
-    scene.fog = new THREE.FogExp2(0x3a2458, 0.0046);
+    scene.fog = new THREE.FogExp2(0x6a3a4a, 0.0046);
     scene.add(buildCloudSea(-44, this.time));
     await ctx.step('haven: sky');
 
     // ---- light: a warm key from behind the player so faces read, a cool rim from the planet, sky fill ----
-    const key = new THREE.DirectionalLight(0xffd2b8, 2.4);
+    const key = new THREE.DirectionalLight(0xffbf80, 3.0);
     key.position.copy(KEY_DIR).multiplyScalar(60).add(v3(0, 0, -4));
     key.target.position.set(0, 0, -4);
     key.castShadow = q.shadows;
@@ -118,7 +119,7 @@ export class HavenWorld extends World {
     key.shadow.radius = 5;
     const rim = new THREE.DirectionalLight(0xff8fb8, 1.7);
     rim.position.copy(PLANET_DIR).multiplyScalar(60);
-    scene.add(key, key.target, rim, new THREE.HemisphereLight(0x7f78ff, 0x6a3a72, 1.15));
+    scene.add(key, key.target, rim, new THREE.HemisphereLight(0xe0a8c0, 0x8a5a4a, 1.1));
 
     // ---- islands ----
     const rock = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
@@ -216,7 +217,7 @@ export class HavenWorld extends World {
     await ctx.step('haven: flora');
 
     // ---- the blossom tree ----
-    const tree = buildBlossomTree(rng.fork(), Math.round(20000 * q.density));
+    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density));
     tree.group.position.copy(HAVEN.tree);
     tree.group.scale.setScalar(1.3);
     scene.add(tree.group);

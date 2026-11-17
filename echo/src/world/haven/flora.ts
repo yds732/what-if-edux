@@ -106,7 +106,7 @@ const PETAL_VS_PARS = /* glsl */ `
 attribute vec4 aLeaf;   // local offset xyz, size
 attribute vec4 aLeafRot; // axis-angle packed: yaw, tilt, phase, tint
 uniform float uTime, uWind;
-varying float vLeafTint; varying vec2 vLeafUv;
+varying float vLeafTint, vLeafPhase; varying vec2 vLeafUv;
 `;
 const PETAL_VS = /* glsl */ `
 {
@@ -118,7 +118,7 @@ const PETAL_VS = /* glsl */ `
   vec3 sway = vec3(sin(uTime * 0.9 + aLeaf.y * 0.7), 0.0, cos(uTime * 0.7 + aLeaf.x * 0.6)) * 0.035 * uWind;
   transformed = p + aLeaf.xyz + sway;
   objectNormal = normalize(aLeaf.xyz - vec3(0.0, 4.2, 0.0)) * 0.7 + vec3(0.0, 0.5, 0.0);   // shade the canopy as one soft mass
-  vLeafTint = aLeafRot.w; vLeafUv = uv;
+  vLeafTint = aLeafRot.w; vLeafPhase = aLeafRot.z; vLeafUv = uv;
 }
 `;
 
@@ -126,25 +126,26 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
-  const barkA = new THREE.Color(0x3a2a4e), barkB = new THREE.Color(0x6a4a6e);
+  const barkA = new THREE.Color(0x24181f), barkB = new THREE.Color(0x4e3438);
 
   const branch = (from: THREE.Vector3, dir: THREE.Vector3, length: number, radius: number, depth: number): void => {
-    const bend = v3(rng.range(-0.5, 0.5), rng.range(0.1, 0.5), rng.range(-0.5, 0.5));
+    const bend = v3(rng.range(-0.8, 0.8), rng.range(-0.1, 0.5), rng.range(-0.8, 0.8));
     const mid = from.clone().addScaledVector(dir, length * 0.5).addScaledVector(bend, length * 0.18);
     const end = from.clone().addScaledVector(dir.clone().add(bend.multiplyScalar(0.35)).normalize(), length);
     const g = sweep([from, mid, end], (t) => radius * lerp(1, 0.58, t), { radial: depth === 0 ? 12 : 7, steps: 10, startCap: 'round', endCap: 'round' });
     bark.push(tintBy(g, (p, out) => void out.copy(barkA).lerp(barkB, 0.5 + 0.5 * fbm3(p.x * 3, p.y * 1.2, p.z * 3, 2))));
-    if (depth >= 3) {
-      tips.push({ p: end, r: 0.75 + rng.range(0, 0.5) });
+    if (depth >= 4) {
+      tips.push({ p: end, r: 0.55 + rng.range(0, 0.35) });
       return;
     }
     const kids = depth === 0 ? 4 : rng.int(2, 3);
     for (let i = 0; i < kids; i++) {
       const spread = depth === 0 ? 0.85 : 0.7;
-      const d = dir.clone().add(v3(rng.range(-1, 1) * spread, rng.range(0.05, 0.6), rng.range(-1, 1) * spread)).normalize();
+      // higher limbs reach out sideways and droop a little, the way an old cherry spreads
+      const d = dir.clone().add(v3(rng.range(-1, 1) * spread, depth >= 2 ? rng.range(-0.25, 0.3) : rng.range(0.05, 0.45), rng.range(-1, 1) * spread)).normalize();
       branch(from.clone().lerp(end, rng.range(0.72, 1)), d, length * rng.range(0.6, 0.78), radius * 0.58, depth + 1);
     }
-    if (depth >= 1) tips.push({ p: end, r: 0.6 + rng.range(0, 0.4) });
+    if (depth >= 2) tips.push({ p: end, r: 0.5 + rng.range(0, 0.3) });
   };
   // a leaning trunk with a root flare
   const trunkTop = v3(0.5, 2.5, 0.25);
@@ -154,9 +155,9 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
     const a = (i / 5) * TAU + rng.range(-0.3, 0.3);
     bark.push(tint(sweep([v3(-0.1, 0.35, 0), v3(Math.cos(a) * 0.5, 0.05, Math.sin(a) * 0.5), v3(Math.cos(a) * 1.1, -0.22, Math.sin(a) * 1.1)], (t) => 0.16 * (1 - t * 0.75), { radial: 7, steps: 8 }), barkA));
   }
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * TAU + rng.range(-0.4, 0.4);
-    branch(trunkTop.clone().add(v3(0, -0.25 * i * 0.3, 0)), v3(Math.cos(a) * 0.8, rng.range(0.55, 0.9), Math.sin(a) * 0.8).normalize(), rng.range(1.9, 2.5), 0.2, 1);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU + rng.range(-0.4, 0.4);
+    branch(trunkTop.clone().add(v3(0, -0.25 * i * 0.3, 0)), v3(Math.cos(a) * 0.95, rng.range(0.3, 0.65), Math.sin(a) * 0.95).normalize(), rng.range(2.1, 2.8), 0.21, 1);
   }
   const trunk = new THREE.Mesh(merge(bark), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
   trunk.castShadow = true;
@@ -164,31 +165,32 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   group.add(trunk);
 
   // canopy: soft masses at the branch tips...
-  const pinkA = new THREE.Color(0xff8fc8), pinkB = new THREE.Color(0xffd0ec), lilac = new THREE.Color(0xb78cff);
+  const pinkA = new THREE.Color(0xeeb0c6), pinkB = new THREE.Color(0xfff0e6), lilac = new THREE.Color(0x7c6fa8);
   const masses: THREE.BufferGeometry[] = [];
   // each branch tip carries a cluster of small puffs: light on top, deep violet underneath
   const puffs: { p: THREE.Vector3; r: number }[] = [];
-  const dark = new THREE.Color(0x6a3f9c);
+  const dark = new THREE.Color(0x6f5a8e);
   for (const tip of tips) {
     const n = 3 + Math.round(tip.r * 3);
     for (let i = 0; i < n; i++) {
-      const off = v3(rng.gauss(), rng.gauss() * 0.6 + 0.2, rng.gauss()).multiplyScalar(tip.r * 0.48);
+      const off = v3(rng.gauss(), rng.gauss() * 0.45 + 0.1, rng.gauss()).multiplyScalar(tip.r * 0.6);
       const r = tip.r * rng.range(0.42, 0.62);
       const p = tip.p.clone().add(off);
       puffs.push({ p, r });
-      const g = blob(r, r * 0.86, r, 3, (q) => {
+      const core = r * 0.42;
+      const g = blob(core, core * 0.8, core, 3, (q) => {
         q.multiplyScalar(1 + 0.16 * fbm3(q.x * 3 + p.x, q.y * 3, q.z * 3 + p.z, 2));
       });
       place(g, p);
-      masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.5 + 0.5 * normal.y).lerp(pinkB, Math.max(0, normal.y) ** 2 * 0.5)));
+      masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.35 + 0.35 * normal.y)));
     }
   }
-  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xff7ab8, emissiveIntensity: 0.16 }));
+  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffb4a0, emissiveIntensity: 0.06 }));
   massMesh.castShadow = true;
   group.add(massMesh);
 
   // ...and thousands of petals sitting on them, each a small curved card
-  const card = new THREE.PlaneGeometry(1, 0.66, 2, 1);
+  const card = new THREE.PlaneGeometry(1, 0.86, 2, 1);
   const cp = card.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < cp.count; i++) cp.setZ(i, -0.35 * cp.getX(i) * cp.getX(i));
   const leaf: number[] = [], rot: number[] = [];
@@ -196,9 +198,12 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   for (let i = 0; i < petalCount; i++) {
     const puff = rng.pick(puffs);
     const d = v3(rng.gauss(), rng.gauss() * 0.8 + 0.25, rng.gauss()).normalize();
-    const p = puff.p.clone().addScaledVector(d, puff.r * rng.range(0.96, 1.1));
-    leaf.push(p.x, p.y, p.z, rng.range(0.06, 0.11));
-    rot.push(rng.range(0, TAU), rng.range(-1.1, 1.1), rng.next(), rng.next());
+    // mostly on the outside of each puff, some deeper in, so the blossom builds up in layers
+    const p = puff.p.clone().addScaledVector(d, puff.r * (rng.next() < 0.75 ? rng.range(0.85, 1.12) : rng.range(0.45, 0.85)));
+    leaf.push(p.x, p.y, p.z, rng.range(0.18, 0.36));
+    // how much light this cluster catches: the top of each puff and the top of the tree are brightest
+    const light = Math.min(1, Math.max(0, 0.3 + 0.42 * d.y + 0.28 * smoothstep(2.2, 6.0, p.y) + rng.range(-0.12, 0.12)));
+    rot.push(rng.range(0, TAU), rng.range(-1.1, 1.1), rng.next(), light);
     if (i % 24 === 0 && d.y < 0.2) canopy.push(p);
   }
   const petals = new THREE.InstancedBufferGeometry();
@@ -209,7 +214,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   petals.setAttribute('aLeaf', new THREE.InstancedBufferAttribute(new Float32Array(leaf), 4));
   petals.setAttribute('aLeafRot', new THREE.InstancedBufferAttribute(new Float32Array(rot), 4));
   petals.instanceCount = petalCount;
-  petals.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 4, 0), 7);
+  petals.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 4, 0), 9);
   const petalMat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.7 });
   petalMat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, windUniforms, { uPinkA: { value: pinkA }, uPinkB: { value: pinkB }, uLilac: { value: lilac } });
@@ -218,12 +223,22 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nobjectNormal = normalize(aLeaf.xyz - vec3(0.5, 4.0, 0.2)) * 0.75 + vec3(0.0, 0.45, 0.0);')
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${PETAL_VS.replace(/objectNormal = [^;]+;/, '')}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vLeafTint; varying vec2 vLeafUv;\nuniform vec3 uPinkA, uPinkB, uLilac;')
+      .replace('#include <common>', '#include <common>\nvarying float vLeafTint, vLeafPhase; varying vec2 vLeafUv;\nuniform vec3 uPinkA, uPinkB, uLilac;')
       .replace('#include <color_fragment>', `#include <color_fragment>
-        vec2 q = vLeafUv - 0.5;
-        if (abs(q.y) * 2.0 > pow(max(1.0 - 4.0 * q.x * q.x, 0.0), 0.6)) discard;     // a pointed petal cut out of the card
-        diffuseColor.rgb = mix(mix(uPinkA, uPinkB, vLeafTint), uLilac, smoothstep(0.75, 1.0, vLeafTint) * 0.6) * (0.72 + 0.5 * vLeafUv.x);`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.34;');
+        // a cluster of blossom, not a single petal: a few round lobes around a centre, like a painted dab
+        vec2 q = (vLeafUv - 0.5) * vec2(1.0, 1.16);
+        float m = 1.0 - length(q) / 0.27, turn = vLeafPhase * 6.2832;
+        for (int k = 0; k < 5; k++) {
+          float a = turn + float(k) * 1.2566;
+          vec2 c = vec2(cos(a), sin(a)) * (0.19 + 0.05 * sin(vLeafPhase * 31.0 + float(k)));
+          m = max(m, 1.0 - length(q - c) / (0.15 + 0.04 * fract(vLeafPhase * 7.3 + float(k) * 0.37)));
+        }
+        if (m <= 0.0) discard;
+        // lavender in the shade, soft pink in between, warm cream where the light lands
+        vec3 col = mix(uLilac, uPinkA, smoothstep(0.05, 0.55, vLeafTint));
+        col = mix(col, uPinkB, smoothstep(0.5, 0.95, vLeafTint));
+        diffuseColor.rgb = col * (0.9 + 0.18 * vLeafPhase) * (0.86 + 0.14 * smoothstep(0.0, 0.5, m));`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.12 + 0.2 * vLeafTint);');
   };
   petalMat.customProgramCacheKey = () => 'echo-petals';
   const petalMesh = new THREE.Mesh(petals, petalMat);
