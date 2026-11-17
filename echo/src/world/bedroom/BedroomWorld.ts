@@ -46,7 +46,7 @@ const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0xffc890;
 /** The wall shelf model's platform: its underside above the shelf's base, and how far its front lip stands from the shelf's middle. */
 const SHELF = { under: 0.18, front: 0.13 };
 /** The mattress's top, where something left on the bed lies. */
-const MATTRESS_TOP = 0.615;
+const MATTRESS_TOP = 0.565;
 /** Toward the afternoon sun, and toward the middle of the city's glow at night: both beyond the window. */
 const SUN_DIRECTION = new THREE.Vector3(-0.28, 0.28, -0.96).normalize(), CITY_GLOW = new THREE.Vector3(0.12, 0.16, -1).normalize();
 
@@ -138,10 +138,10 @@ export class BedroomWorld extends World {
 
     // ---- furniture ----
     const deskTop = (await sizeOf(ctx, 'study-desk'))[1];
-    const [bedWide, , bedLong] = await sizeOf(ctx, 'bed');
+    const bedWide = 1.12, bedLong = 2.06;
     // the bed against the warm wall, head to the window; the star plush on it came with them from the old house
     const bx = -W + bedWide / 2 + 0.02, bz = -D + bedLong / 2 + 0.05;
-    await dress(ctx, scene, 'bed', [[bx, 0, bz]]);
+    scene.add(buildBed(bx, bz, bedWide, bedLong));
     // a white bedside table on a single stem, with a white lamp whose shade glows
     const bedside = buildBedside(LAMP.x, LAMP.z);
     scene.add(bedside.group);
@@ -164,7 +164,7 @@ export class BedroomWorld extends World {
     const sx = W - 0.16;
     // two floating shelves of slim, modern books and a few keepsakes: an astronaut, a glass planet, a glass dome
     scene.add(buildShelf(1.02, -0.72, 'lower'), buildShelf(1.6, -0.3, 'upper'));
-    await dress(ctx, scene, 'wardrobe', [[WARDROBE.x, 0, WARDROBE.z, 180]]);
+    scene.add(buildWardrobe(WARDROBE.x, WARDROBE.z));
     await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
     // school bag slumped by the bed
     await dress(ctx, scene, 'backpack', [[BAG.x, 0, BAG.z, 35]]);
@@ -1175,5 +1175,177 @@ const buildBookStack = (x: number, y: number, z: number, yawDeg: number): THREE.
   }
   group.position.set(x, y, z);
   group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
+};
+
+// ---- the bed and the wardrobe ----
+
+/** A navy duvet cover scattered with tiny stars. */
+const starryCloth = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#34446b';
+  c.fillRect(0, 0, 512, 512);
+  const rng = new Rng(311);
+  for (let i = 0; i < 260; i++) {
+    const x = rng.next() * 512, y = rng.next() * 512, r = 0.8 + rng.next() * 1.8;
+    c.fillStyle = rng.next() < 0.25 ? 'rgba(255, 214, 140, 0.9)' : 'rgba(225, 232, 255, 0.75)';
+    if (r > 2.2) {
+      // a few little four-pointed sparkles
+      c.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU, rr = k % 2 ? r * 0.35 : r * 2.2;
+        c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      c.fill();
+    } else {
+      c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 4;
+  return map;
+};
+
+/**
+ * A low upholstered platform bed: a soft grey base that floats on a warm light tucked under it, an arched padded
+ * headboard against the window wall, a white mattress, a starry navy duvet with its top folded back, a plump white
+ * pillow and the yellow star plush that came with them from the old house. Head toward -Z; `x`,`z` is its middle.
+ */
+const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group => {
+  const group = new THREE.Group();
+  const fabric = new THREE.MeshStandardMaterial({ color: 0xa9a7ad, roughness: 0.92 });
+  const panel = new THREE.MeshStandardMaterial({ color: 0x6d7385, roughness: 0.95 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xf3f2ef, roughness: 0.85 });
+  // the base, lifted on a recessed plinth with a warm strip of light round it
+  const plinth = new THREE.Mesh(roundBox(wide - 0.2, 0.1, long - 0.2, 0.02, 2), new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.6 }));
+  plinth.position.y = 0.05;
+  const base = new THREE.Mesh(roundBox(wide, 0.2, long, 0.06, 4), fabric);
+  base.position.y = 0.1 + 0.1;
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(1.6) });
+  for (const [w, d, dx, dz] of [[wide - 0.2, 0.01, 0, (long - 0.2) / 2], [wide - 0.2, 0.01, 0, -(long - 0.2) / 2], [0.01, long - 0.2, (wide - 0.2) / 2, 0], [0.01, long - 0.2, -(wide - 0.2) / 2, 0]] as const) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(w, 0.006, d), glowMat);
+    s.position.set(dx, 0.097, dz);
+    group.add(s);
+  }
+  const under = new THREE.PointLight(SCONCE_COLOR, 0.25, 1.4, 2);
+  under.position.set(0.35, 0.06, 0);
+  // the mattress and the duvet
+  const mattress = new THREE.Mesh(roundBox(wide - 0.08, 0.19, long - 0.1, 0.06, 4), white);
+  mattress.position.set(0, 0.3 + 0.095, 0.02);
+  const cloth = new THREE.MeshStandardMaterial({ map: starryCloth(), roughness: 0.9 });
+  cloth.map!.repeat.set(1.2, 2);
+  const duvetLong = long * 0.72;
+  const duvet = new THREE.Mesh(roundBox(wide + 0.02, 0.17, duvetLong, 0.05, 4), cloth);
+  duvet.position.set(0, 0.565 - 0.085, long / 2 - duvetLong / 2 + 0.01);
+  const fold = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, wide - 0.06, 6, 16), white);
+  fold.rotation.z = Math.PI / 2;
+  fold.position.set(0, 0.56, long / 2 - duvetLong + 0.02);
+  // the pillow: a squashed sphere is as soft as a pillow looks
+  const pillow = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), white);
+  pillow.scale.set(wide * 0.4, 0.075, 0.19);
+  pillow.position.set(0, 0.56, -long / 2 + 0.3);
+  // the headboard: an arched padded panel in a grey frame, standing against the wall
+  const arch = (w: number, h: number, r: number): THREE.Shape => {
+    const sh = new THREE.Shape();
+    sh.moveTo(-w / 2, 0);
+    sh.lineTo(w / 2, 0);
+    sh.lineTo(w / 2, h - r);
+    sh.quadraticCurveTo(w / 2, h, w / 2 - r, h);
+    sh.lineTo(-w / 2 + r, h);
+    sh.quadraticCurveTo(-w / 2, h, -w / 2, h - r);
+    sh.lineTo(-w / 2, 0);
+    return sh;
+  };
+  const frameGeo = new THREE.ExtrudeGeometry(arch(wide + 0.06, 0.82, 0.32), { depth: 0.06, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 4, curveSegments: 24 });
+  const frame = new THREE.Mesh(frameGeo, fabric);
+  frame.position.set(0, 0.22, -long / 2 - 0.06);
+  const padGeo = new THREE.ExtrudeGeometry(arch(wide - 0.14, 0.62, 0.24), { depth: 0.04, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.025, bevelSegments: 5, curveSegments: 24 });
+  const pad = new THREE.Mesh(padGeo, panel);
+  pad.position.set(0, 0.36, -long / 2 + 0.02);
+  // the star plush, resting on the pillow
+  const star = new THREE.Shape();
+  for (let k = 0; k <= 10; k++) {
+    const a = Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 0.045 : 0.1;
+    if (k === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r); else star.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const plush = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.022, bevelSegments: 5 }), new THREE.MeshStandardMaterial({ color: 0xf0c03a, roughness: 0.95 }));
+  plush.position.set(0.16, 0.66, -long / 2 + 0.34);
+  plush.rotation.set(-0.5, 0.25, 0.2);
+  group.add(plinth, base, under, mattress, duvet, fold, pillow, frame, pad, plush);
+  group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, 0, z);
+  return group;
+};
+
+/**
+ * A wardrobe in matte warm white, its back against the +Z wall, facing -Z: two tall doors parted by a thin lit
+ * line with short dark pulls, and beside them an open column of lit shelves holding folded clothes and a box.
+ */
+const buildWardrobe = (x: number, z: number): THREE.Group => {
+  const group = new THREE.Group();
+  const wide = 1.1, tall = 1.9, deep = 0.58, foot = 0.07, t = 0.025;
+  const body = new THREE.MeshStandardMaterial({ color: 0xe6e4e0, roughness: 0.7 });
+  const inside = new THREE.MeshStandardMaterial({ color: 0x3a4357, roughness: 0.8 });
+  const front = -deep / 2, h = tall - foot, cy = foot + h / 2;
+  const doorsW = 0.74, nicheW = wide - doorsW;
+  // the shell: sides, top, bottom and back, and a divider between the doors and the shelves
+  const slab = (w: number, hh: number, d: number, px: number, py: number, pz: number, m: THREE.Material = body): void => {
+    const mesh = new THREE.Mesh(roundBox(w, hh, d, Math.min(0.008, w / 3, hh / 3, d / 3), 1), m);
+    mesh.position.set(px, py, pz);
+    group.add(mesh);
+  };
+  const left = wide / 2, right = -wide / 2; // +x and -x edges; the shelves are on the -x side
+  slab(t, h, deep, left - t / 2, cy, 0);
+  slab(t, h, deep, right + t / 2, cy, 0);
+  slab(wide, t, deep, 0, tall - t / 2, 0);
+  slab(wide, t, deep, 0, foot + t / 2, 0);
+  slab(wide, h, 0.01, 0, cy, deep / 2 - 0.005, inside);
+  const divider = left - doorsW;
+  slab(t, h, deep, divider, cy, 0);
+  // the doors
+  const doorW = doorsW / 2 - 0.006;
+  for (const k of [0, 1]) {
+    const dx = left - doorW / 2 - 0.003 - k * (doorW + 0.006);
+    slab(doorW, h - 0.02, 0.022, dx, cy, front - 0.011);
+    const pull = new THREE.Mesh(roundBox(0.012, 0.2, 0.016, 0.005, 1), new THREE.MeshStandardMaterial({ color: 0x2d323d, roughness: 0.4, metalness: 0.5 }));
+    pull.position.set(left - doorsW / 2 + (k === 0 ? 0.03 : -0.03), 1.05, front - 0.028);
+    group.add(pull);
+  }
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(1.8) });
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.004, h - 0.14, 0.004), glowMat);
+  seam.position.set(left - doorsW / 2, cy, front - 0.014);
+  group.add(seam);
+  // the open column: four shelves, each lit along its front underside
+  const nx = (divider + right) / 2, nw = nicheW - t * 1.5;
+  const levels = [0.5, 0.92, 1.34];
+  for (const y of levels) {
+    slab(nw, 0.02, deep - 0.04, nx, y, 0.01);
+    const led = new THREE.Mesh(new THREE.BoxGeometry(nw - 0.02, 0.004, 0.006), glowMat);
+    led.position.set(nx, y - 0.013, front + 0.04);
+    group.add(led);
+  }
+  const shelfLight = new THREE.PointLight(SCONCE_COLOR, 0.35, 1.2, 2);
+  shelfLight.position.set(nx, 1.1, front + 0.1);
+  group.add(shelfLight);
+  // folded clothes, a box, and shoes at the bottom
+  const fold = (w: number, hh: number, color: number, px: number, py: number): void => slab(w, hh, 0.3, px, py + hh / 2, 0.02, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
+  let y = levels[0]! + 0.01;
+  for (const c of [0x4a5a7c, 0xd9d6cf, 0x8a95ab]) { fold(0.24, 0.045, c, nx, y); y += 0.045; }
+  y = levels[1]! + 0.01;
+  for (const c of [0xefe9de, 0x5f6e8c]) { fold(0.25, 0.05, c, nx, y); y += 0.05; }
+  slab(0.24, 0.16, 0.26, nx, levels[2]! + 0.09, 0.03, new THREE.MeshStandardMaterial({ color: 0xc9ced8, roughness: 0.6 }));
+  for (const dx of [-0.06, 0.06]) slab(0.09, 0.07, 0.24, nx + dx, foot + t + 0.035, 0.0, new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7 }));
+  // a recessed plinth with a strip of light under the front
+  const plinth = new THREE.Mesh(roundBox(wide - 0.08, foot, deep - 0.1, 0.01, 1), new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.6 }));
+  plinth.position.set(0, foot / 2, 0.03);
+  const under = new THREE.Mesh(new THREE.BoxGeometry(wide - 0.12, 0.005, 0.006), glowMat);
+  under.position.set(0, 0.012, front + 0.05);
+  group.add(plinth, under);
+  group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, 0, z);
   return group;
 };
