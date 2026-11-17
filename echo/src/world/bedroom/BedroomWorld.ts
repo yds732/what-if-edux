@@ -42,7 +42,7 @@ const WARDROBE = { x: 1.7, z: 2.29 }, BEANBAG = { x: 1.62, z: 0.8 }, BAG = { x: 
 const TOP = { y: 0.74, slab: 0.03, deep: 0.62, start: -0.15, ret: 1.3, retDeep: 0.6, bend: 0.24, end: 0.07 };
 const OAK = 0xd6b58e, STEEL_WHITE = 0xeef0f3, SLATE_BLUE = 0x51627e;
 /** The room's accents: warm wall lights beside the window, cool LED strips tucked out of sight. */
-const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0x6f8dff;
+const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0xffc890;
 /** The wall shelf model's platform: its underside above the shelf's base, and how far its front lip stands from the shelf's middle. */
 const SHELF = { under: 0.18, front: 0.13 };
 /** The mattress's top, where something left on the bed lies. */
@@ -108,10 +108,12 @@ export class BedroomWorld extends World {
 
     // ---- shell: floor, walls with one wide window, ceiling ----
     const floor = floorOf(await ctx.assets.picture('floor-bedroom'), W * 2, D * 2, 2.3, 0.55);
+    // dark-stained boards, so the floor stays in the dusk of the room
+    (floor.material as THREE.MeshStandardMaterial).color.setRGB(0.5, 0.42, 0.38);
     scene.add(floor);
 
     const b = new Builder();
-    const wall = 0x5d6884, trim = 0xdfe3ee, wallWarm = 0x77627c;
+    const wall = 0x46526e, trim = 0xc9cfdc, wallWarm = 0x4a5572;
     const WX0 = -1.15, WX1 = 2.0, WY0 = 0.98, WY1 = 2.34; // window opening
     b.box('matte', wall, [W + WX0, H, 0.14], [(-W + WX0) / 2, H / 2, -D - 0.07]);
     b.box('matte', wall, [W - WX1, H, 0.14], [(W + WX1) / 2, H / 2, -D - 0.07]);
@@ -120,7 +122,7 @@ export class BedroomWorld extends World {
     b.box('matte', wallWarm, [0.14, H, D * 2], [-W - 0.07, H / 2, 0]);
     b.box('matte', wall, [0.14, H, D * 2], [W + 0.07, H / 2, 0]);
     b.box('matte', wall, [W * 2, H, 0.14], [0, H / 2, D + 0.07]);
-    b.box('matte', 0xe6e8f0, [W * 2 + 0.3, 0.12, D * 2 + 0.3], [0, H + 0.06, 0]);
+    b.box('matte', 0xa9b0c2, [W * 2 + 0.3, 0.12, D * 2 + 0.3], [0, H + 0.06, 0]);
     for (const [sx, sz, len, rot] of [[0, -D + 0.012, W * 2, 0], [0, D - 0.012, W * 2, 0], [-W + 0.012, 0, D * 2, Math.PI / 2], [W - 0.012, 0, D * 2, Math.PI / 2]] as const) {
       b.box('satin', trim, [len, 0.09, 0.022], [sx, 0.045, sz], { rot: [0, rot, 0] });
     }
@@ -367,26 +369,25 @@ export class BedroomWorld extends World {
 
   private applyNight(): void {
     const n = this.night;
-    // the view is always the same flat overcast, so the window never says whether it is day or night:
-    // a soft, neutral grey light comes through it and the room's own lamps carry the time of day
-    this.city.setNight(0.5);
-    this.city.setOvercast(1);
-    // moody: little general light, so the lamps, the wall lights and the LED strips are what you see by
-    this.sun.intensity = 0.42;
-    this.sun.color.setRGB(0.93, 0.95, 1.0);
-    this.skyFill.intensity = 0.3;
+    // a dim city at night beyond the glass, its windows lit and softened by the rain
+    this.city.setNight(0.75 + 0.25 * n);
+    this.city.setOvercast(0.55);
+    // dark and moody: almost no general light, so the lamps, the wall lights and the LED strips are what you see by
+    this.sun.intensity = 0.16;
+    this.sun.color.setRGB(0.62, 0.7, 0.95);
+    this.skyFill.intensity = 0.14;
     for (const led of this.leds) led.intensity = (led.userData.power as number) * (0.5 + 0.5 * n);
     (this.ledGlow.material as THREE.MeshBasicMaterial).color.setScalar(1.2 + 1.0 * n);
-    this.skyFill.color.setRGB(0.64, 0.67, 0.74);
+    this.skyFill.color.setRGB(0.5, 0.56, 0.74);
     this.lamp.intensity = 0.4 + 2.6 * n;
     this.lampGlow.value = this.lampFull * (0.2 + 0.8 * n);
     (this.cove.material as THREE.MeshBasicMaterial).color.setRGB(0.8, 0.84, 0.92).multiplyScalar(0.3 + 0.5 * n);
     (this.rain.material as THREE.ShaderMaterial).uniforms.uAmount!.value = n * 0.6;
-    this.look.exposure = 1.0 + 0.12 * n;
+    this.look.exposure = 0.82 + 0.06 * n;
     this.lightDirection.copy(SUN_DIRECTION).lerp(CITY_GLOW, 0.5).normalize();
-    this.look.shafts = 0.12;
-    this.look.shaftColor.setRGB(0.82, 0.85, 0.9);
-    this.scene.environmentIntensity = 0.16;
+    this.look.shafts = 0.04;
+    this.look.shaftColor.setRGB(0.6, 0.7, 0.95);
+    this.scene.environmentIntensity = 0.08;
   }
 
   /** The phone pulses when a message is waiting. */
