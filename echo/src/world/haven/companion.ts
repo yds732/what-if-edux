@@ -1,54 +1,19 @@
 import * as THREE from 'three';
 import type { Character } from '../../characters/Character';
-import { TAU, angleDelta, damp } from '../../core/math';
+import { angleDelta, damp } from '../../core/math';
 import type { Colliders } from '../colliders';
 
 /**
- * Spark: the other Echo companion, the one that is a little too keen to be your friend. Spark is built from the
- * same figure as Lumi, in a red cap like a disguise. In Haven Spark keeps near the player without quite walking
+ * Lumi on the move: the Echo companion being a little too keen to be your friend. It leads the tour, and in free
+ * time it keeps near the player without quite walking
  * with them: it drifts off to look at blossom and at things in the grass, and the moment the player comes close it
  * stops whatever it was doing and watches them.
  */
 
-const CAP_RED = 0xd8262e;
-
-/** The cap, in head space: origin at the middle of the face sphere, +Z forward. `r` is the head's radius. */
-export const buildCap = (r: number): THREE.Group => {
-  const cap = new THREE.Group();
-  cap.name = 'spark cap';
-  const cloth = new THREE.MeshStandardMaterial({ color: CAP_RED, roughness: 0.78, metalness: 0 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x8e1219, roughness: 0.7 });
-  // the crown: a little more than half a sphere, sitting low on the brow
-  const crown = new THREE.Mesh(new THREE.SphereGeometry(r * 1.34, 40, 20, 0, TAU, 0, Math.PI * 0.5), cloth);
-  crown.scale.set(1, 0.78, 1.06);
-  crown.position.set(0, r * 0.55, -r * 0.12);
-  // the brim: a flattened half disc out over the eyes, tipped down a little
-  const brimShape = new THREE.Shape();
-  brimShape.absarc(0, 0, r * 1.15, 0, Math.PI, false);
-  brimShape.lineTo(-r * 1.15, 0);
-  const brimGeo = new THREE.ExtrudeGeometry(brimShape, { depth: r * 0.06, bevelEnabled: true, bevelSize: r * 0.02, bevelThickness: r * 0.02, bevelSegments: 2, curveSegments: 24 });
-  brimGeo.scale(0.92, 1.25, 1);
-  const brim = new THREE.Mesh(brimGeo, cloth);
-  brim.rotation.x = Math.PI / 2 - 0.12;
-  brim.position.set(0, r * 0.6, r * 1.02);
-  // a button on top and a band where the crown meets the head
-  const button = new THREE.Mesh(new THREE.SphereGeometry(r * 0.12, 12, 8), dark);
-  button.position.set(0, r * 1.59, -r * 0.12);
-  const band = new THREE.Mesh(new THREE.TorusGeometry(r * 1.34, r * 0.05, 8, 48), dark);
-  band.rotation.x = Math.PI / 2;
-  band.scale.set(1, 1.04, 1);
-  band.position.set(0, r * 0.57, -r * 0.12);
-  for (const m of [crown, brim, button, band]) {
-    m.castShadow = true;
-    cap.add(m);
-  }
-  return cap;
-};
-
 /** A floating "!" over the head, like a notification: talk to me. */
 const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial } => {
   const group = new THREE.Group();
-  group.name = 'spark alert';
+  group.name = 'companion alert';
   const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.86, 0.05, 0.06), transparent: true, depthWrite: false, toneMapped: false });
   const bar = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.16, 4, 12), material);
   bar.position.y = 0.13;
@@ -85,10 +50,10 @@ const buildLabel = (): { sprite: THREE.Sprite; set: (text: string | null) => voi
     g.beginPath();
     g.roundRect(x, 18, w, 76, 38);
     g.fill();
-    g.strokeStyle = 'rgba(255, 120, 108, 0.9)';
+    g.strokeStyle = 'rgba(143, 234, 255, 0.9)';
     g.lineWidth = 3;
     g.stroke();
-    g.fillStyle = '#ffe9e4';
+    g.fillStyle = '#e9fbff';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillText(text, canvas.width / 2, 58);
@@ -97,9 +62,9 @@ const buildLabel = (): { sprite: THREE.Sprite; set: (text: string | null) => voi
   return { sprite, set };
 };
 
-/** A ring on the ground around Spark while it leads: faint and beckoning far off, bright once you are with it. */
+/** A ring on the ground around Lumi while it leads: faint and beckoning far off, bright once you are with it. */
 const buildFollowRing = (radius: number): { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial } => {
-  const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.36, 0.3), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+  const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.44, 0.9, 1), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(new THREE.RingGeometry(radius - 0.07, radius, 72), material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0.04;
@@ -107,26 +72,26 @@ const buildFollowRing = (radius: number): { mesh: THREE.Mesh; material: THREE.Me
   return { mesh, material };
 };
 
-/** Close enough that Spark stops and watches you. */
+/** Close enough that Lumi stops and watches you. */
 const NEAR = 2.3;
-/** Further than this and Spark comes after you. */
+/** Further than this and Lumi comes after you. */
 const FAR = 4.6;
 /** Leading: the player counts as following within this distance. */
 export const FOLLOW_RADIUS = 2.4;
-/** Leading: further back than this and Spark stops to wait. */
+/** Leading: further back than this and Lumi stops to wait. */
 const LEFT_BEHIND = 6;
 const SPEED = 1.5;
 const RADIUS = 0.3;
 
-export type SparkMode = 'still' | 'roam' | 'lead';
+export type CompanionMode = 'still' | 'roam' | 'lead';
 
-export class Spark {
+export class Companion {
   readonly person: Character;
   /** Where to aim to talk: the middle of the chest, kept up to date. */
   readonly chest = new THREE.Vector3();
   /** still: where the story put it. roam: keeps near the player and wanders. lead: goes to a point and waits there for the player. */
-  mode: SparkMode = 'still';
-  /** Leading: Spark has reached the point it was going to. */
+  mode: CompanionMode = 'still';
+  /** Leading: Lumi has reached the point it was going to. */
   arrived = false;
   /** Leading: the player is close enough to count as following. */
   followed = false;
@@ -157,7 +122,6 @@ export class Spark {
     private readonly colliders: Colliders,
   ) {
     this.person = person;
-    person.wear(buildCap(person.headRadius));
     this.alert = buildAlert();
     person.root.add(this.alert.group);
     this.alert.group.visible = false;
@@ -165,17 +129,17 @@ export class Spark {
     person.root.add(this.ring.mesh);
   }
 
-  /** The "!" over Spark's head. */
+  /** The "!" over Lumi's head. */
   setAlert(on: boolean): void {
     this.alertOn = on;
   }
 
-  /** The caption over Spark's head, or null for none. */
+  /** The caption over Lumi's head, or null for none. */
   setLabel(text: string | null): void {
     this.label.set(text);
   }
 
-  /** Leads the player to (x, z), where Spark turns to show them `show`. */
+  /** Leads the player to (x, z), where Lumi turns to show them `show`. */
   leadTo(x: number, z: number, show: THREE.Vector3 | null): void {
     this.mode = 'lead';
     this.goal.set(x, 0, z);
@@ -185,7 +149,7 @@ export class Spark {
     this.beckonIn = 1.2;
   }
 
-  /** Puts Spark at a point, facing `yaw` (0 faces +Z). */
+  /** Puts Lumi at a point, facing `yaw` (0 faces +Z). */
   placeAt(x: number, z: number, yaw: number): void {
     this.pos.set(x, this.groundAt(x, z), z);
     this.yaw = yaw;
@@ -197,6 +161,10 @@ export class Spark {
   update(dt: number, player: THREE.Vector3, eye: THREE.Vector3, camera: THREE.Camera): void {
     this.time += dt;
     const p = this.person;
+    if (this.mode === 'still') {
+      this.pos.copy(p.root.position);
+      this.yaw = p.root.rotation.y;
+    }
     // the alert bobs and always faces the camera; the label sits under it
     this.alertShown = damp(this.alertShown, this.alertOn ? 1 : 0, 7, dt);
     const a = this.alert.group;
@@ -212,7 +180,7 @@ export class Spark {
 
     const toPlayer = Math.hypot(player.x - this.pos.x, player.z - this.pos.z);
     this.followed = this.mode === 'lead' && toPlayer < FOLLOW_RADIUS;
-    // the follow ring: a slow pulse while Spark waits for you, bright and still once you are with it
+    // the follow ring: a slow pulse while Lumi waits for you, bright and still once you are with it
     const ringWant = this.mode !== 'lead' ? 0 : this.followed ? 0.95 : 0.3 + 0.25 * Math.sin(this.time * 4);
     this.ringShown = damp(this.ringShown, ringWant, 6, dt);
     this.ring.material.opacity = this.ringShown;
@@ -304,7 +272,7 @@ export class Spark {
     this.curiosity = c;
     this.linger = 3 + Math.random() * 3.5;
     if (!c) return;
-    // stand a step short of it, on the side facing Spark
+    // stand a step short of it, on the side facing Lumi
     const ang = Math.atan2(this.pos.x - c.x, this.pos.z - c.z);
     const back = c.y > 1.2 ? 1.9 : 0.8;
     this.goal.set(c.x + Math.sin(ang) * back, 0, c.z + Math.cos(ang) * back);
