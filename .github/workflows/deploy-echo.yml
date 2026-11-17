@@ -25,4 +25,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy
-        run: npx --yes vercel@53.4.0 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes vercel@65.9.0 deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
