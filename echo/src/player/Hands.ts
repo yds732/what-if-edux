@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { App } from '../app/App';
 import type { AssetLibrary } from '../assets/AssetLibrary';
-import { damp } from '../core/math';
+import { TAU, damp } from '../core/math';
 import type { Input } from '../input/Input';
 import type { Player } from './Player';
 
@@ -149,9 +149,9 @@ class Hand {
     orientation(p, this.side, this.group.quaternion);
   }
 
-  update(dt: number, swayX: number, swayY: number, bob: number, rate: number): void {
+  update(dt: number, swayX: number, swayY: number, bob: number, rate: number, swing = 0): void {
     const p = POSES[this.pose];
-    this.targetP.set(p.at[0] * this.side + swayX, p.at[1] + swayY + bob, p.at[2]);
+    this.targetP.set(p.at[0] * this.side + swayX, p.at[1] + swayY + bob, p.at[2] + swing);
     orientation(p, this.side, this.targetQ);
     const k = 1 - Math.exp(-rate * dt);
     this.group.position.lerp(this.targetP, k);
@@ -173,6 +173,9 @@ export class Hands {
   readonly ready: Promise<void>;
   private readonly uniforms = { uSkin: { value: new THREE.Color(0xf7efe6) }, uPainted: { value: PAINTED_SKIN }, uGlow: { value: 0 } };
   private swayX = 0;
+  /** How far into a walk the player is, 0 standing to 1 walking, and where they were last frame. */
+  private walking = 0;
+  private lastTravelled = 0;
   private swayY = 0;
   private glow = 0;
   private glowTarget = 0;
@@ -225,8 +228,8 @@ export class Hands {
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
           float rimLight = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.2);
           totalEmissiveRadiance += uGlow * vec3(0.5, 0.62, 1.0) * (0.16 + 1.1 * rimLight);
-          // in the real world the hands are a neutral warm white that glows softly, so they belong to any player
-          totalEmissiveRadiance += (1.0 - uGlow) * skin * vec3(1.0, 0.86, 0.68) * (0.14 + 0.55 * rimLight);`);
+          // in the real world the skin keeps a faint glow of its own tone, enough to read in a dim room without washing it out
+          totalEmissiveRadiance += (1.0 - uGlow) * skin * uSkin * (0.06 + 0.3 * rimLight);`);
     };
     material.customProgramCacheKey = () => 'echo-hands';
     return material;
@@ -280,10 +283,17 @@ export class Hands {
     // hands trail the head a touch when it turns, and ride the walk
     this.swayX = damp(this.swayX, this.input.look.x * -1.6, 9, dt);
     this.swayY = damp(this.swayY, this.input.look.y * 1.2, 9, dt);
-    const bob = Math.sin(this.player.travelled * 6.8) * 0.006;
+    // walking: the hands swing one after the other, forward and back in time with the steps (one full swing per two
+    // steps), dipping a little at the bottom of each swing; they settle back when the player stops
+    const speed = dt > 0 ? (this.player.travelled - this.lastTravelled) / dt : 0;
+    this.lastTravelled = this.player.travelled;
+    this.walking = damp(this.walking, Math.min(1, Math.max(0, speed) / 1.4), 6, dt);
+    const phase = this.player.travelled * (TAU / 1.44);
+    const swing = Math.sin(phase) * 0.045 * this.walking;
+    const bob = -Math.abs(Math.cos(phase)) * 0.014 * this.walking;
     if (!this.gripped) {
-      this.right.update(dt, this.swayX, this.swayY, bob, this.rate);
-      this.left.update(dt, this.swayX, this.swayY, -bob, this.rate);
+      this.right.update(dt, this.swayX, this.swayY, bob, this.rate, swing);
+      this.left.update(dt, this.swayX, this.swayY, bob, this.rate, -swing);
     }
     this.glow = damp(this.glow, this.glowTarget, 3, dt);
     this.uniforms.uGlow.value = this.glow;

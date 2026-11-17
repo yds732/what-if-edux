@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Character } from '../../characters/Character';
 import { CAST } from '../../characters/cast';
-import { place, sweep, v3 } from '../../core/geo';
+import { place, roundBox, sweep, v3 } from '../../core/geo';
 import { Rng, TAU, damp } from '../../core/math';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
@@ -35,6 +35,18 @@ const W = 2.3, D = 2.6, H = 2.7;
 /** Where the furniture stands, on the floor. The bed finds its own place against the walls. */
 const DESK = { x: 0.85, z: -2.2 }, CHAIR = { x: 0.62, z: -1.5 }, LAMP = { x: -0.8, z: -2.3 };
 const WARDROBE = { x: 1.7, z: 2.29 }, BEANBAG = { x: 1.62, z: 0.8 }, BAG = { x: -0.98, z: -0.22 };
+/**
+ * The desk: one long pale oak top hung on the window wall, with no legs, running into the right-hand corner and
+ * turning a little way along the right wall. `ret` is how far the turn reaches out from the window wall.
+ */
+const TOP = { y: 0.74, slab: 0.03, deep: 0.62, start: -0.15, ret: 1.3, retDeep: 0.6, bend: 0.24, end: 0.07 };
+const OAK = 0xd6b58e, STEEL_WHITE = 0xeef0f3, SLATE_BLUE = 0x51627e;
+/** The room's accents: warm wall lights beside the window, cool LED strips tucked out of sight. */
+const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0x6f8dff;
+/** The wall shelf model's platform: its underside above the shelf's base, and how far its front lip stands from the shelf's middle. */
+const SHELF = { under: 0.18, front: 0.13 };
+/** The mattress's top, where something left on the bed lies. */
+const MATTRESS_TOP = 0.615;
 /** Toward the afternoon sun, and toward the middle of the city's glow at night: both beyond the window. */
 const SUN_DIRECTION = new THREE.Vector3(-0.28, 0.28, -0.96).normalize(), CITY_GLOW = new THREE.Vector3(0.12, 0.16, -1).normalize();
 
@@ -54,6 +66,9 @@ export class BedroomWorld extends World {
   private lampFull = 0;
   private dockFull = 0;
   private cove!: THREE.Mesh;
+  /** The LED strips' painted light and the soft light each throws, turned up as the evening comes in. */
+  private ledGlow!: THREE.Mesh;
+  private readonly leds: THREE.PointLight[] = [];
   private hologram!: Panel;
   private beam!: THREE.Mesh;
   private holoShown = 0;
@@ -125,9 +140,9 @@ export class BedroomWorld extends World {
     await dress(ctx, scene, 'bed', [[bx, 0, bz]]);
     this.lampGlow = glowOf(await dress(ctx, scene, 'bedside', [[LAMP.x, 0, LAMP.z, 15]]));
     this.lampFull = this.lampGlow.value;
-    await dress(ctx, scene, 'study-desk', [[DESK.x, 0, DESK.z]]);
+    scene.add(buildDesk());
     await dress(ctx, scene, 'desk-chair', [[CHAIR.x, 0, CHAIR.z, 205]]);
-    await dress(ctx, scene, 'monitor', [[DESK.x + 0.58, deskTop, DESK.z - 0.14, -20]]);
+    scene.add(buildMonitor(1.72, deskTop, -2.27, 0));
     await dress(ctx, scene, 'slate', [[DESK.x - 0.2, deskTop, DESK.z + 0.1, 12]]);
     this.dockGlow = glowOf(await dress(ctx, scene, 'dock', [[BEDROOM.dock.x, deskTop, BEDROOM.dock.z]]));
     this.dockFull = this.dockGlow.value;
@@ -139,6 +154,14 @@ export class BedroomWorld extends World {
     // school bag slumped by the bed
     await dress(ctx, scene, 'backpack', [[BAG.x, 0, BAG.z, 35]]);
     await dress(ctx, scene, 'door', [[-1.2, 0, D - 0.07, 180]]);
+    // the routine screen on the left-hand wall as you come in: 65% of the wall's height, centred on it
+    const board = buildRoutineBoard(1.25, H * 0.65);
+    board.position.set(-W + 0.002, H / 2, 1.2);
+    board.rotation.y = Math.PI / 2;
+    scene.add(board);
+    // a sports bottle on the desk, and a book left open face down on the bed
+    scene.add(buildBottle(1.12, deskTop, -2.42));
+    scene.add(buildBook(bx + 0.08, MATTRESS_TOP, bz + 0.38, 28));
     await ctx.step('bedroom: furniture');
 
     // ---- rug, posters, glass ----
@@ -244,6 +267,48 @@ export class BedroomWorld extends World {
     coveLight.position.set(0.6, 2.3, -2.2);
     scene.add(this.skyFill, this.sun, this.sun.target, this.lamp, lampGlow, this.cove, coveLight);
 
+    // quarter-sphere wall lights: a bowl against the wall, its flat cut face on top, throwing warm light up the wall.
+    // One on the right-hand wall beside the window, one above the bed's headboard.
+    const fx = new Builder();
+    const SCONCE_R = 0.14;
+    const sconces: { at: [number, number, number]; out: [number, number] }[] = [
+      { at: [W, 1.78, -1.91], out: [-1, 0] },
+      { at: [-W + bedWide / 2 + 0.02, 1.62, -D], out: [0, 1] },
+    ];
+    for (const { at, out } of sconces) {
+      // the half of the sphere's azimuth that is in the room, and the lower half of its height
+      const phiStart = out[0] < 0 ? -Math.PI / 2 : 0;
+      const bowl = new THREE.SphereGeometry(SCONCE_R, 32, 12, phiStart, Math.PI, Math.PI / 2, Math.PI / 2);
+      bowl.deleteAttribute('uv');
+      fx.add('glow', 0x9c8a72, place(bowl, at));
+      const cut = new THREE.CircleGeometry(SCONCE_R, 32, out[0] < 0 ? Math.PI / 2 : Math.PI, Math.PI).rotateX(-Math.PI / 2);
+      cut.deleteAttribute('uv');
+      fx.add('glow', 0xffe2c0, place(cut, [at[0], at[1] + 0.001, at[2]]));
+      const up = new THREE.PointLight(SCONCE_COLOR, 1.2, 4, 1.8);
+      up.position.set(at[0] + out[0] * 0.12, at[1] + 0.2, at[2] + out[1] * 0.12);
+      const down = new THREE.PointLight(SCONCE_COLOR, 0.35, 3, 2);
+      down.position.set(at[0] + out[0] * 0.3, at[1] - 0.15, at[2] + out[1] * 0.3);
+      scene.add(up, down);
+    }
+    fx.finish(scene, { glow: 2.4, shadows: false });
+    // LED strips, hidden so only their light shows: under the back of the desk, on top of the wardrobe, under each shelf
+    const strips = new Builder();
+    const strip = (size: [number, number, number], at: [number, number, number], light: [number, number, number], power: number, reach: number): void => {
+      strips.box('glow', LED_COLOR, size, at);
+      const led = new THREE.PointLight(LED_COLOR, power, reach, 2);
+      led.position.set(...light);
+      led.userData.power = power;
+      this.leds.push(led);
+      scene.add(led);
+    };
+    const under = TOP.y - TOP.slab - 0.006;
+    strip([W - TOP.start - 0.1, 0.006, 0.008], [(TOP.start + W) / 2, under, -D + 0.03], [0.9, 0.45, -D + 0.15], 0.9, 2.6);
+    strip([0.008, 0.006, TOP.ret - 0.12], [W - 0.03, under, -D + TOP.ret / 2], [W - 0.32, 0.5, -1.85], 0.22, 1.6);
+    strip([1.0, 0.006, 0.008], [WARDROBE.x, 1.905, D - 0.04], [WARDROBE.x, 2.1, D - 0.12], 0.8, 2.4);
+    // on each shelf, a strip along the front edge of the platform itself, under its lip, lighting the shelf below and the wall
+    for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3);
+    this.ledGlow = strips.finish(scene, { glow: 2.2, shadows: false }).glow!;
+
     this.dust = buildMotes(Math.round(60 * ctx.quality.density), v3(LAMP.x + 0.3, 0.4, LAMP.z + 0.5), v3(1.0, 1.1, 0.9), rng.fork(), this.clock, { a: 0xffc890, b: 0xffe9c8, size: 0.015, gain: 0.7 });
     scene.add(this.dust.points);
 
@@ -284,7 +349,8 @@ export class BedroomWorld extends World {
     scene.add(callLight);
 
     this.colliders.bounds = { kind: 'rect', minX: -W, maxX: W, minZ: -D, maxZ: D };
-    this.colliders.box(bx, bz, bedWide / 2, bedLong / 2).box(LAMP.x, LAMP.z, 0.28, 0.28).box(DESK.x, DESK.z, 0.97, 0.38).circle(CHAIR.x, CHAIR.z, 0.3)
+    this.colliders.box(bx, bz, bedWide / 2, bedLong / 2).box(LAMP.x, LAMP.z, 0.28, 0.28).box((TOP.start + W) / 2, -D + TOP.deep / 2, (W - TOP.start) / 2, TOP.deep / 2 + 0.05)
+      .box(W - TOP.retDeep / 2, -D + (TOP.deep + TOP.ret) / 2, TOP.retDeep / 2 + 0.05, (TOP.ret - TOP.deep) / 2 + 0.05).circle(CHAIR.x, CHAIR.z, 0.3)
       .box(sx, -0.5, 0.16, 0.88).box(WARDROBE.x, WARDROBE.z, 0.57, 0.31)
       .circle(BEANBAG.x, BEANBAG.z, 0.42).circle(BAG.x, BAG.z, 0.2);
     this.setNight(1, true);
@@ -305,9 +371,12 @@ export class BedroomWorld extends World {
     // a soft, neutral grey light comes through it and the room's own lamps carry the time of day
     this.city.setNight(0.5);
     this.city.setOvercast(1);
-    this.sun.intensity = 0.55;
+    // moody: little general light, so the lamps, the wall lights and the LED strips are what you see by
+    this.sun.intensity = 0.42;
     this.sun.color.setRGB(0.93, 0.95, 1.0);
-    this.skyFill.intensity = 0.6;
+    this.skyFill.intensity = 0.3;
+    for (const led of this.leds) led.intensity = (led.userData.power as number) * (0.5 + 0.5 * n);
+    (this.ledGlow.material as THREE.MeshBasicMaterial).color.setScalar(1.2 + 1.0 * n);
     this.skyFill.color.setRGB(0.64, 0.67, 0.74);
     this.lamp.intensity = 0.4 + 2.6 * n;
     this.lampGlow.value = this.lampFull * (0.2 + 0.8 * n);
@@ -317,7 +386,7 @@ export class BedroomWorld extends World {
     this.lightDirection.copy(SUN_DIRECTION).lerp(CITY_GLOW, 0.5).normalize();
     this.look.shafts = 0.12;
     this.look.shaftColor.setRGB(0.82, 0.85, 0.9);
-    this.scene.environmentIntensity = 0.3;
+    this.scene.environmentIntensity = 0.16;
   }
 
   /** The phone pulses when a message is waiting. */
@@ -492,4 +561,265 @@ const paintTennisPoster = (c: CanvasRenderingContext2D, w: number, h: number): v
   c.fillStyle = '#5a2a18';
   c.font = font(500, 18);
   c.fillText('HARBOUR JUNIOR OPEN', w * 0.12, h * 0.9);
+};
+
+// ---- the desk and the monitor ----
+
+/** Pale oak, its grain running along the desk: one metre of wood per repeat. */
+const oakGrain = (): THREE.CanvasTexture => {
+  const size = 1024, rng = new Rng(4411);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#d6b58e';
+  c.fillRect(0, 0, size, size);
+  for (let i = 0; i < 260; i++) {
+    const y = rng.range(0, size), amp = rng.range(2, 10), freq = rng.range(0.002, 0.006), phase = rng.range(0, TAU);
+    c.strokeStyle = rng.chance(0.5) ? `rgba(150, 108, 66, ${rng.range(0.05, 0.16)})` : `rgba(240, 214, 178, ${rng.range(0.06, 0.18)})`;
+    c.lineWidth = rng.range(0.6, 3.2);
+    c.beginPath();
+    for (let x = 0; x <= size; x += 16) c.lineTo(x, y + Math.sin(x * freq + phase) * amp);
+    c.stroke();
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 8;
+  return map;
+};
+
+/**
+ * The desk: a slim oak top fixed to the walls, no legs, running from beside the bed into the corner and a little way
+ * along the right-hand wall, with a soft curve where the two runs meet. A white steel rail holds it to the walls and
+ * a slate-blue drawer unit hangs under the end of the turn.
+ */
+const buildDesk = (): THREE.Group => {
+  const group = new THREE.Group();
+  const { y, slab, deep, start, ret, retDeep, bend, end } = TOP;
+  // the outline seen from above, in (x, -z): the window wall is at -z = D
+  const s = new THREE.Shape();
+  const front = D - deep, inner = W - retDeep, tip = D - ret;
+  s.moveTo(start, D);
+  s.lineTo(W, D);
+  s.lineTo(W, tip);
+  s.lineTo(inner + end, tip);
+  s.quadraticCurveTo(inner, tip, inner, tip + end);
+  s.lineTo(inner, front - bend);
+  s.quadraticCurveTo(inner, front, inner - bend, front);
+  s.lineTo(start + end, front);
+  s.quadraticCurveTo(start, front, start, front + end);
+  s.lineTo(start, D);
+  const bevel = 0.004;
+  const top = new THREE.ExtrudeGeometry(s, { depth: slab - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 16 });
+  top.rotateX(-Math.PI / 2);
+  top.translate(0, y - slab + bevel, 0);
+  const map = oakGrain();
+  const wood = new THREE.Mesh(top, new THREE.MeshStandardMaterial({ map, roughness: 0.55 }));
+  wood.castShadow = wood.receiveShadow = true;
+  group.add(wood);
+
+  const b = new Builder();
+  const below = y - slab;
+  // the rail that holds it to the walls
+  b.box('satin', STEEL_WHITE, [W - start - 0.04, 0.05, 0.02], [(start + W) / 2, below - 0.025, -D + 0.01], { r: 0.004 });
+  b.box('satin', STEEL_WHITE, [0.02, 0.05, ret - 0.04], [W - 0.01, below - 0.025, -D + ret / 2], { r: 0.004 });
+  // the drawers, hung under the end of the turn, fronts toward the room
+  const unit = { x: W - retDeep / 2 + 0.01, z: -D + ret - 0.33, wide: retDeep - 0.08, deep: 0.5, tall: 0.28 };
+  b.box('satin', SLATE_BLUE, [unit.wide, unit.tall, unit.deep], [unit.x, below - unit.tall / 2, unit.z], { r: 0.012 });
+  for (const k of [0, 1]) {
+    const cy = below - unit.tall * (0.27 + 0.5 * k);
+    b.box('satin', 0x46566f, [0.006, 0.004, unit.deep - 0.06], [unit.x - unit.wide / 2 - 0.001, below - unit.tall / 2, unit.z]);
+    const knob = new THREE.SphereGeometry(0.016, 14, 10);
+    knob.deleteAttribute('uv');
+    b.add('satin', OAK, place(knob, [unit.x - unit.wide / 2 - 0.012, cy, unit.z]));
+  }
+  b.finish(group);
+  return group;
+};
+
+/** A large, slim monitor: an edge-to-edge dark glass screen, a white ceramic back no thicker than a finger, on a slender neck and a round oak foot. */
+const buildMonitor = (x: number, y: number, z: number, yawDeg: number): THREE.Group => {
+  const group = new THREE.Group();
+  const wide = 0.86, tall = 0.37, thick = 0.008, lift = 0.17;
+  const back = new THREE.Mesh(new THREE.BoxGeometry(wide, tall, thick), new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.4 }));
+  back.position.set(0, lift + tall / 2, 0);
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(wide - 0.004, tall - 0.004), new THREE.MeshPhysicalMaterial({ color: 0x07090d, roughness: 0.08, metalness: 0.2, clearcoat: 1, clearcoatRoughness: 0.03 }));
+  screen.position.set(0, lift + tall / 2, thick / 2 + 0.0005);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.011, lift + 0.08, 16), new THREE.MeshStandardMaterial({ color: 0xf2f2ef, roughness: 0.35 }));
+  neck.position.set(0, (lift + 0.08) / 2, -0.03);
+  const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.115, 0.012, 40), new THREE.MeshStandardMaterial({ map: oakGrain(), roughness: 0.55 }));
+  foot.position.set(0, 0.006, -0.03);
+  for (const m of [back, screen, neck, foot]) {
+    m.castShadow = m.receiveShadow = true;
+    group.add(m);
+  }
+  group.position.set(x, y, z);
+  group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
+};
+
+// ---- the routine screen, the bottle and the book ----
+
+/** A wall screen that helps with the day: the two alarms, and the week's weather as symbols. Faces +Z; its origin is its middle. */
+const buildRoutineBoard = (wide: number, tall: number): THREE.Group => {
+  const group = new THREE.Group();
+  const px = 760, py = Math.round((px * tall) / wide);
+  const canvas = document.createElement('canvas');
+  canvas.width = px;
+  canvas.height = py;
+  const c = canvas.getContext('2d')!;
+  const bg = c.createLinearGradient(0, 0, 0, py);
+  bg.addColorStop(0, '#101a33');
+  bg.addColorStop(1, '#0b1224');
+  c.fillStyle = bg;
+  c.fillRect(0, 0, px, py);
+  const pad = 56;
+  c.fillStyle = 'rgba(150, 190, 255, 0.75)';
+  c.font = font(600, 30);
+  c.fillText('MY DAY', pad, 92);
+
+  // the alarms: a card each, a symbol, the time and a switch that is on
+  const alarm = (y: number, label: string, time: string, icon: 'sun' | 'moon'): void => {
+    c.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    roundRect(c, pad, y, px - pad * 2, 190, 28);
+    c.fill();
+    if (icon === 'sun') drawSun(c, pad + 78, y + 95, 30);
+    else {
+      c.fillStyle = '#c9d6ff';
+      c.beginPath(); c.arc(pad + 78, y + 95, 34, 0, TAU); c.fill();
+      c.fillStyle = '#16213d';
+      c.beginPath(); c.arc(pad + 94, y + 82, 30, 0, TAU); c.fill();
+    }
+    c.fillStyle = 'rgba(200, 215, 255, 0.7)';
+    c.font = font(500, 30);
+    c.fillText(label, pad + 150, y + 74);
+    c.fillStyle = '#ffffff';
+    c.font = font(300, 72);
+    c.fillText(time, pad + 146, y + 146);
+    const sx = px - pad - 120, sy = y + 72;
+    c.fillStyle = '#4f8dff';
+    roundRect(c, sx, sy, 88, 46, 23);
+    c.fill();
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(sx + 65, sy + 23, 18, 0, TAU); c.fill();
+  };
+  alarm(140, 'Wake up', '7:00 AM', 'sun');
+  alarm(360, 'Bedtime', '9:30 PM', 'moon');
+
+  // the week's weather, symbols only
+  const top = 620;
+  c.fillStyle = 'rgba(150, 190, 255, 0.75)';
+  c.font = font(600, 30);
+  c.fillText('THIS WEEK', pad, top);
+  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const sky: ('sun' | 'part' | 'cloud' | 'rain')[] = ['sun', 'part', 'cloud', 'rain', 'rain', 'part', 'sun'];
+  const colW = (px - pad * 2) / 7;
+  c.fillStyle = 'rgba(255, 255, 255, 0.05)';
+  roundRect(c, pad, top + 28, px - pad * 2, py - top - 28 - pad, 28);
+  c.fill();
+  const mid = top + 28 + (py - top - 28 - pad) / 2;
+  days.forEach((d, i) => {
+    const x = pad + colW * (i + 0.5);
+    c.fillStyle = i === 1 ? '#ffffff' : 'rgba(200, 215, 255, 0.6)';
+    c.font = font(i === 1 ? 700 : 500, 30);
+    c.textAlign = 'center';
+    c.fillText(d, x, mid - 70);
+    c.textAlign = 'left';
+    const kind = sky[i]!;
+    if (kind === 'sun') drawSun(c, x, mid + 10, 20);
+    if (kind === 'part') { drawSun(c, x + 10, mid - 2, 15); drawCloud(c, x - 4, mid + 18, 0.75); }
+    if (kind === 'cloud') drawCloud(c, x, mid + 10, 0.9);
+    if (kind === 'rain') {
+      drawCloud(c, x, mid, 0.85);
+      c.strokeStyle = '#6fb6ff';
+      c.lineWidth = 4;
+      c.lineCap = 'round';
+      for (const dx of [-14, 0, 14]) { c.beginPath(); c.moveTo(x + dx, mid + 26); c.lineTo(x + dx - 6, mid + 44); c.stroke(); }
+    }
+  });
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(wide + 0.016, tall + 0.016, 0.028), new THREE.MeshStandardMaterial({ color: 0x15171c, roughness: 0.3, metalness: 0.6 }));
+  body.position.z = 0.014;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.MeshBasicMaterial({ map }));
+  face.material.color.setScalar(1.05);
+  face.position.z = 0.0285;
+  group.add(body, face);
+  return group;
+};
+
+const drawSun = (c: CanvasRenderingContext2D, x: number, y: number, r: number): void => {
+  c.strokeStyle = '#ffd25e';
+  c.lineWidth = r * 0.16;
+  c.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    c.beginPath();
+    c.moveTo(x + Math.cos(a) * r * 1.35, y + Math.sin(a) * r * 1.35);
+    c.lineTo(x + Math.cos(a) * r * 1.7, y + Math.sin(a) * r * 1.7);
+    c.stroke();
+  }
+  c.fillStyle = '#ffd25e';
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+};
+
+const drawCloud = (c: CanvasRenderingContext2D, x: number, y: number, s: number): void => {
+  c.fillStyle = '#dfe7f5';
+  for (const [dx, dy, r] of [[-18, 6, 16], [0, -6, 22], [20, 4, 17]] as const) {
+    c.beginPath(); c.arc(x + dx * s, y + dy * s, r * s, 0, TAU); c.fill();
+  }
+  roundRect(c, x - 34 * s, y + 4 * s, 70 * s, 20 * s, 10 * s);
+  c.fill();
+};
+
+/** A sports water bottle: a teal body that narrows a little at the waist, a grey flip cap with a carry loop. */
+const buildBottle = (x: number, y: number, z: number): THREE.Group => {
+  const group = new THREE.Group();
+  const profile = [[0, 0], [0.033, 0], [0.036, 0.008], [0.036, 0.07], [0.032, 0.1], [0.036, 0.13], [0.036, 0.18], [0.03, 0.2], [0.024, 0.205]]
+    .map(([r, h]) => new THREE.Vector2(r, h));
+  const body = new THREE.Mesh(new THREE.LatheGeometry(profile, 32), new THREE.MeshStandardMaterial({ color: 0x23a6a0, roughness: 0.35 }));
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x585e68, roughness: 0.6 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.027, 0.032, 28), capMat);
+  cap.position.y = 0.221;
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.022, 16), new THREE.MeshStandardMaterial({ color: 0xe9ecef, roughness: 0.5 }));
+  spout.position.y = 0.247;
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 8, 20), capMat);
+  loop.position.set(0.024, 0.236, 0);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0365, 0.0365, 0.024, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5 }));
+  band.position.y = 0.15;
+  for (const m of [body, cap, spout, loop, band]) {
+    m.castShadow = m.receiveShadow = true;
+    group.add(m);
+  }
+  group.position.set(x, y, z);
+  return group;
+};
+
+/** A paperback left open and face down on the bed: a soft yellow cover tented over its pages, rounded like the bed. */
+const buildBook = (x: number, y: number, z: number, yawDeg: number): THREE.Group => {
+  const group = new THREE.Group();
+  const w = 0.15, d = 0.22, board = 0.008, lean = THREE.MathUtils.degToRad(13);
+  const rise = w * Math.sin(lean);
+  const cover = new THREE.MeshStandardMaterial({ color: 0xf2c230, roughness: 0.7 });
+  const paper = new THREE.MeshStandardMaterial({ color: 0xf7f0dc, roughness: 0.9 });
+  for (const side of [-1, 1]) {
+    const theta = side < 0 ? lean : -lean;
+    const mid = new THREE.Vector3(side * (w / 2) * Math.cos(lean), rise / 2 + 0.018, 0);
+    const half = new THREE.Mesh(roundBox(w, board, d, 0.004, 2), cover);
+    half.position.copy(mid);
+    half.rotation.z = theta;
+    const pages = new THREE.Mesh(roundBox(w - 0.012, 0.016, d - 0.012, 0.003, 1), paper);
+    pages.position.set(mid.x, mid.y - 0.012, 0);
+    pages.rotation.z = theta;
+    group.add(half, pages);
+  }
+  const spine = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, d, 16, 1, false, 0, Math.PI), cover);
+  spine.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
+  spine.position.set(0, rise + 0.016, 0);
+  group.add(spine);
+  group.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, y, z);
+  group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
 };

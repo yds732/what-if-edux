@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { Character } from '../../characters/Character';
 import { CAST, type CastName } from '../../characters/cast';
 import { place, sweep, torus, v3 } from '../../core/geo';
@@ -20,7 +21,7 @@ import { buildSunbeams, type Sunbeams } from './sunbeams';
 /** Seat height of every chair, and the eye height of a child sitting on one. */
 export const SEAT = 0.36;
 const _sunDir = new THREE.Vector3();
-export const EYE_SEATED = 1.0;
+export const EYE_SEATED = 0.9;
 
 /** The classroom: 10 m wide (x), 12 m deep (z). The display and teacher are on the -Z wall, windows on -X. */
 export const CLASSROOM = {
@@ -52,8 +53,28 @@ export type ScreenContent =
 const W = 5, D = 6, H = 3.4;
 /** Height of a floor marker: just clear of the floor. */
 export const FLOOR_MARK = 0.02;
-/** The ceiling's light panels stand over these columns and rows, as they always have. */
+/** The ceiling's pendant lights hang over these columns and rows, where the old panels were. */
 const LIGHT_COLS = [-2.8, 0, 2.8], LIGHT_ROWS = [-3.6, -0.6, 2.4];
+/** Radius of each pendant orb (32 cm across). Its wire is as long as the orb is wide. */
+const ORB_R = 0.16;
+/** The room's light comes from the lamps: a soft warm white, not the blue-white of office panels. */
+const LAMP_COLOR = 0xfff1e0, PENDANT_POWER = 3.0;
+/**
+ * The border light: a line of cool light round the foot of the walls, just above the skirting and the stage, in a slim
+ * white channel that stands a little off the wall, washing the floor's edge and the bottom of the walls.
+ */
+const BORDER = { y: 0.24, off: 0.05, color: 0xcfe4ff, power: 0.9 };
+/** Where the border's light is gathered into lamps: [x, z], a little in from each wall, low down. */
+const BORDER_LAMPS: readonly (readonly [number, number])[] = [
+  [-2.5, -D + 0.35], [2.5, -D + 0.35], [-2.5, D - 0.35], [2.5, D - 0.35],
+  [W - 0.35, -3.6], [W - 0.35, 2.4], [-W + 0.35, -3], [-W + 0.35, 3],
+];
+/** The door's opening on the right wall, which the border steps round. */
+const DOOR_GAP = { z0: -2.45, z1: -1.35 };
+/** The teacher's desk: a long white slab, plain and square. */
+const DESK = { wide: 1.5, deep: 0.64, top: 0.82, yaw: 18 * (Math.PI / 180) };
+/** The wall screens by the pin board: both the same portrait size. */
+const SIGN = { wide: 0.8, tall: 1.2 };
 /** The low stage along the front wall, the teacher's desk on it, and where the bookshelf stands along the right wall. */
 const STAGE_HEIGHT = 0.16, TEACHER_DESK = { x: -2.2, z: -4.95, scale: 1.4 }, BOOKSHELF_Z = -3.5;
 
@@ -147,6 +168,11 @@ export class ClassroomWorld extends World {
   private sun!: THREE.DirectionalLight;
   private fill!: THREE.HemisphereLight;
   private ceiling!: THREE.Mesh;
+  /** The pendant and wall lights, dimmed with the room. */
+  private readonly lamps: THREE.PointLight[] = [];
+  /** The border light's painted strip, and the light that comes in through each window. */
+  private border!: THREE.Mesh;
+  private readonly windows: THREE.RectAreaLight[] = [];
   private screen!: Panel;
   private poster!: Panel;
   private posterGroup = new THREE.Group();
@@ -215,8 +241,11 @@ export class ClassroomWorld extends World {
     for (const z of centres) {
       const frame = [v3(0, WY0, z - WW / 2), v3(0, WY0, z + WW / 2), v3(0, WY1, z + WW / 2), v3(0, WY1, z - WW / 2), v3(0, WY0, z - WW / 2)];
       b.add('metal', 0xf2f3f7, place(sweep(frame, () => 0.045, { radial: 6, polyline: true, steps: 4, startCap: 'flat', endCap: 'flat' }), [-W - 0.02, 0, 0]));
-      b.box('satin', 0xf2f3f7, [0.36, 0.05, WW + 0.14], [-W + 0.1, WY0 - 0.025, z], { r: 0.014 });
     }
+    // one long windowsill of beech under all four windows, deep enough for the plants, on a white apron
+    b.box('satin', 0xd2ad7f, [0.34, 0.04, D * 2 - 0.6], [-W + 0.17, WY0 - 0.02, 0], { r: 0.012 });
+    b.box('satin', 0xb98c5a, [0.02, 0.04, D * 2 - 0.58], [-W + 0.34, WY0 - 0.02, 0], { r: 0.008 });
+    b.box('satin', 0xf2f3f7, [0.02, 0.12, D * 2 - 0.64], [-W + 0.02, WY0 - 0.1, 0]);
     // skirting, and a band of colour at the foot of the front wall
     b.box('satin', trim, [W * 2, 0.1, 0.03], [0, 0.05, -D + 0.015]);
     b.box('satin', trim, [0.03, 0.1, D * 2], [W - 0.015, 0.05, 0]);
@@ -252,8 +281,9 @@ export class ClassroomWorld extends World {
         const turn = (p.facing === 1 ? 180 : 0) + t.yaw + (state === 'askew' ? rng.pick([-1, 1]) * rng.range(10, 22) : rng.range(-4, 4));
         set.chairs.push([cx, 0, cz, turn]);
         if (used || rng.chance(0.4)) {
-          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.13);
-          set.slates.push([sx, TABLE.top, sz, turn + rng.range(-8, 8)]);
+          // a tablet standing up, its screen turned toward the chair
+          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.1);
+          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-8, 8)]);
         }
         if (p.who) {
           set.colliders.push({ kind: 'circle', cx, cz, r: 0.3 });
@@ -267,7 +297,7 @@ export class ClassroomWorld extends World {
     for (const set of sets) {
       set.b.finish(set.to);
       await dress(ctx, set.to, 'chair', set.chairs);
-      await dress(ctx, set.to, 'slate', set.slates);
+      set.to.add(tablets(set.slates));
       await dress(ctx, set.to, 'backpack', set.bags);
     }
     // the back tables' obstacles stay; the front ones come and go with their tables (see setScene)
@@ -280,7 +310,19 @@ export class ClassroomWorld extends World {
     // the plinth is cut down to the lower eye line: squashed in height only, so its footprint stays the same
     const [, plinthTall] = await sizeOf(ctx, 'plinth');
     (await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]])).scale.y = CLASSROOM.plinth.y / plinthTall;
-    await dress(ctx, scene, 'teacher-desk', [[TEACHER_DESK.x, STAGE_HEIGHT, TEACHER_DESK.z, 18, TEACHER_DESK.scale]]);
+    // a long white slab on two slab ends, a recessed panel between them and a hairline of light under the top's edge
+    {
+      const c = Math.cos(DESK.yaw), s = Math.sin(DESK.yaw);
+      const at = (lx: number, y: number, lz: number): [number, number, number] =>
+        [TEACHER_DESK.x + lx * c + lz * s, STAGE_HEIGHT + y, TEACHER_DESK.z - lx * s + lz * c];
+      const rot: [number, number, number] = [0, DESK.yaw, 0];
+      const { wide, deep, top } = DESK, slab = 0.035, under = top - slab;
+      b.box('gloss', 0xf4f5f7, [wide, slab, deep], at(0, top - slab / 2, 0), { r: 0.006, rot });
+      for (const e of [-1, 1]) b.box('satin', 0xe8eaed, [slab, under, deep - 0.02], at(e * (wide / 2 - slab / 2 - 0.01), under / 2, 0), { r: 0.004, rot });
+      b.box('satin', 0xdadde2, [wide - 0.1, 0.44, 0.018], at(0, under - 0.22, 0), { rot });
+      for (const f of [-1, 1]) b.box('glow', 0xa8dcff, [wide - 0.12, 0.005, 0.005], at(0, under - 0.004, f * (deep / 2 - 0.012)), { rot });
+      scene.add(teacherThings(at(0, top, 0), DESK.yaw));
+    }
 
     // ---- the back wall: cubbies with bags and jumpers ----
     const [cubbyWide, , cubbyDeep] = await sizeOf(ctx, 'lockers');
@@ -302,8 +344,30 @@ export class ClassroomWorld extends World {
       scene.add(hung);
     };
     await hang('pinboard', 3.4, W - 0.005, 1.72, 2.2, -Math.PI / 2);
-    await hang('poster-newstart', 1.0, W - 0.005, 1.75, -0.45, -Math.PI / 2);
-    await hang('poster-stars', 0.66, W - 0.005, 1.8, 4.65, -Math.PI / 2);
+    // the two posters by the pin board are slim wall screens now, like the ad boards in a shopping centre
+    const signage = async (id: string, x: number, y: number, z: number, turn: number): Promise<void> => {
+      const picture = await ctx.assets.picture(id);
+      const [pw, ph] = picture.entry.size;
+      // crop the picture to the screen's portrait shape, keeping its middle
+      const map = picture.map.clone();
+      const want = SIGN.wide / SIGN.tall, have = pw / ph;
+      if (have > want) { map.repeat.set(want / have, 1); map.offset.set((1 - want / have) / 2, 0); }
+      else { map.repeat.set(1, have / want); map.offset.set(0, (1 - have / want) / 2); }
+      map.needsUpdate = true;
+      const sign = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(SIGN.wide + 0.012, SIGN.tall + 0.012, 0.024), new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.3, metalness: 0.6 }));
+      body.position.z = 0.012;
+      body.castShadow = true;
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(SIGN.wide, SIGN.tall), new THREE.MeshBasicMaterial({ map }));
+      face.material.color.setScalar(1.12);
+      face.position.z = 0.0245;
+      sign.add(body, face);
+      sign.position.set(x, y, z);
+      sign.rotation.y = turn;
+      scene.add(sign);
+    };
+    await signage('poster-newstart', W - 0.005, 1.6, -0.45, -Math.PI / 2);
+    await signage('poster-stars', W - 0.005, 1.6, 4.65, -Math.PI / 2);
     // "Class 1" over the door: separate cut-out letters on a shallow arch, a quiet slate serif rather than nursery colours
     {
       const text = 'Class 1', tall = 0.2, radius = 1.7, door = { z: -1.9, top: 2.1 };
@@ -405,10 +469,58 @@ export class ClassroomWorld extends World {
     this.beams = buildSunbeams(new Rng(2081), centres.map((z, i) => ({ x: -W, y0: WY0, y1: WY1 - BLIND_DROPS[i]!, z0: z - WW / 2, z1: z + WW / 2 })),
       { min: new THREE.Vector3(-W, 0.05, -D), max: new THREE.Vector3(W, H - 0.05, D) }, ctx.quality.density);
     scene.add(this.beams.group);
-    // ceiling panels: soft rectangles of light over each column of desks
+    // pendant lights: a white orb the size of a child's head, hung from the ceiling on a thin wire as long as the orb is wide
     const panels = new Builder();
-    for (const x of LIGHT_COLS) for (const z of LIGHT_ROWS) panels.box('glow', 0xffffff, [1.5, 0.02, 0.5], [x, H - 0.012, z], { r: 0.01 });
-    this.ceiling = panels.finish(scene, { glow: 2.2 }).glow!;
+    // the room is lit by these lamps: each orb and each wall dome carries a light of its own
+    const lamp = (x: number, y: number, z: number, power: number): void => {
+      const light = new THREE.PointLight(LAMP_COLOR, power, 0, 2);
+      light.position.set(x, y, z);
+      light.userData.power = power;
+      this.lamps.push(light);
+      scene.add(light);
+    };
+    for (const x of LIGHT_COLS) for (const z of LIGHT_ROWS) {
+      const orb = new THREE.SphereGeometry(ORB_R, 32, 20);
+      orb.deleteAttribute('uv');
+      panels.add('glow', 0xffffff, place(orb, [x, H - 2 * ORB_R - ORB_R, z]));
+      panels.cyl('metal', 0x2a2a2a, 0.002, 2 * ORB_R + 0.01, [x, H - 2 * ORB_R - 0.005, z], { radial: 6 });
+      lamp(x, H - 3 * ORB_R, z, PENDANT_POWER);
+    }
+    this.ceiling = panels.finish(scene, { glow: 2.2, shadows: false }).glow!;
+    // the border light: a white channel all the way round, its strip of light along the top and bottom edges
+    {
+      const border = new Builder(), o = BORDER.off, y = BORDER.y;
+      const runs: [number, number, number, number][] = [
+        // [centre x, centre z, length, turned along z?]
+        [0, -D + o, W * 2 - 2 * o, 0], [0, D - o, W * 2 - 2 * o, 0], [-W + o + 0.02, 0, D * 2 - 2 * o, 1],
+        // the right wall, in two runs either side of the door
+        [W - o, (-D + o + DOOR_GAP.z0) / 2, DOOR_GAP.z0 - (-D + o), 1], [W - o, (DOOR_GAP.z1 + D - o) / 2, D - o - DOOR_GAP.z1, 1],
+      ];
+      for (const [x, z, len, alongZ] of runs) {
+        const size = (a: number, b: number, c: number): [number, number, number] => (alongZ ? [c, b, a] : [a, b, c]);
+        border.box('satin', 0xf4f6fa, size(len, 0.05, 0.03), [x, y, z], { r: 0.008 });
+        for (const edge of [-1, 1]) border.box('glow', BORDER.color, size(len, 0.005, 0.02), [x, y + edge * 0.0275, z]);
+      }
+      this.border = border.finish(scene, { glow: 2.4, shadows: false }).glow!;
+      if (ctx.quality.tier !== 'low') {
+        for (const [x, z] of BORDER_LAMPS) {
+          const light = new THREE.PointLight(BORDER.color, BORDER.power, 0, 2);
+          light.position.set(x, y + 0.15, z);
+          light.userData.power = BORDER.power;
+          this.lamps.push(light);
+          scene.add(light);
+        }
+      }
+    }
+    // the windows' own light: a soft panel of sky in each opening, so daylight comes from where the glass is
+    RectAreaLightUniformsLib.init();
+    for (const [i, z] of centres.entries()) {
+      const sky = new THREE.RectAreaLight(0xe4ecff, 0, WW, WY1 - BLIND_DROPS[i]! - WY0);
+      sky.position.set(-W + 0.02, (WY0 + WY1 - BLIND_DROPS[i]!) / 2, z);
+      sky.lookAt(0, sky.position.y, z);
+      this.windows.push(sky);
+      scene.add(sky);
+    }
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe0ff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false });
     for (const z of centres) {
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(WW, WY1 - WY0), glassMat);
@@ -507,10 +619,19 @@ export class ClassroomWorld extends World {
     this.sun.color.setRGB(1.0, 0.96 - 0.38 * m.warm, 0.9 - 0.66 * m.warm);
     // a low sun reaches right across the room
     this.sun.position.set(-12, 9 - 6.2 * m.warm, -3 + 2 * m.warm);
-    this.fill.intensity = 0.26 + 0.52 * m.room + 0.12 * m.warm;
-    this.fill.color.setRGB(0.87 + 0.13 * m.warm, 0.91 - 0.16 * m.warm, 1.0 - 0.44 * m.warm);
+    // all the light has a source: the lamps, the border light, the display and the windows; no light from nowhere
+    for (const l of this.lamps) l.intensity = (l.userData.power as number) * m.room;
+    const daylight = m.sun / 4.4;
+    for (const w of this.windows) {
+      w.intensity = 2.2 * daylight;
+      w.color.setRGB(0.9 + 0.1 * m.warm, 0.93 - 0.2 * m.warm, 1.0 - 0.45 * m.warm);
+    }
+    // about nine tenths of the light is from the lamps, the border and the windows: only a trace of ambient is left
+    this.fill.intensity = 0.012;
+    this.fill.color.setRGB(0.95 + 0.05 * m.warm, 0.93 - 0.18 * m.warm, 0.9 - 0.4 * m.warm);
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);
-    this.scene.environmentIntensity = 0.14 + 0.36 * m.room + 0.1 * m.warm;
+    (this.border.material as THREE.MeshBasicMaterial).color.setScalar(0.1 + 2.4 * m.room);
+    this.scene.environmentIntensity = 0.03 + 0.03 * m.room + 0.02 * m.warm;
     this.city.setNight(m.night);
     this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (m.sun / 4.4) * (1.2 + 0.2 * m.warm));
     this.look.exposure = this.variant === 'viewer' ? 1.15 : 1.0;
@@ -742,6 +863,182 @@ export class ClassroomWorld extends World {
 
 // ---- the room's furniture and paper ----
 
+/**
+ * What lives on the teacher's desk: a mug of coffee, a keycard on its lanyard, flowers in a glass vase and a thank-you
+ * card with two balloons on it. `origin` is the middle of the desk's top; +Z in the desk's frame is the class's side.
+ */
+const teacherThings = (origin: readonly [number, number, number], yaw: number): THREE.Group => {
+  const group = new THREE.Group();
+  const add = (mesh: THREE.Mesh, x: number, y: number, z: number, shadows = true): THREE.Mesh => {
+    mesh.position.set(x, y, z);
+    mesh.castShadow = mesh.receiveShadow = shadows;
+    group.add(mesh);
+    return mesh;
+  };
+  const std = (color: THREE.ColorRepresentation, roughness = 0.5, metalness = 0): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness, metalness });
+
+  // the mug, by the teacher's hand, half full
+  const mug = { x: 0.48, z: 0.12, r: 0.04, tall: 0.095 };
+  add(new THREE.Mesh(new THREE.CylinderGeometry(mug.r, mug.r * 0.92, mug.tall, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0x3d5a80, roughness: 0.35, side: THREE.DoubleSide })), mug.x, mug.tall / 2, mug.z);
+  add(new THREE.Mesh(new THREE.CircleGeometry(mug.r * 0.92, 32).rotateX(-Math.PI / 2), std(0x3d5a80, 0.35)), mug.x, 0.002, mug.z);
+  add(new THREE.Mesh(new THREE.CircleGeometry(mug.r - 0.003, 32).rotateX(-Math.PI / 2), std(0x3a2416, 0.15)), mug.x, mug.tall - 0.018, mug.z, false);
+  add(new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.006, 10, 24), std(0x3d5a80, 0.35)), mug.x + mug.r + 0.012, mug.tall * 0.55, mug.z);
+
+  // the keycard, face up, its lanyard coiled beside it
+  const card = add(new THREE.Mesh(new THREE.BoxGeometry(0.054, 0.0016, 0.086), [std(0xf4f6f8, 0.4), std(0xf4f6f8, 0.4), new THREE.MeshStandardMaterial({ map: keycardFace(), roughness: 0.35 }), std(0xf4f6f8, 0.4), std(0xf4f6f8, 0.4), std(0xf4f6f8, 0.4)]), 0.24, 0.0008, 0.2);
+  card.rotation.y = 0.5;
+  const lanyard = add(new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.006, 4, 48), std(0x1f3a68, 0.8)), 0.3, 0.0015, 0.08);
+  lanyard.rotation.x = Math.PI / 2;
+  lanyard.scale.set(1, 1.35, 0.25);
+
+  // flowers in a glass vase, at the far end
+  const vase = { x: -0.55, z: -0.1 };
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.04, 0.17, 32), new THREE.MeshPhysicalMaterial({ color: 0xdfeff2, roughness: 0.05, transmission: 0.9, thickness: 0.01, transparent: true, opacity: 0.45 })), vase.x, 0.085, vase.z, false);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.038, 0.09, 24), new THREE.MeshStandardMaterial({ color: 0xbfe0e0, roughness: 0.1, transparent: true, opacity: 0.35 })), vase.x, 0.047, vase.z, false);
+  const rng = new Rng(518), stem = std(0x4f7d3a, 0.7), petals = [0xf28fae, 0xffd166, 0xfdfdfb, 0xe85d75, 0xc39bd3];
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * TAU + rng.range(-0.3, 0.3), lean = rng.range(0.12, 0.38), len = rng.range(0.22, 0.3);
+    const dir = new THREE.Vector3(Math.cos(a) * Math.sin(lean), Math.cos(lean), Math.sin(a) * Math.sin(lean));
+    const s = add(new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.003, len, 6), stem), vase.x + dir.x * len / 2, 0.05 + dir.y * len / 2, vase.z + dir.z * len / 2);
+    s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    const head = add(new THREE.Mesh(new THREE.IcosahedronGeometry(rng.range(0.024, 0.034), 1), std(rng.pick(petals), 0.7)), vase.x + dir.x * len, 0.05 + dir.y * len, vase.z + dir.z * len);
+    head.scale.y = 0.75;
+    head.rotation.set(rng.range(0, TAU), rng.range(0, TAU), 0);
+    if (i % 2 === 0) {
+      const leaf = add(new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), std(0x5d9147, 0.7)), vase.x + dir.x * len * 0.6, 0.05 + dir.y * len * 0.6, vase.z + dir.z * len * 0.6);
+      leaf.scale.set(1, 0.18, 0.4);
+      leaf.rotation.set(0, -a, lean + 0.4);
+    }
+  }
+
+  // the thank-you card, stood up as a tent, its front to the class
+  const tent = { x: -0.18, z: 0.02, wide: 0.15, tall: 0.11, lean: 18 * RAD };
+  const cs = Math.sin(tent.lean), cc = Math.cos(tent.lean);
+  const front = add(new THREE.Mesh(new THREE.PlaneGeometry(tent.wide, tent.tall), new THREE.MeshStandardMaterial({ map: thankYouCard(), roughness: 0.8 })), tent.x, (tent.tall / 2) * cc, tent.z + (tent.tall / 2) * cs);
+  front.rotation.x = -tent.lean;
+  const behind = add(new THREE.Mesh(new THREE.PlaneGeometry(tent.wide, tent.tall), new THREE.MeshStandardMaterial({ color: 0xfbf6ea, roughness: 0.8, side: THREE.DoubleSide })), tent.x, (tent.tall / 2) * cc, tent.z - (tent.tall / 2) * cs);
+  behind.rotation.x = tent.lean;
+
+  group.position.set(...origin);
+  group.rotation.y = yaw;
+  return group;
+};
+
+/** The face of a staff keycard: a blue band, a little photo, a chip. */
+const keycardFace = (): THREE.CanvasTexture => canvasTexture(216, 344, (ctx) => {
+  ctx.fillStyle = '#f6f8fa';
+  ctx.fillRect(0, 0, 216, 344);
+  ctx.fillStyle = '#2f6fd0';
+  ctx.fillRect(0, 0, 216, 70);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = font(700, 22);
+  ctx.fillText('STAFF', 20, 45);
+  ctx.fillStyle = '#c9d3de';
+  ctx.fillRect(58, 96, 100, 120);
+  ctx.fillStyle = '#d9b26a';
+  ctx.fillRect(24, 250, 44, 34);
+  ctx.fillStyle = '#9aa6b4';
+  ctx.fillRect(84, 254, 110, 10);
+  ctx.fillRect(84, 274, 80, 10);
+});
+
+/** A thank-you card: two balloons on strings and the words under them. */
+const thankYouCard = (): THREE.CanvasTexture => canvasTexture(450, 330, (ctx) => {
+  ctx.fillStyle = '#fdf8ee';
+  ctx.fillRect(0, 0, 450, 330);
+  const balloon = (x: number, y: number, color: string, shine: string): void => {
+    ctx.strokeStyle = '#8a8f99';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 62);
+    ctx.bezierCurveTo(x - 16, y + 110, x + 18, y + 140, 225, 250);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.ellipse(x, y, 46, 58, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 7, y + 64); ctx.lineTo(x + 7, y + 64); ctx.lineTo(x, y + 55); ctx.fill();
+    ctx.fillStyle = shine;
+    ctx.beginPath(); ctx.ellipse(x - 16, y - 22, 9, 16, -0.4, 0, TAU); ctx.fill();
+  };
+  balloon(170, 92, '#e8505b', 'rgba(255,255,255,0.45)');
+  balloon(285, 78, '#3a86d6', 'rgba(255,255,255,0.45)');
+  ctx.fillStyle = '#2d3550';
+  ctx.font = `700 46px ${HAND}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Thank you!', 225, 300);
+});
+
+/** A pupil's tablet: a sheet of glass that is all screen, no rim, standing tilted back on a hairline kickstand. */
+const TABLET = { wide: 0.34, tall: 0.24, thick: 0.0045, lean: 24 * RAD, standAt: 0.55, standBack: 0.075 };
+let tabletScreen: THREE.CanvasTexture | null = null;
+
+/** The tablets at a group of desks, one batch each for glass, stand and screen. A spot is the screen's bottom edge, facing +Z. */
+const tablets = (spots: readonly Spot[]): THREE.Group => {
+  const group = new THREE.Group();
+  if (spots.length === 0) return group;
+  const { wide, tall, thick, lean, standAt, standBack } = TABLET;
+  const c = Math.cos(lean), s = Math.sin(lean), lift = 0.002;
+  // the glass leans back: up its face is (0, c, -s), out of the screen is (0, s, c)
+  const along = (a: number, out: number): THREE.Vector3 => new THREE.Vector3(0, lift + a * c + out * s, -a * s + out * c);
+  const glass = place(new THREE.BoxGeometry(wide, tall, thick), along(tall / 2, -thick / 2), [-lean, 0, 0]);
+  const face = place(new THREE.PlaneGeometry(wide, tall), along(tall / 2, 0.0003), [-lean, 0, 0]);
+  const top = along(standAt * tall, -thick), foot = new THREE.Vector3(0, 0.0015, top.z - standBack);
+  const legLength = top.distanceTo(foot);
+  const leg = place(new THREE.BoxGeometry(wide * 0.36, legLength, 0.003), top.clone().add(foot).multiplyScalar(0.5), [Math.atan2(top.z - foot.z, top.y - foot.y), 0, 0]);
+  if (!tabletScreen) tabletScreen = tabletUi();
+  const parts: [THREE.BufferGeometry, THREE.Material, boolean][] = [
+    [glass, new THREE.MeshPhysicalMaterial({ color: 0x101318, roughness: 0.18, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.05 }), true],
+    [leg, new THREE.MeshStandardMaterial({ color: 0xc3c9d1, roughness: 0.3, metalness: 0.9 }), true],
+    [face, new THREE.MeshBasicMaterial({ map: tabletScreen, color: new THREE.Color().setScalar(1.25) }), false],
+  ];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  for (const [geometry, material, shadows] of parts) {
+    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+    spots.forEach(([x, y, z, yaw = 0], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one)));
+    mesh.castShadow = shadows;
+    mesh.receiveShadow = shadows;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+  return group;
+};
+
+/** What the tablets show: a calm lesson screen, deep blue with a few soft cards and a progress ring. */
+const tabletUi = (): THREE.CanvasTexture => {
+  const w = 540, h = 380;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext('2d')!;
+  const bg = g.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, '#0d1b33');
+  bg.addColorStop(1, '#123c4f');
+  g.fillStyle = bg;
+  g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(140, 210, 255, 0.9)';
+  g.font = font(600, 22);
+  g.fillText('Today', 28, 46);
+  g.fillStyle = 'rgba(200, 225, 255, 0.45)';
+  g.fillRect(28, 60, 120, 3);
+  const cards: [number, number, number, number, string][] = [[28, 84, 300, 120, 'rgba(120, 190, 255, 0.16)'], [28, 220, 300, 130, 'rgba(120, 230, 210, 0.14)'], [348, 84, 164, 266, 'rgba(255, 255, 255, 0.07)']];
+  for (const [x, y, cw, ch, fill] of cards) {
+    g.fillStyle = fill;
+    roundRect(g, x, y, cw, ch, 16);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(220, 235, 255, 0.55)';
+  for (const [x, y, lw] of [[48, 116, 200], [48, 140, 240], [48, 164, 150], [48, 252, 220], [48, 276, 180], [48, 300, 240]] as const) g.fillRect(x, y, lw, 8);
+  g.lineWidth = 12;
+  g.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  g.beginPath(); g.arc(430, 190, 52, 0, TAU); g.stroke();
+  g.strokeStyle = '#6fd3ff';
+  g.lineCap = 'round';
+  g.beginPath(); g.arc(430, 190, 52, -Math.PI / 2, -Math.PI / 2 + TAU * 0.68); g.stroke();
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  return map;
+};
+
 const STEEL = 0x8e959e;
 
 /** A table for two: a beech top with a darker edge, a steel rail under each long side, four tube legs; now and then a few things left on it. */
@@ -824,11 +1121,22 @@ const chartPaper = (rng: Rng): THREE.CanvasTexture => canvasTexture(372, 516, (c
   const ink = rng.pick(['#2d55b5', '#1d1d1d', '#2f8a4a']), accent = rng.pick(['#d6402f', '#e07b1f', '#8a3fb8']);
   ctx.fillStyle = accent;
   ctx.font = `700 34px ${HAND}`;
-  ctx.fillText(rng.pick(['Our class rules', 'Story starters', 'Good listening', 'Word bank', 'Today we will']), 24, 58);
+  const heading = rng.pick(['Our class rules', 'Story starters', 'Good listening', 'Word bank', 'Daily affirmations']);
+  ctx.font = `700 ${heading === 'Daily affirmations' ? 31 : 34}px ${HAND}`;
+  ctx.fillText(heading, 24, 58);
   ctx.fillRect(24, 70, 220, 4);
   ctx.font = `500 22px ${HAND}`;
+  if (heading === 'Daily affirmations') {
+    // what a class of 11 to 14 year olds says to itself in the morning
+    const lines = ['I can do hard things', 'Mistakes help me learn', 'My voice matters', 'I belong here', 'I choose to be kind', 'I am proud of my effort', 'I can ask for help', 'Today is a fresh start', 'I am more than my grades'];
+    ctx.font = `500 21px ${HAND}`;
+    lines.forEach((line, i) => {
+      ctx.fillStyle = i % 3 === 2 ? accent : ink;
+      ctx.fillText(`★ ${line}`, 26 + rng.range(-3, 3), 116 + i * 43);
+    });
+  }
   const words = ['kind', 'listen', 'share', 'try again', 'ask', 'because', 'however', 'suddenly', 'first', 'then', 'finally', 'help', 'explain'];
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < (heading === 'Daily affirmations' ? 0 : 9); i++) {
     ctx.fillStyle = i % 3 === 2 ? accent : ink;
     let line = '';
     for (let k = rng.int(2, 4); k > 0; k--) line += rng.pick(words) + ' ';

@@ -1,8 +1,8 @@
 :root {
-  --ink: #f4f1ff;
-  --dim: rgba(232, 226, 255, 0.72);
+  --ink: #eef3f8;
+  --dim: rgba(220, 230, 240, 0.72);
   --gold: #ffd98a;
-  --glass: rgba(26, 18, 54, 0.62);
+  --glass: rgba(22, 30, 42, 0.62);
   --line: rgba(255, 226, 180, 0.16);
   --line-hover: rgba(255, 217, 138, 0.5);
   /* buttons: squarer, with a little softness left at the corners */
@@ -49,8 +49,8 @@
   align-items: flex-start;
   padding-left: max(clamp(26px, 7.5vw, 150px), env(safe-area-inset-left));
   background:
-    linear-gradient(90deg, rgba(8, 6, 22, 0.76) 0%, rgba(8, 6, 22, 0.5) 34%, rgba(8, 6, 22, 0) 62%),
-    linear-gradient(0deg, rgba(8, 6, 22, 0.5) 0%, rgba(8, 6, 22, 0) 30%);
+    linear-gradient(90deg, rgba(6, 9, 14, 0.76) 0%, rgba(6, 9, 14, 0.5) 34%, rgba(6, 9, 14, 0) 62%),
+    linear-gradient(0deg, rgba(6, 9, 14, 0.5) 0%, rgba(6, 9, 14, 0) 30%);
 }
 .menu--title .head,
 .menu--title .actions {
@@ -78,7 +78,7 @@
   align-items: center;
   justify-content: space-between;
   padding: max(8vh, env(safe-area-inset-top)) 20px max(5vh, env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(8, 6, 22, 0.72) 0%, rgba(8, 6, 22, 0) 40%, rgba(8, 6, 22, 0) 58%, rgba(8, 6, 22, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(6, 9, 14, 0.72) 0%, rgba(6, 9, 14, 0) 40%, rgba(6, 9, 14, 0) 58%, rgba(6, 9, 14, 0.82) 100%);
 }
 .menu--title.tall .head {
   align-items: center;
@@ -98,7 +98,7 @@
 /* A card is centred while it fits and scrolls from its top when it does not (plain centring would cut the top off). */
 .menu--veil {
   justify-content: flex-start;
-  background: rgba(8, 6, 22, 0.66);
+  background: rgba(6, 9, 14, 0.66);
   backdrop-filter: blur(10px) saturate(1.1);
   -webkit-backdrop-filter: blur(10px) saturate(1.1);
 }
@@ -175,6 +175,13 @@
   background-position: 100% 0;
   pointer-events: none;
 }
+@keyframes btn-sheen {
+  0% { background-position: 100% 0; }
+  75%, 100% { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn:hover::before { animation: none; }
+}
 /* four pixels touching the corners */
 .btn::after {
   content: '';
@@ -201,12 +208,14 @@
   .btn:hover {
     transform: translateY(-2px);
     border-color: var(--line-hover);
-    background-color: rgba(60, 40, 104, 0.72);
+    background-color: rgba(52, 66, 86, 0.72);
     box-shadow: 0 6px 24px rgba(255, 196, 120, 0.22);
   }
   .btn:hover::before {
     background-position: 0% 0;
     transition: background-position var(--dur-sheen) var(--ease-out);
+    /* after the first quick sweep, the band keeps crossing slowly for as long as the pointer stays */
+    animation: btn-sheen 3.2s ease-in-out var(--dur-sheen) infinite;
   }
   /* on hover the corner pixels step out a little and brighten */
   .btn:hover::after {
@@ -219,7 +228,7 @@
 }
 .btn--primary {
   background: linear-gradient(180deg, #ffe2a6, #ffc56f);
-  color: #23153f;
+  color: #1a2433;
   border-color: transparent;
   font-weight: 600;
   box-shadow: 0 0 34px rgba(255, 196, 120, 0.42);
@@ -242,7 +251,7 @@
   font-size: 12.5px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(232, 226, 255, 0.5);
+  color: rgba(220, 230, 240, 0.5);
   text-align: center;
 }
 
@@ -251,18 +260,30 @@
   padding: 30px 32px;
   border-radius: 26px;
   border: 1.5px solid var(--line);
-  background: linear-gradient(180deg, rgba(54, 34, 92, 0.82), rgba(26, 17, 58, 0.9));
+  background: linear-gradient(180deg, rgba(46, 58, 76, 0.82), rgba(22, 29, 40, 0.9));
   box-shadow: 0 0 60px rgba(255, 190, 120, 0.16);
   box-sizing: border-box;
 }
 /* the pause card sits lighter over the paused scene, so the room still shows through */
 .menu--veil.menu--light {
-  background: rgba(8, 6, 22, 0.38);
+  background: rgba(6, 9, 14, 0.38);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
 .card--pause {
-  background: linear-gradient(180deg, rgba(54, 34, 92, 0.7), rgba(26, 17, 58, 0.7));
+  background: linear-gradient(180deg, rgba(46, 58, 76, 0.7), rgba(22, 29, 40, 0.7));
+}
+/* the pause card's title and the day under it sit centred */
+.card--pause h2,
+.card--pause .day-name {
+  text-align: center;
+}
+.card--pause .day-name {
+  margin: 0 0 22px;
+  color: var(--dim);
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
 }
 .card--wide {
   width: min(760px, 94vw);
@@ -358,7 +379,7 @@
 }
 .seg button[aria-pressed='true'] {
   background: var(--gold);
-  color: #23153f;
+  color: #1a2433;
 }
 .setting input[type='range'] {
   width: 170px;
@@ -501,7 +522,7 @@
   height: 46px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.3);
-  background: rgba(20, 16, 40, 0.5);
+  background: rgba(16, 21, 30, 0.5);
   color: #fff;
   font: 600 14px/1 var(--font);
   pointer-events: auto;
@@ -622,7 +643,7 @@
   font-size: 14px;
   letter-spacing: 0.04em;
   color: var(--dim);
-  background-color: rgba(20, 14, 42, 0.38);
+  background-color: rgba(16, 21, 30, 0.38);
 }
 .btn--utility .icon {
   width: 16px;

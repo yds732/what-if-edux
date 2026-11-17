@@ -3,7 +3,7 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #07060c;
+  background: #06080c;
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
 }

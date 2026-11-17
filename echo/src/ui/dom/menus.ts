@@ -1,7 +1,7 @@
 import './menus.css';
 import type { Game } from '../../app/Game';
 import { TIERS } from '../../app/quality';
-import { saveSettings, tierFor, type Settings } from '../../app/settings';
+import { SKIN_TONES, saveSettings, tierFor, type Settings } from '../../app/settings';
 import { FRIDAY, THURSDAY, TUESDAY } from '../../story/script';
 import { CHAPTERS, clearProgress, freshState, loadProgress, type ChapterId, type StoryState } from '../../story/state';
 import { XRRig } from '../../input/XRRig';
@@ -165,6 +165,7 @@ class Menus {
     game.audio.setVolume(settings.volume);
     game.director.autoAdvance = settings.autoAdvance;
     game.input.sensitivity = settings.sensitivity;
+    game.hands.setSkin(SKIN_TONES[settings.skin] ?? SKIN_TONES[1]);
     saveSettings(settings);
   }
 
@@ -359,6 +360,23 @@ class Menus {
     row('Volume', '', range(0, 1, s.volume, (v) => (s.volume = v)));
     row('Dialogue', 'Lines move on by themselves after a reading pause.', seg(['auto', 'manual'] as const, s.autoAdvance ? 'auto' : 'manual', (v) => (s.autoAdvance = v === 'auto')));
     row('Look sensitivity', '', range(0.4, 2, s.sensitivity, (v) => (s.sensitivity = v)));
+    // the player's skin tone, as their hands look in the real world
+    const swatches = el('div', 'swatches');
+    SKIN_TONES.forEach((tone, i) => {
+      const b = el('button');
+      b.type = 'button';
+      b.style.background = `#${tone.toString(16).padStart(6, '0')}`;
+      b.setAttribute('aria-label', `Skin tone ${i + 1}`);
+      b.setAttribute('aria-pressed', String(i === s.skin));
+      b.addEventListener('click', () => {
+        for (const other of Array.from(swatches.children)) other.setAttribute('aria-pressed', 'false');
+        b.setAttribute('aria-pressed', 'true');
+        s.skin = i;
+        this.applySettings();
+      });
+      swatches.append(b);
+    });
+    row('Skin tone', 'Your hands, as they look in the real world.', swatches);
     const done = button('Done', 'btn--primary', back);
     done.style.marginTop = '20px';
     card.append(done);
@@ -377,7 +395,8 @@ class Menus {
     game.input.freePointer();
     const menu = el('div', 'menu menu--veil menu--light');
     const card = el('div', 'card card--pause');
-    card.append(el('h2', '', 'Paused'), el('p', 'lede', game.chapter ? `${game.chapter[0]!.toUpperCase()}${game.chapter.slice(1)}` : ''));
+    card.append(el('h2', '', 'Paused'));
+    if (game.chapter) card.append(el('p', 'day-name', game.chapter));
     const buttons = el('div', 'buttons');
     buttons.style.width = '100%';
     buttons.append(
