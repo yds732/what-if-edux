@@ -13,6 +13,8 @@ export const CAST = {
   jamie: { name: 'Jamie', face: { eyeColor: 0x5a4128, browColor: 0x55392a }, rest: { mouthSmile: 0.25 } },
   lumi: { name: 'Lumi', aura: 0x6fe6ff, face: { eyeColor: 0x4f86ad, browColor: 0xb9b6cf, glintColor: 0xbff3ff, eyeScale: 1.04 }, rest: { mouthSmile: 0.4, blush: 0.08 } },
   kai: { name: 'Kai', aura: 0xffc063, face: { eyeColor: 0x5e3a1a, browColor: 0x241a1c, glintColor: 0xffe6b8 }, rest: { mouthSmile: 0.38, mouthWidth: 1.05, blush: 0.05 } },
+  // Lumi's twin in a red cap: the same kind of face, a smile held a little too steady
+  spark: { name: 'Spark', aura: 0xff5a4e, face: { eyeColor: 0x6b2f2a, browColor: 0xb9b6cf, glintColor: 0xffd2c8, eyeScale: 1.06 }, rest: { mouthSmile: 0.5, blush: 0.04 } },
   nova: { name: 'Nova', aura: 0xff7fd8, face: { eyeColor: 0x5e3a50, browColor: 0x5e3a2c, glintColor: 0xffd0f2 }, rest: { mouthSmile: 0.38, blush: 0.08 } },
   // ---- classmates ----
   priya: { name: 'Priya', face: { eyeColor: 0x3a2416, browColor: 0x1d1512 }, rest: { mouthSmile: 0.28, mouthWidth: 0.95 } },

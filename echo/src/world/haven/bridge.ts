@@ -3,6 +3,7 @@ import { addGlow } from '../../assets/glow';
 import { merge, place, v3 } from '../../core/geo';
 import { TAU, damp } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
+import { Walkway } from '../colliders';
 import { recolourMaterial } from './recolour';
 
 /** Centres of the three rings of the Star Bridge challenge, near to far. */
@@ -193,6 +194,10 @@ export interface StarBridge {
   readonly group: THREE.Group;
   readonly rings: Ring[];
   readonly path: THREE.CatmullRomCurve3;
+  /** The deck as a path to walk on: only the tiles that stand can be walked. */
+  readonly walkway: Walkway;
+  /** The gateway island beyond the far end, walkable once the bridge is whole. */
+  readonly landing: Walkway;
   /** 0..3: how many sections stand. Fractions are mid-build. */
   built: number;
   /** Sets the target number of sections; the deck grows toward it tile by tile. */
@@ -247,11 +252,17 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
   const rings = RING_POINTS.map((p, i) => new Ring(p, start, hoops[i]!));
   for (const r of rings) group.add(r.group);
 
+  // the walkable deck follows the same curve as the tiles, a little narrower than they are
+  const line: THREE.Vector3[] = [];
+  for (let i = 0; i <= 160; i++) line.push(path.getPointAt(i / 160));
+  const walkway = new Walkway(line, W - 0.1);
+  const landing = new Walkway([end.clone(), v3(end.x, end.y, end.z - 4.2)], 1.6);
+
   let target = 0;
   const revealFor = (sections: number): number => STUB + (sections / 3) * (TILES - STUB) + (sections >= 3 ? 1 : 0);
   deckU.uReveal.value = revealFor(0);
   const bridge: StarBridge = {
-    group, rings, path, built: 0,
+    group, rings, path, walkway, landing, built: 0,
     setSections(n, immediate = false) {
       target = n;
       if (immediate) {
@@ -269,6 +280,9 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
       const speed = Math.max(9, Math.abs(want - deckU.uReveal.value) * 1.6);
       deckU.uReveal.value += Math.sign(want - deckU.uReveal.value) * Math.min(Math.abs(want - deckU.uReveal.value), speed * dt);
       bridge.built = (Math.max(0, deckU.uReveal.value - STUB) / (TILES - STUB)) * 3;
+      // a tile can be stood on once it has settled into place
+      walkway.reach = Math.min(1, Math.max(0, Math.floor(deckU.uReveal.value) - 0.1) / TILES);
+      landing.reach = bridge.built >= 2.999 ? 1 : 0;
       for (const r of rings) r.update(dt, time);
     },
   };

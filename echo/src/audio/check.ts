@@ -313,6 +313,7 @@ const SAMPLE_LINES: Record<SpeakerId, Line> = {
   teacher: MONDAY.intro[0],
   jamie: WEDNESDAY.discussion[4],
   lumi: TUESDAY.welcome[0],
+  spark: MONDAY.sparkHello[0],
   kai: TUESDAY.success[1],
   nova: TUESDAY.success[2],
   you: WEDNESDAY.discussion[1],

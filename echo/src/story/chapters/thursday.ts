@@ -3,7 +3,7 @@ import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroom/BedroomWorld';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
 import { MONDAY, THURSDAY } from '../script';
-import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, playRings, stowHeadset, waitHeadsetOff, waitUse } from './shared';
+import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, stowHeadset, waitHeadsetOff, waitUse } from './shared';
 
 /** Scene 4. The Starlight Festival and Jamie's rehearsal fall on the same evening. */
 export const thursday = async (game: Game): Promise<void> => {
@@ -23,20 +23,13 @@ export const thursday = async (game: Game): Promise<void> => {
   await d.fadeIn(1.4);
   await d.play(THURSDAY.intro);
 
-  // ---- two rings; then the last orb, and an interruption ----
-  const [first, second, last] = haven.bridge.rings;
-  const board = (value: number): void => haven.setBoard({ title: THURSDAY.festivalTitle, body: THURSDAY.festivalBody, value, total: 3 });
-  board(0);
+  // ---- across the bridge toward the gateway; partway over, the real world interrupts ----
+  haven.setBoard({ title: THURSDAY.festivalTitle, body: THURSDAY.festivalBody, value: 0, total: 1 });
   d.objective(THURSDAY.objective);
-  await playRings(game, haven, {
-    rings: [first!, second!], orbs: null, label: 'Starlight', total: 3,
-    onHit: (hits) => {
-      board(hits);
-      haven.fireworks(3, 1.2);
-    },
-  });
-  d.objective(null);
-  last!.setState('target');
+  const path = haven.bridge.path;
+  const partway = path.getPointAt(0.3);
+  await d.walkTo(partway.x, partway.z, 2.2);
+  haven.fireworks(3, 1.2);
   game.reach('thursday.oneMore');
   await d.play(THURSDAY.oneMore);
   audio.sfx('notify');
@@ -44,7 +37,6 @@ export const thursday = async (game: Game): Promise<void> => {
   d.objective(THURSDAY.objectiveRemove);
   await waitHeadsetOff(game, THURSDAY.promptRemove);
   hud.setToast(null);
-  hud.setCounter(null);
   d.objective(null);
   player.canMove = false;
   const bedroom = await leaveHaven(game, 1);
@@ -120,19 +112,17 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   player.canMove = false;
   await liftHeadset(game);
   const haven = await enterHaven(game, 'festival');
-  // the two rings lit before the message are still lit
-  const [first, second, last] = haven.bridge.rings;
-  first!.setState('lit', true);
-  second!.setState('lit', true);
+  // back where the player left off, partway across
+  const partway = haven.bridge.path.getPointAt(0.3);
+  player.position.set(partway.x, partway.y, partway.z);
   player.canMove = true;
   game.reach('thursday.return');
   for (const name of ['lumi', 'kai', 'nova'] as const) haven.cast[name]!.lookAtPoint(game.playerEye);
   await d.play(THURSDAY.haven.back);
-  const board = (value: number): void => haven.setBoard({ title: THURSDAY.festivalTitle, body: THURSDAY.festivalBody, value, total: 3 });
-  board(2);
   d.objective(THURSDAY.haven.objective);
-  await playRings(game, haven, { rings: [last!], orbs: null, label: 'Starlight', total: 3, done: 2, onHit: () => board(3) });
-  d.objective(null);
+  const end = haven.bridge.path.getPointAt(1);
+  await d.walkTo(end.x, end.z - 1.5, 2.6);
+  await d.complete(THURSDAY.haven.objective);
   // the gateway opens
   haven.openGateway();
   audio.sfx('gateOpen');
@@ -142,7 +132,6 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   await d.wait(2.2);
   audio.sfx('cheer');
   await d.play(THURSDAY.haven.cheers);
-  game.hud.setCounter(null);
   await d.wait(0.8);
   await d.result(THURSDAY.haven.result);
 };

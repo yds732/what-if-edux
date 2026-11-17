@@ -168,6 +168,17 @@ export class Character {
   }
 
   /** World-space point to look at with eyes, head and a little of the chest; null to look ahead. */
+  /** Size of the head: the radius of the face's sphere, in the figure's own units. */
+  get headRadius(): number {
+    return this.body.face.radius;
+  }
+
+  /** Puts something on the head (a cap, a crown): the item is in head space, origin at the middle of the face sphere, +Z forward. */
+  wear(item: THREE.Object3D): this {
+    this.head.add(item);
+    return this;
+  }
+
   lookAtPoint(target: THREE.Vector3 | null): this {
     this.lookAt = target;
     return this;

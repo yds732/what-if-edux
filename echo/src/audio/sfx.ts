@@ -126,6 +126,19 @@ export const SFX: Record<SfxName, SfxSpec> = {
     },
   },
 
+  taskDone: {
+    bus: 'ui',
+    level: 1,
+    build: (p, c) => {
+      // a quick rising arpeggio that lands on a full chord, with a glitter of high notes falling out of it
+      const t = p.t, m = p.mix(0.4), root = c.root + 12;
+      [0, 4, 7, 12].forEach((semis, i) => bell(p, m, t + 0.07 * i, mtof(root + semis), { level: dB(-17), dur: 0.9, ratio: 2, index: 0.6 }));
+      [0, 4, 7, 12, 16].forEach((semis) => bell(p, m, t + 0.3, mtof(root + semis), { level: dB(-21), dur: 1.8, ratio: 3.5, index: 1.1 }));
+      const pool = pentatonic(c.root, 86, 103);
+      sparkle(p, m, t + 0.34, [5, 3, 6, 2, 4, 1].map((k) => mtof(pool[Math.min(k, pool.length - 1)]!)), 0.05, dB(-22), 0.4);
+    },
+  },
+
   card: {
     bus: 'ui',
     level: -3.5,

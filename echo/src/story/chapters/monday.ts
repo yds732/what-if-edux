@@ -3,7 +3,10 @@ import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
 import { CONTROLS, MONDAY, TUESDAY } from '../script';
+import type { Interactable } from '../../player/Interaction';
+import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { giveGem, holdGem, refreshSideTasks, sparkTour, takeGem } from './spark';
 
 /** Scene 1. The pilot is announced; the player volunteers, goes home, and puts the headset on for the first time. */
 export const monday = async (game: Game): Promise<void> => {
@@ -82,7 +85,82 @@ export const monday = async (game: Game): Promise<void> => {
   await d.wait(2.6);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.4);
   await d.play(TUESDAY.welcome);
+
+  // ---- Spark: the other companion, in the red cap, waiting to be talked to ----
+  const spark = haven.spark;
+  haven.showSpark(true, { x: -4.6, z: -0.6, yaw: 2.0 });
+  spark.setAlert(true);
+  spark.setLabel(MONDAY.birthdayLabel);
+  spark.mode = 'roam';
+  refreshSideTasks(game);
   player.canMove = true;
-  await d.wait(1.6);
+  d.objective(MONDAY.objectiveSpark);
+  await waitUse(game, { position: spark.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptSpark });
+  spark.setAlert(false);
+  spark.mode = 'still';
+  player.canMove = false;
+  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 0.6);
+  await d.complete(MONDAY.objectiveSpark);
+  await d.play(MONDAY.sparkHello);
+  const trust = await d.choose(MONDAY.trust.title, MONDAY.trust.options);
+  await d.play(trust === 0 ? MONDAY.trustYes : MONDAY.trustMaybe);
+  player.canMove = true;
+
+  // ---- the tour: Spark leads, the player follows ----
+  game.reach('monday.tour');
+  await sparkTour(game, haven);
+
+  // ---- free time: talk to Spark about its birthday, find it a gem, or take the headset off ----
+  await havenFreeTime(game, haven);
   await d.fadeOut(1.4);
+};
+
+/** Free time in Haven after the tour, until the player takes the headset off. Spark's birthday is there to find. */
+const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
+  const { director: d, player, input, state } = game;
+  const spark = haven.spark;
+  for (;;) {
+    d.objective(MONDAY.objectiveFree);
+    let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
+    const items: Interactable[] = [];
+    if (state.sparkGift === 'none') items.push({ position: spark.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptBirthday, enabled: true, use: () => (action = 'talk') });
+    if (state.sparkGift === 'carrying') items.push({ position: spark.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive, enabled: true, use: () => (action = 'give') });
+    if (state.sparkGift === 'asked') for (const position of haven.gems) items.push({ position, radius: 0.55, reach: 2.6, prompt: MONDAY.promptGem, enabled: true, use: () => (action = 'gem') });
+    for (const item of items) game.interaction.add(item);
+    let held = 0;
+    try {
+      await d.until((dt) => {
+        held += dt;
+        if (action) return true;
+        if (game.autopilot.enabled && held > 0.6) {
+          // a scripted run does everything there is to do, then leaves
+          action = ({ none: 'talk', asked: 'gem', carrying: 'give', given: 'off' } as const)[state.sparkGift];
+          return true;
+        }
+        if (input.pressed.has('headset')) action = 'off';
+        return action !== null;
+      });
+    } finally {
+      for (const item of items) game.interaction.remove(item);
+    }
+    const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
+    if (did === 'off' || did === null) break;
+    if (did === 'talk') {
+      player.canMove = false;
+      spark.mode = 'still';
+      player.faceToward(spark.person.headWorld(new THREE.Vector3()), 0.6);
+      await d.play(MONDAY.birthday);
+      state.sparkGift = 'asked';
+      refreshSideTasks(game);
+      spark.mode = 'roam';
+      player.canMove = true;
+    } else if (did === 'gem') {
+      // the gem comes from the cluster's light; the cluster stays as it was
+      takeGem(game);
+    } else {
+      await giveGem(game, haven);
+    }
+  }
+  d.objective(null);
+  holdGem(game, false);
 };

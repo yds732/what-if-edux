@@ -5,6 +5,7 @@ import { CLASSROOM, FLOOR_MARK, type ClassroomWorld } from '../../world/classroo
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
 import { MONDAY, TUESDAY } from '../script';
 import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, playRings, stowHeadset, waitHeadsetOff, waitUse } from './shared';
+import { giveGem, holdGem, pickGem, refreshSideTasks } from './spark';
 
 /** Scene 2. The Star Bridge, a message from the real world, and the first decision. */
 export const tuesday = async (game: Game): Promise<void> => {
@@ -12,6 +13,12 @@ export const tuesday = async (game: Game): Promise<void> => {
   app.fx.fade = 1;
   const haven = (await d.enter('haven', HAVEN.spawn)) as HavenWorld;
   haven.setVariant('arrival');
+  haven.showSpark(true, { x: -5.2, z: 0.4, yaw: 2.4 });
+  haven.spark.setLabel(TUESDAY.birthdayLabel);
+  haven.spark.person.lookAtPoint(game.playerEye);
+  // a gem carried over from Monday waits until there is a free hand for it
+  holdGem(game, false);
+  refreshSideTasks(game);
   stowHeadset(game);
   game.hands.setStyle('haven', true);
   game.hands.pose('rest');
@@ -143,7 +150,7 @@ const meetJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
 };
 
 const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[]): Promise<void> => {
-  const { director: d, player, audio, headset } = game;
+  const { director: d, player, audio, headset, state } = game;
   const [you, jamieReply] = TUESDAY.stay.reply;
   await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: jamieReply.text }]);
   bedroom.setMessages(null);
@@ -155,25 +162,47 @@ const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
-  const haven = await enterHaven(game, 'bonus');
+  const haven = await enterHaven(game, 'arrival');
+  // the bridge stands finished from the morning
+  haven.bridge.setSections(3, true);
+  haven.bridge.rings.forEach((ring) => ring.setState('lit', true));
+  const spark = haven.spark;
+  haven.showSpark(true, { x: 0.6, z: 1.6, yaw: Math.PI });
+  spark.setLabel(TUESDAY.birthdayLabel);
+  spark.mode = 'still';
   player.canMove = true;
-  game.reach('tuesday.bonus');
-  for (const name of ['lumi', 'kai', 'nova'] as const) haven.cast[name]!.lookAtPoint(game.playerEye);
+  game.reach('tuesday.spark');
+  spark.person.lookAtPoint(game.playerEye);
+  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);
+  spark.mode = 'roam';
 
-  haven.setBoard({ title: 'Bonus Level', body: TUESDAY.stay.objective, value: 0, total: 1 });
-  d.objective(TUESDAY.stay.objective);
-  await playRings(game, haven, {
-    rings: [haven.bonusRing], orbs: null, label: 'Bonus ring', total: 1,
-    onHit: () => haven.setBoard({ title: 'Bonus Level', body: 'New high score!', value: 1, total: 1 }),
-  });
-  d.objective(null);
-  haven.fireworks(12, 4);
-  audio.sfx('bridgeComplete');
-  await d.wait(1.2);
+  // ---- Spark's present ----
+  if (state.sparkGift === 'none') {
+    await d.play(TUESDAY.stay.ask);
+    state.sparkGift = 'asked';
+  }
+  if (state.sparkGift === 'asked') {
+    refreshSideTasks(game);
+    d.objective(MONDAY.objectiveGem);
+    await pickGem(game, haven);
+    d.objective(null);
+  }
+  if (state.sparkGift === 'carrying') {
+    holdGem(game, true);
+    refreshSideTasks(game);
+    d.objective(MONDAY.sideGive);
+    await waitUse(game, { position: spark.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive });
+    d.objective(null);
+    await giveGem(game, haven);
+  } else {
+    await d.play(TUESDAY.stay.given);
+  }
+  spark.mode = 'still';
+  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 0.6);
+  haven.fireworks(8, 3);
   audio.sfx('cheer');
   await d.play(TUESDAY.stay.cheers);
-  game.hud.setCounter(null);
   await d.wait(0.6);
   await d.result(TUESDAY.stay.result);
   await holdToRead(game, 0.2, 0.4);

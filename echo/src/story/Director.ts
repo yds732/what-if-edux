@@ -5,6 +5,7 @@ import { lerpLook, makeLook } from '../render/PostPipeline';
 import type { ChoiceOption } from '../ui/Hud';
 import { cameraYaw, type Anchor, type World } from '../world/World';
 import { DAYS, SPEAKERS, type Line } from './script';
+import { glowScreenEdges } from '../ui/dom/taskGlow';
 
 const _head = new THREE.Vector3();
 
@@ -120,6 +121,17 @@ export class Director {
   /** Clears the subtitle panel between beats. */
   hush(): void {
     this.game.hud.setSubtitle(null);
+  }
+
+  /** A task done: a chime, the screen's edges light up gold, and the task stays up ticked for a moment. */
+  async complete(text: string): Promise<void> {
+    const { hud, audio, app } = this.game;
+    audio.sfx('taskDone');
+    glowScreenEdges();
+    app.fx.flash = Math.max(app.fx.flash, 0.12);
+    hud.setObjective(text, true);
+    await this.wait(1.5);
+    hud.setObjective(null);
   }
 
   objective(text: string | null): void {

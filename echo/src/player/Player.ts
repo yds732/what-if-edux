@@ -40,6 +40,8 @@ export class Player {
   private readonly breathing = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
   private bob = 0;
   private eye = EYE_STANDING;
+  /** The height of the world's own floor, where the player was put: walkways lift them above it. */
+  private floorY = 0;
   private turn: { yaw: number; pitch: number; left: number; total: number; fromYaw: number; fromPitch: number } | null = null;
   private lastStepAt = 0;
   private seatYaw: number | null = null;
@@ -51,6 +53,7 @@ export class Player {
 
   teleport(a: Anchor, eyeHeight = EYE_STANDING): void {
     this.position.copy(a.position);
+    this.floorY = a.position.y;
     this.yaw = cameraYaw(a);
     this.pitch = 0;
     this.eyeHeight = this.eye = eyeHeight;
@@ -64,6 +67,7 @@ export class Player {
   /** Sits at an anchor: no walking, and the head only turns so far from the seat's facing. */
   sit(a: Anchor, eyeHeight: number): void {
     this.position.copy(a.position);
+    this.floorY = a.position.y;
     this.seated = true;
     this.seatYaw = cameraYaw(a);
     this.eyeHeight = eyeHeight;
@@ -167,6 +171,11 @@ export class Player {
         this.lastStepAt = this.travelled;
         this.onStep.emit(speed / WALK_SPEED);
       }
+    }
+    // up onto a bridge or other walkway, and back down to the floor off it
+    if (!this.seated) {
+      const ground = this.app.world?.colliders.groundAt(this.position.x, this.position.z, PLAYER_RADIUS) ?? null;
+      this.position.y = damp(this.position.y, ground ?? this.floorY, 14, dt);
     }
     const walking = clamp(speed / WALK_SPEED, 0, 1);
     this.bob = xr ? 0 : damp(this.bob, Math.sin(this.bobPhase * 2) * 0.022 * walking, 14, dt);

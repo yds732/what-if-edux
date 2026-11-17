@@ -6,7 +6,7 @@ export type SfxName =
   | 'pickup' | 'putDown' | 'sit' | 'footstep' | 'bell' | 'phoneTap' | 'holoOpen' | 'holoClose' | 'vote' | 'poster'
   | 'headsetOn' | 'headsetOff' | 'wipe'
   | 'orbAppear' | 'orbTake' | 'orbThrow' | 'ringHit' | 'ringRim' | 'orbFizzle' | 'bridgeBuild' | 'bridgeComplete'
-  | 'firework' | 'gateOpen' | 'cheer' | 'fail' | 'reveal';
+  | 'firework' | 'gateOpen' | 'cheer' | 'fail' | 'reveal' | 'taskDone';
 
 /** Which bed of ambience and music is playing. */
 export type Soundscape = 'silence' | 'title' | 'classroom' | 'classroomWarm' | 'bedroom' | 'haven' | 'havenEvening' | 'havenFestival' | 'unease' | 'ending';

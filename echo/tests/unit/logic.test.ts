@@ -171,6 +171,7 @@ describe('the script', () => {
   const allLines: Line[] = [
     ...MONDAY.intro, ...MONDAY.thanks, ...TUESDAY.welcome, ...TUESDAY.invite, ...TUESDAY.retry, ...TUESDAY.success, ...TUESDAY.message,
     ...TUESDAY.meet.reply, ...TUESDAY.meet.scene, ...TUESDAY.meet.thanks, ...TUESDAY.stay.reply, ...TUESDAY.stay.back, ...TUESDAY.stay.cheers,
+    ...MONDAY.sparkHello, ...MONDAY.trustYes, ...MONDAY.trustMaybe, ...MONDAY.birthday, ...MONDAY.thanksGift, ...TUESDAY.stay.ask, ...TUESDAY.stay.given,
     ...WEDNESDAY.intro, ...WEDNESDAY.greeting, ...WEDNESDAY.greetingMet, ...WEDNESDAY.greetingStayed, ...WEDNESDAY.discussion, ...WEDNESDAY.evening,
     ...WEDNESDAY.pause, ...WEDNESDAY.offer, ...THURSDAY.intro, ...THURSDAY.oneMore, ...THURSDAY.message, ...THURSDAY.help.reply, ...THURSDAY.help.call,
     ...THURSDAY.haven.reply, ...THURSDAY.haven.back, ...THURSDAY.haven.cheers, ...FRIDAY.intro, ...FRIDAY.voices, ...FRIDAY.framing, ...FRIDAY.closing,
@@ -204,7 +205,7 @@ describe('the script', () => {
 
 describe('story state', () => {
   it('starts with nothing decided and no score to keep', () => {
-    expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null });
+    expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, sparkGift: 'none' });
   });
   it('knows the five days in order', () => {
     expect(CHAPTERS).toEqual(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);

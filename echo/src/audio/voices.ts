@@ -49,6 +49,8 @@ export const VOICES: Record<SpeakerId, RealVoice | HavenVoice> = {
   riley: { kind: 'real', base: 245, tract: 1.15, tilt: 1.25, breath: 0.07, level: -17, length: 0.092, span: 4, scoop: 0.6 },
   // C5, G3 and A4: each companion's scale is drawn from the five notes Haven's bells play
   lumi: { kind: 'haven', base: 523.25, scale: [-5, -3, 0, 2, 4, 7, 9], level: -15, timbre: 'bell' },
+  // Lumi's notes, a semitone flat and always a little too even
+  spark: { kind: 'haven', base: 493.88, scale: [-5, -3, 0, 2, 4, 7, 9], level: -15, timbre: 'glass' },
   kai: { kind: 'haven', base: 196, scale: [-5, -3, 0, 2, 4, 7], level: -16.5, timbre: 'round' },
   nova: { kind: 'haven', base: 440, scale: [-5, -2, 0, 3, 5, 7], level: -13, timbre: 'glass' },
 };

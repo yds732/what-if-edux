@@ -66,6 +66,8 @@ export class Hud {
   private promptText = '';
   private promptAction: keyof (typeof ACTION_LABELS)['mouse'] = 'interact';
   private objectiveText = '';
+  private objectiveDone = false;
+  private sideTasks: string[] = [];
   /** The pointer has moved onto a choice. */
   readonly onHover = new Signal();
   private reticleWanted = true;
@@ -220,11 +222,19 @@ export class Hud {
     }
   }
 
-  setObjective(text: string | null): void {
+  /** Tasks on the side, listed under the objective while there is one. */
+  setSideTasks(tasks: readonly string[]): void {
+    this.sideTasks = [...tasks];
+    if (this.objective.widget.visible) this.objective.repaint();
+  }
+
+  /** `done` shows the objective ticked off, in the accent colour. */
+  setObjective(text: string | null, done = false): void {
     if (text === null) {
       this.objective.widget.visible = false;
       return;
     }
+    this.objectiveDone = done;
     this.objectiveText = text;
     this.objective.repaint();
     this.objective.widget.visible = true;
@@ -602,23 +612,60 @@ export class Hud {
   private paintObjective(): void {
     const widget = this.objective.widget;
     let lines: string[] = [];
+    const side: string[][] = [];
     widget.panel.paint((ctx) => {
       ctx.font = font(500, 18);
       lines = wrap(ctx, this.objectiveText, 470 - 74);
+      ctx.font = font(500, 16);
+      for (const t of this.sideTasks) side.push(wrap(ctx, t, 470 - 74));
     });
-    widget.panel.resize(470 + PAD * 2, 34 + lines.length * 25 + PAD * 2);
+    const sideH = side.reduce((h, l) => h + 26 + l.length * 22, side.length ? 8 : 0);
+    widget.panel.resize(470 + PAD * 2, 34 + lines.length * 25 + sideH + PAD * 2);
     widget.panel.paint((ctx, w, h) => {
       fade(ctx, 0, PAD, w, h - PAD * 2, this.theme);
       ctx.fillStyle = this.theme.accent;
-      ctx.save();
-      ctx.translate(PAD + 27, PAD + 30);
-      ctx.rotate(Math.PI / 4);
-      ctx.fillRect(-6, -6, 12, 12);
-      ctx.restore();
+      if (this.objectiveDone) {
+        // a tick, drawn thick
+        ctx.strokeStyle = this.theme.accent;
+        ctx.lineWidth = 3.5;
+        ctx.lineCap = ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(PAD + 19, PAD + 30);
+        ctx.lineTo(PAD + 25, PAD + 36);
+        ctx.lineTo(PAD + 36, PAD + 22);
+        ctx.stroke();
+      } else {
+        ctx.save();
+        ctx.translate(PAD + 27, PAD + 30);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-6, -6, 12, 12);
+        ctx.restore();
+      }
       ctx.font = font(500, 18);
-      ctx.fillStyle = this.theme.text;
+      ctx.fillStyle = this.objectiveDone ? this.theme.accent : this.theme.text;
       ctx.textBaseline = 'middle';
       lines.forEach((line, i) => ctx.fillText(line, PAD + 50, PAD + 30 + i * 25));
+      // side tasks: a small heading, then each one beside a hollow diamond
+      let y = PAD + 30 + lines.length * 25 + 8;
+      side.forEach((tl) => {
+        ctx.font = font(600, 11);
+        ctx.fillStyle = this.theme.accent;
+        ctx.globalAlpha = 0.8;
+        ctx.fillText('SIDE TASK', PAD + 50, y + 4);
+        ctx.globalAlpha = 1;
+        y += 22;
+        ctx.save();
+        ctx.translate(PAD + 27, y);
+        ctx.rotate(Math.PI / 4);
+        ctx.strokeStyle = this.theme.accent;
+        ctx.lineWidth = 1.6;
+        ctx.strokeRect(-5, -5, 10, 10);
+        ctx.restore();
+        ctx.font = font(500, 16);
+        ctx.fillStyle = this.theme.text;
+        tl.forEach((line, i) => ctx.fillText(line, PAD + 50, y + i * 22));
+        y += tl.length * 22 + 4;
+      });
     });
   }
 

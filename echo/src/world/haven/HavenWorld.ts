@@ -19,6 +19,7 @@ import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './
 import { buildIsland, type Island } from './islands';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
+import { Spark } from './spark';
 
 /** Where things stand in Haven. The player arrives facing -Z: plaza, bridge, gateway, planet. */
 export const HAVEN = {
@@ -67,6 +68,12 @@ export class HavenWorld extends World {
   readonly theme = 'haven' as const;
   mainIsland!: Island;
   bridge!: StarBridge;
+  /** The other companion, in the red cap: hidden until the story brings it out. */
+  spark!: Spark;
+  /** Blossom, flowers and crystals Spark wanders off to look at. */
+  private readonly curiosities: THREE.Vector3[] = [];
+  /** Crystal clusters on the island where a gem can be picked up: the point to aim at. */
+  readonly gems: THREE.Vector3[] = [];
   gateway!: Gateway;
   /** The far, drifting ring of Tuesday's bonus challenge. */
   bonusRing!: Ring;
@@ -202,6 +209,7 @@ export class HavenWorld extends World {
       flowers.push({ x, y: g.y, z, h: rng.range(0.18, 0.5), color: rng.pick(flowerColors) });
     }
     scene.add(buildGlowFlowers(flowers));
+    for (const f of flowers) if (Math.hypot(f.x, f.z + 0.6) < 8 && this.curiosities.length < 14 && rng.range(0, 1) < 0.25) this.curiosities.push(v3(f.x, f.y + f.h * 0.6, f.z));
     const clusters: [x: number, z: number, scale: number, color: number][] = [
       // cyan clusters and emerald ones (the broad kind, repainted from lavender in recolour.ts)
       [4.9, -7.0, 1.5, 0x59d8ff], [-6.3, -8.2, 1.2, 0x1fd68a], [7.6, -1.6, 0.95, 0x1fd68a], [-8.3, 5.9, 1.3, 0x59d8ff],
@@ -210,6 +218,7 @@ export class HavenWorld extends World {
     const crystals: Record<'crystals-a' | 'crystals-b', Spot[]> = { 'crystals-a': [], 'crystals-b': [] };
     for (const [x, z, scale, color] of clusters) {
       const y = (this.mainIsland.heightAt(x, z) ?? 0) - 0.12;
+      if (Math.hypot(x, z + 0.6) < 9.2) this.gems.push(v3(x, y + 0.45 * scale, z));
       // the cyan clusters are the tall slender kind
       if (color === 0x59d8ff) crystals['crystals-b'].push([x, y, z, rng.range(0, 360), scale * 0.8]);
       else crystals['crystals-a'].push([x, y, z, rng.range(0, 360), scale * 0.95]);
@@ -366,8 +375,19 @@ export class HavenWorld extends World {
       c.root.add(aura);
     }
 
+    // Spark: Lumi's figure under a red cap
+    this.curiosities.push(v3(HAVEN.tree.x, 2.6, HAVEN.tree.z), v3(HAVEN.tree.x + 1.4, 2.2, HAVEN.tree.z + 0.8), v3(4.9, 0.5, -7.0), v3(7.6, 0.4, -1.6), v3(-8.3, 0.5, 5.9));
+    const sparkFigure = this.addPerson('spark', await Character.create(ctx, CAST.spark, 'lumi'));
+    sparkFigure.setPose('standOpen', { immediate: true });
+    const sparkAura = makeHalo(CAST.spark.aura, 2.3, 0.2);
+    sparkAura.position.set(0, 0.95, -0.15);
+    sparkFigure.root.add(sparkAura);
+    this.spark = new Spark(sparkFigure, this.curiosities, (x, z) => this.colliders.groundAt(x, z, 0.3) ?? this.mainIsland.heightAt(x, z) ?? 0, this.colliders);
+
     await this.buildFestival(ctx, rng.fork(), edgeZ);
     this.colliders.bounds = { kind: 'circle', cx: 0, cz: -0.6, r: 9.4 };
+    // the bridge can be walked as far as it has been built, and on to the gateway once it is whole
+    this.colliders.walkways.push(this.bridge.walkway, this.bridge.landing);
     this.setVariant('arrival');
   }
 
@@ -417,11 +437,20 @@ export class HavenWorld extends World {
     who.root.position.y = this.mainIsland.heightAt(at.position.x, at.position.z) ?? 0;
   }
 
+  /** Brings Spark out (standing at `at`, or where it was) or puts it away. Shown, it is still until `spark.active`. */
+  showSpark(on: boolean, at?: { x: number; z: number; yaw: number }): void {
+    this.spark.person.root.visible = on;
+    this.spark.mode = 'still';
+    this.spark.setAlert(false);
+    if (at) this.spark.placeAt(at.x, at.z, at.yaw);
+  }
+
   /** Arranges Haven for a moment of the story. `title` is the finished bridge with only Lumi about. */
   setVariant(variant: HavenVariant): void {
     const { lumi, kai, nova } = this.cast;
     const friends = variant === 'bonus' || variant === 'festival';
     kai!.root.visible = nova!.root.visible = friends;
+    this.showSpark(false);
     lumi!.placeAt(variant === 'evening' ? HAVEN.lumiNear : HAVEN.lumi);
     this.festivalTarget = variant === 'festival' ? 1 : 0;
     this.festival.visible = variant === 'festival';
@@ -502,6 +531,7 @@ export class HavenWorld extends World {
     this.floating.update(time, frame.pixelHeight);
     this.shootingStars.update(dt, frame.camera);
     this.bridge.update(dt, time);
+    if (this.spark.person.root.visible) this.spark.update(dt, _player.set(frame.camera.position.x, 0, frame.camera.position.z), frame.camera.position, frame.camera);
     this.gateway.update(dt, time);
     if (this.bonusRing.group.visible) {
       // the bonus ring drifts from side to side: a moving target
@@ -541,4 +571,5 @@ export class HavenWorld extends World {
 }
 
 const _p = new THREE.Vector3();
+const _player = new THREE.Vector3();
 const _white = new THREE.Color(1, 0.97, 0.9);
