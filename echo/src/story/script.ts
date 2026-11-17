@@ -329,6 +329,15 @@ export const CONTROLS: Hints = {
   xr: [['L STICK', 'Walk'], ['R STICK', 'Turn'], ['TRIGGER', 'Use what you point at'], ['A', 'Next line']],
 };
 
+/** Every key, for the card the K key opens; elsewhere the same rows as the opening controls. */
+export const KEYBINDS: Hints = {
+  ...CONTROLS,
+  mouse: [
+    ['WASD', 'Walk'], ['MOUSE', 'Look around'], ['E', 'Use what you are looking at'], ['SPACE', 'Next line'],
+    ['1 2 3', 'Pick an answer'], ['Q', 'Put the headset on or off'], ['P', 'Pause'], ['K', 'Hide these controls'],
+  ],
+};
+
 export const ORB_CONTROLS: Hints = {
   mouse: [['HOLD', 'Hold the mouse button to draw back'], ['AIM', 'Aim above the ring, then let go']],
   touch: [['HOLD', 'Hold a finger on the right to draw back'], ['DRAG', 'Aim above the ring, then let go']],

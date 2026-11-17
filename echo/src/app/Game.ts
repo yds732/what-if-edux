@@ -195,6 +195,7 @@ export class Game {
     this.clearStage();
     this.state = state;
     this.playing = true;
+    this.hud.setControlsTip(true);
     try {
       for (const id of CHAPTERS.slice(CHAPTERS.indexOf(from))) {
         this.chapter = id;

@@ -77,10 +77,13 @@ const echo = (button: HTMLElement): void => {
     const px = el('div', 'echo-corner');
     Object.assign(px.style, { left: `${box.left + cx * box.width}px`, top: `${box.top + cy * box.height}px` });
     layer.append(px);
-    const dx = (cx ? 1 : -1) * (ECHO.reach + 4), dy = (cy ? 1 : -1) * (ECHO.reach + 4);
+    // it starts where the resting pixel sits, touching the corner from outside, and rides out with the ring
+    const size = px.offsetWidth;
+    const x0 = cx ? 0 : -size, y0 = cy ? 0 : -size;
+    const dx = (cx ? 1 : -1) * ECHO.reach, dy = (cy ? 1 : -1) * ECHO.reach;
     done.push(px.animate([
-      { transform: `translate(${cx ? 2 : -6}px, ${cy ? 2 : -6}px)`, opacity: 1 },
-      { transform: `translate(${(cx ? 2 : -6) + dx}px, ${(cy ? 2 : -6) + dy}px)`, opacity: 0 },
+      { transform: `translate(${x0}px, ${y0}px)`, opacity: 1 },
+      { transform: `translate(${x0 + dx}px, ${y0 + dy}px)`, opacity: 0 },
     ], { duration: ECHO.ms, easing: ECHO.ease, fill: 'both' }).finished);
   }
   // and the button itself gives one small pulse
@@ -372,8 +375,8 @@ class Menus {
     game.app.paused = true;
     game.audio.setPaused(true);
     game.input.freePointer();
-    const menu = el('div', 'menu menu--veil');
-    const card = el('div', 'card');
+    const menu = el('div', 'menu menu--veil menu--light');
+    const card = el('div', 'card card--pause');
     card.append(el('h2', '', 'Paused'), el('p', 'lede', game.chapter ? `${game.chapter[0]!.toUpperCase()}${game.chapter.slice(1)}` : ''));
     const buttons = el('div', 'buttons');
     buttons.style.width = '100%';

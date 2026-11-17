@@ -56,6 +56,6 @@ export const runShot = async (canvas: HTMLCanvasElement, params: URLSearchParams
   app.renderAt(t); // second draw: shadow maps and any one-frame-late targets have settled
   window.__INFO = { ...app.info, buildMs: Math.round(performance.now() - t0), world: name };
   if (params.has('live')) app.start();
-  window.__READY = true;
+  (window as any).__world = world; window.__READY = true;
   return app;
 };

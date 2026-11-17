@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { clamp } from '../core/math';
 import { Signal } from '../core/tasks';
 
-export type Action = 'primary' | 'interact' | 'advance' | 'pause' | 'choice1' | 'choice2' | 'choice3' | 'headset';
+export type Action = 'primary' | 'interact' | 'advance' | 'pause' | 'choice1' | 'choice2' | 'choice3' | 'headset' | 'controls';
 export type InputMode = 'mouse' | 'touch' | 'xr';
 
 const KEY_ACTIONS: Record<string, Action> = {
   KeyE: 'interact', KeyF: 'interact', Space: 'advance', Enter: 'advance', Digit1: 'choice1', Digit2: 'choice2', Digit3: 'choice3',
-  Numpad1: 'choice1', Numpad2: 'choice2', Numpad3: 'choice3', KeyQ: 'headset', KeyP: 'pause',
+  Numpad1: 'choice1', Numpad2: 'choice2', Numpad3: 'choice3', KeyQ: 'headset', KeyP: 'pause', KeyK: 'controls',
 };
 /** What a prompt tells the player to press for an action, in each way of playing. Kept beside the bindings it describes. */
 export const ACTION_LABELS: Record<InputMode, Record<'interact' | 'headset', string>> = {

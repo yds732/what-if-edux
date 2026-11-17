@@ -29,10 +29,11 @@ export interface FaceState {
 }
 
 export const neutralFace = (): FaceState => ({
-  eyeL: 1, eyeR: 1, eyeSmile: 0, gazeX: 0, gazeY: 0, mouthOpen: 0, mouthSmile: 0.35, mouthWidth: 1, browRaise: 0, browTilt: 0, blush: 0.25,
+  eyeL: 1, eyeR: 1, eyeSmile: 0, gazeX: 0, gazeY: 0, mouthOpen: 0, mouthSmile: 0.25, mouthWidth: 1, browRaise: 0, browTilt: 0, blush: 0,
 });
 
 export interface FaceLook {
+  /** Iris colour. */
   eyeColor?: THREE.ColorRepresentation;
   browColor?: THREE.ColorRepresentation;
   /** Companions carry a glint of their own light in the eye. */
@@ -41,6 +42,11 @@ export interface FaceLook {
   eyeScale?: number;
 }
 
+/*
+ * The style is a calm, natural one: almond eyes with white, a coloured iris and a single modest catch-light under a
+ * soft lash line; straight, fairly thick brows a little above them; a small closed mouth that only just turns up.
+ * Every character shares it; they differ by colouring and by how their resting mouth sits.
+ */
 const FACE_PARS = /* glsl */ `
 varying vec3 vHeadPos;
 uniform float uEyeScale, uBlush;
@@ -51,19 +57,36 @@ uniform vec2 uBrow;    // raise, tilt
 uniform vec3 uEyeColor, uBrowColor, uGlintColor;
 float faceGloss = 0.0; vec3 faceGlint = vec3(0.0);
 
-float fEye(vec2 f, vec2 c, vec2 r, float open, float smile, out float glint){
+// returns the eye's coverage; col is its colour there
+float fEye(vec2 f, vec2 c, vec2 r, float open, float smile, vec2 gaze, out vec3 col, out float glint){
   vec2 d = f - c;
-  d.y -= smile * 0.62 * r.x * (1.0 - (d.x * d.x) / (r.x * r.x));
-  float ry = max(r.y * open, 0.021);
+  d.y -= smile * 0.5 * r.x * (1.0 - (d.x * d.x) / (r.x * r.x));
+  // almond: the upper lid is a fuller curve than the lower
+  float ry = max(r.y * open * (d.y > 0.0 ? 1.0 : 0.78), 0.010);
   float e = (length(vec2(d.x / r.x, d.y / ry)) - 1.0) * min(r.x, ry);
   float aa = fwidth(e) * 0.75 + 1e-5;
   float m = 1.0 - smoothstep(-aa, aa, e);
+  // the iris keeps its size as the lids close over it
+  float ri = 0.86 * r.y;
+  vec2 q = f - c - gaze * vec2(0.34 * r.x, 0.2 * r.y) - vec2(0.0, 0.1 * r.y);
+  float di = length(q);
+  float aaI = fwidth(di) * 0.75 + 1e-5;
+  float iris = 1.0 - smoothstep(ri - aaI, ri + aaI, di);
+  float pupil = 1.0 - smoothstep(0.42 * ri - aaI, 0.42 * ri + aaI, di);
+  vec3 irisCol = uEyeColor * (1.0 + 0.35 * smoothstep(0.2 * ri, -0.8 * ri, q.y)) * (1.0 - 0.45 * smoothstep(0.62 * ri, ri, di));
+  vec3 sclera = vec3(0.93, 0.91, 0.88) * (1.0 - 0.2 * smoothstep(-0.1, 0.9, d.y / max(r.y * open, 0.01)));
+  col = mix(sclera, irisCol, iris);
+  col = mix(col, vec3(0.025, 0.02, 0.025), pupil);
+  // lash line: dark along the upper lid, a faint edge along the lower
+  float lashW = mix(0.005, 0.02, smoothstep(-0.35, 0.25, d.y / max(ry, 0.01)));
+  float lash = smoothstep(-lashW - aa, -lashW + aa, e);
+  col = mix(col, mix(vec3(0.05, 0.04, 0.04), uBrowColor * 0.6, 0.3), lash);
   float vis = smoothstep(0.35, 0.8, open) * (1.0 - smoothstep(0.3, 0.7, abs(smile)));
-  vec2 g1 = d - vec2(-0.30, 0.32) * r, g2 = d - vec2(0.26, -0.34) * r;
-  glint = (1.0 - smoothstep(0.22 * r.x, 0.30 * r.x, length(g1)) + 0.7 * (1.0 - smoothstep(0.09 * r.x, 0.15 * r.x, length(g2)))) * vis * m;
+  vec2 g1 = q - vec2(-0.32, 0.34) * ri, g2 = q - vec2(0.3, -0.36) * ri;
+  glint = ((1.0 - smoothstep(0.13 * ri, 0.2 * ri, length(g1))) + 0.35 * (1.0 - smoothstep(0.05 * ri, 0.1 * ri, length(g2)))) * vis * m * (1.0 - lash);
   return m;
 }
-float fSeg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0)); }
+float fSeg(vec2 p, vec2 a, vec2 b, out float h){ vec2 pa = p - a, ba = b - a; h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
 `;
 
 const FACE_COLOR = /* glsl */ `
@@ -73,49 +96,54 @@ const FACE_COLOR = /* glsl */ `
   float front = smoothstep(0.05, 0.3, vHeadPos.z) * (1.0 - smoothstep(1.25, 1.45, length(vHeadPos)));
   if (front > 0.0) {
     vec3 skin = diffuseColor.rgb;
-    // cheeks
-    vec2 bl = vec2(abs(f.x) - 0.50, f.y + 0.34);
-    diffuseColor.rgb = mix(diffuseColor.rgb, mix(skin, vec3(1.0, 0.36, 0.38), 0.55), uBlush * front * exp(-dot(bl, bl) / 0.026));
-    // mouth
-    float w = 0.115 * uMouth.z;
-    vec2 d = f - vec2(0.0, -0.49);
+    // cheeks: only ever a faint warmth
+    vec2 bl = vec2(abs(f.x) - 0.48, f.y + 0.30);
+    diffuseColor.rgb = mix(diffuseColor.rgb, skin * vec3(1.08, 0.86, 0.84), uBlush * front * exp(-dot(bl, bl) / 0.03));
+    // mouth: small and closed at rest
+    float w = 0.092 * uMouth.z;
+    vec2 d = f - vec2(0.0, -0.48);
     float x = clamp(d.x / w, -1.0, 1.0);
     // an open mouth has a flatter upper lip and a deep lower one: a smile that opens, not a tongue that hangs
     float opening = smoothstep(0.0, 0.45, uMouth.x);
-    float sag = uMouth.y * 0.55 * w * (1.0 - x * x) * (1.0 - 0.7 * opening);
-    float top = -sag + uMouth.y * 0.2 * w;
-    float depth = uMouth.x * w * (1.25 + 0.55 * max(uMouth.y, 0.0));
+    float sag = uMouth.y * w * (0.45 * (1.0 - x * x) - 0.12 * pow(abs(x), 4.0)) * (1.0 - 0.7 * opening);
+    float top = -sag + uMouth.y * 0.16 * w;
+    float depth = uMouth.x * w * (1.15 + 0.4 * max(uMouth.y, 0.0));
     float lower = top - depth * pow(1.0 - x * x, 0.7);
     float beyond = abs(d.x) - w;
     float dLine = beyond > 0.0 ? length(vec2(beyond, d.y - top)) : abs(d.y - top);
     float aaM = fwidth(d.y) * 0.9 + 1e-5;
     float inside = smoothstep(lower - aaM, lower + aaM, d.y) * (1.0 - smoothstep(top - aaM, top + aaM, d.y)) * (1.0 - smoothstep(w - aaM, w + aaM, abs(d.x))) * step(0.02, uMouth.x);
     float down = clamp((top - d.y) / max(depth, 1e-4), 0.0, 1.0);
-    vec3 mouthIn = mix(vec3(0.30, 0.07, 0.09), vec3(0.86, 0.38, 0.40), smoothstep(0.5, 0.85, down));
+    // a soft shade under the lower lip
+    vec2 lp = vec2(d.x / (0.62 * w), (d.y - (top - depth - 0.034)) / 0.016);
+    diffuseColor.rgb = mix(diffuseColor.rgb, skin * vec3(0.86, 0.78, 0.76), 0.35 * front * exp(-dot(lp, lp)));
+    vec3 mouthIn = mix(vec3(0.30, 0.09, 0.10), vec3(0.78, 0.40, 0.40), smoothstep(0.5, 0.85, down));
     diffuseColor.rgb = mix(diffuseColor.rgb, mouthIn, inside * front);
-    float line = 1.0 - smoothstep(0.014 - aaM, 0.014 + aaM, dLine);
-    diffuseColor.rgb = mix(diffuseColor.rgb, skin * vec3(0.42, 0.24, 0.24), line * front * 0.92);
-    // brows
+    float line = 1.0 - smoothstep(0.0095 - aaM, 0.0095 + aaM, dLine);
+    diffuseColor.rgb = mix(diffuseColor.rgb, skin * vec3(0.52, 0.32, 0.31), line * front * mix(0.85, 0.45, smoothstep(0.55, 1.0, abs(d.x) / w)));
+    // brows: straight and fairly full, tapering toward the temple
     for (int i = 0; i < 2; i++) {
       float s = i == 0 ? -1.0 : 1.0;
-      vec2 c = vec2(0.36 * s, 0.25 + 0.07 * uBrow.x);
-      vec2 dir = vec2(0.095, 0.0);
-      float tilt = uBrow.y * 0.045;
-      vec2 a = c - dir * s + vec2(0.0, tilt), b = c + dir * s - vec2(0.0, tilt);
-      float db = fSeg(f, a, b);
+      vec2 c = vec2(0.365 * s, 0.155 + 0.06 * uBrow.x);
+      float tilt = uBrow.y * 0.04;
+      vec2 a = c - vec2(0.115 * s, -tilt), b = c + vec2(0.115 * s, -tilt - 0.005);
+      float h;
+      fSeg(f, a, b, h);
+      float db = length(f - mix(a, b, h) - vec2(0.0, 0.007 * 4.0 * h * (1.0 - h)));
+      float rad = mix(0.03, 0.016, smoothstep(0.25, 1.0, h));
       float aaB = fwidth(db) + 1e-5;
-      diffuseColor.rgb = mix(diffuseColor.rgb, uBrowColor, (1.0 - smoothstep(0.02 - aaB, 0.02 + aaB, db)) * front * 0.9);
+      diffuseColor.rgb = mix(diffuseColor.rgb, uBrowColor, (1.0 - smoothstep(rad - aaB, rad + aaB, db)) * front * 0.94);
     }
     // eyes
-    vec2 r = vec2(0.118, 0.172) * uEyeScale;
-    vec2 gz = uGaze * vec2(0.03, 0.025);
+    vec2 r = vec2(0.126, 0.1) * uEyeScale;
     float gl, gr;
-    float el = fEye(f, vec2(0.36, -0.07) + gz, r, uEyes.y, uEyes.z, gl);   // +x is the character's left
-    float er = fEye(f, vec2(-0.36, -0.07) + gz, r, uEyes.x, uEyes.z, gr);
-    float eyes = max(el, er) * front;
-    diffuseColor.rgb = mix(diffuseColor.rgb, uEyeColor, eyes);
-    faceGloss = eyes;
-    faceGlint = uGlintColor * (gl + gr) * front;
+    vec3 cl, cr;
+    float el = fEye(f, vec2(0.36, -0.06), r, uEyes.y, uEyes.z, uGaze, cl, gl);   // +x is the character's left
+    float er = fEye(f, vec2(-0.36, -0.06), r, uEyes.x, uEyes.z, uGaze, cr, gr);
+    diffuseColor.rgb = mix(diffuseColor.rgb, cl, el * front);
+    diffuseColor.rgb = mix(diffuseColor.rgb, cr, er * front);
+    faceGloss = max(el, er) * front;
+    faceGlint = uGlintColor * 0.7 * (gl + gr) * front;
   }
 }
 `;
@@ -127,10 +155,10 @@ const FACE_COLOR = /* glsl */ `
  */
 export class FaceLayer {
   private readonly u = {
-    uFaceMatrix: { value: new THREE.Matrix4() }, uEyeScale: { value: 1 }, uBlush: { value: 0.25 },
+    uFaceMatrix: { value: new THREE.Matrix4() }, uEyeScale: { value: 1 }, uBlush: { value: 0 },
     uEyes: { value: new THREE.Vector4(1, 1, 0, 0) }, uGaze: { value: new THREE.Vector2() },
-    uMouth: { value: new THREE.Vector4(0, 0.35, 1, 0) }, uBrow: { value: new THREE.Vector2() },
-    uEyeColor: { value: new THREE.Color(0x15121a) }, uBrowColor: { value: new THREE.Color(0x3a2a22) }, uGlintColor: { value: new THREE.Color(0xffffff) },
+    uMouth: { value: new THREE.Vector4(0, 0.25, 1, 0) }, uBrow: { value: new THREE.Vector2() },
+    uEyeColor: { value: new THREE.Color(0x4a2e1f) }, uBrowColor: { value: new THREE.Color(0x2a201c) }, uGlintColor: { value: new THREE.Color(0xffffff) },
   };
 
   constructor(look: Partial<FaceLook>, toFace: THREE.Matrix4) {

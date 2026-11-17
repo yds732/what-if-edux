@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { clamp } from '../core/math';
 import { Cancelled, Signal } from '../core/tasks';
 import { ACTION_LABELS, type Input, type InputMode } from '../input/Input';
-import type { Hints } from '../story/script';
-import { THEMES, displayFont, font, glass, keyCap, roundRect, spaced, sparkle, wrap, type Theme, type ThemeName } from './draw';
+import { KEYBINDS, type Hints } from '../story/script';
+import { THEMES, displayFont, fade, font, glass, keyCap, roundRect, spaced, sparkle, wrap, type Theme, type ThemeName } from './draw';
 import { Widget } from './Panel';
 
 export interface SubtitleLine {
@@ -57,6 +57,7 @@ export class Hud {
   private readonly reflection = this.add(new Widget(1000, 260), () => this.paintReflection());
   private readonly counter = this.add(new Widget(330, 62 + PAD * 2), () => this.paintCounter());
   private readonly hint = this.add(new Widget(440, 150 + PAD * 2), () => this.paintHint());
+  private readonly keysTip = this.add(new Widget(300, 34 + PAD * 2), () => this.paintKeysTip());
   private readonly choiceTitle = this.add(new Widget(900, 90), () => this.paintChoiceTitle());
   private readonly options: Painted[] = [];
 
@@ -75,6 +76,11 @@ export class Hud {
   private reflectionLines: string[] = [];
   private counterData = { label: '', value: 0, total: 3, pulse: 0 };
   private hints: Hints | null = null;
+  /** What the story last asked the hint card to show, kept while the player has the full controls open. */
+  private storyHints: Hints | null = null;
+  private controlsOpen = false;
+  /** The story is running: the K tip at the top of the screen may show. */
+  private inPlay = false;
   private choice: { title: string; options: ChoiceOption[]; hover: number; pick: ((i: number) => void) | null } | null = null;
   private lastSubPaint = -1;
   // ---- headset: the same panels, hung in the world in front of the player ----
@@ -99,6 +105,7 @@ export class Hud {
       this.hint.repaint();
     });
     this.mode = input.mode;
+    this.keysTip.widget.slide = -8;
   }
 
   private add(widget: Widget, paint: () => void): Painted {
@@ -315,6 +322,7 @@ export class Hud {
 
   /** Takes everything off the screen: nothing of one scene may hang over the start of another. */
   clear(): void {
+    this.setControlsTip(false);
     this.setPrompt(null);
     this.setObjective(null);
     this.setSubtitle(null);
@@ -328,6 +336,8 @@ export class Hud {
 
   /** A card of control hints; it shows the rows for whatever the player is holding. */
   setHint(hints: Hints | null): void {
+    this.storyHints = hints;
+    if (this.controlsOpen) return;
     if (hints === null) {
       this.hint.widget.visible = false;
       return;
@@ -335,6 +345,24 @@ export class Hud {
     this.hints = hints;
     this.hint.repaint();
     this.hint.widget.visible = true;
+  }
+
+  /** The plain line at the top centre that says K shows the controls; on while the story runs. */
+  setControlsTip(on: boolean): void {
+    this.inPlay = on;
+    if (!on && this.controlsOpen) this.toggleControls();
+  }
+
+  /** Opens or closes the card of every key; closing it gives the card back to whatever the story had there. */
+  toggleControls(): void {
+    this.controlsOpen = !this.controlsOpen;
+    const story = this.storyHints;
+    if (this.controlsOpen) {
+      this.hints = KEYBINDS;
+      this.hint.repaint();
+      this.hint.widget.visible = true;
+    } else this.setHint(story);
+    this.keysTip.repaint();
   }
 
   /** Shows a decision and resolves with the index chosen (pointer, tap, or the 1/2/3 keys). */
@@ -395,7 +423,7 @@ export class Hud {
     this.reticle.widget.x = this.reticle.widget.y = 0;
     this.prompt.widget.x = 0;
     this.prompt.widget.y = -92;
-    this.objective.widget.x = -vw / 2 + this.objective.widget.panel.width / 2 + edge - PAD;
+    this.objective.widget.x = -vw / 2 + this.objective.widget.panel.width / 2;
     this.objective.widget.y = vh / 2 - this.objective.widget.panel.height / 2 - edge + PAD;
     this.subtitle.widget.x = 0;
     this.subtitle.widget.y = -vh / 2 + this.subtitle.widget.panel.height / 2 + Math.max(18, vh * 0.045) - PAD;
@@ -413,8 +441,15 @@ export class Hud {
     const stacked = this.objective.widget.visible && objective.width + counter.panel.width + corner + (edge - PAD) * 2 > vw;
     counter.x = stacked ? -vw / 2 + counter.panel.width / 2 + edge - PAD : vw / 2 - counter.panel.width / 2 - edge + PAD - corner;
     counter.y = vh / 2 - counter.panel.height / 2 - edge + PAD - (stacked ? objective.height - PAD * 2 + 8 : 0);
-    this.hint.widget.x = -vw / 2 + this.hint.widget.panel.width / 2 + edge - PAD;
+    this.hint.widget.x = -vw / 2 + this.hint.widget.panel.width / 2;
     this.hint.widget.y = 30;
+    // the K tip: keyboard only, on a flat screen, while the story runs
+    const keys = this.inPlay && this.mode === 'mouse' && !this.follow;
+    if (keys && this.input.pressed.has('controls')) this.toggleControls();
+    if (!keys && this.controlsOpen) this.toggleControls();
+    this.keysTip.widget.visible = keys;
+    this.keysTip.widget.x = 0;
+    this.keysTip.widget.y = vh / 2 - this.keysTip.widget.panel.height / 2 - 14 + PAD;
 
     if (this.counterData.pulse > 0) {
       this.counterData.pulse = Math.max(0, this.counterData.pulse - dt * 1.8);
@@ -573,7 +608,7 @@ export class Hud {
     });
     widget.panel.resize(470 + PAD * 2, 34 + lines.length * 25 + PAD * 2);
     widget.panel.paint((ctx, w, h) => {
-      glass(ctx, PAD, PAD, w - PAD * 2, h - PAD * 2, this.theme, { radius: 16, glow: 0.6 });
+      fade(ctx, 0, PAD, w, h - PAD * 2, this.theme);
       ctx.fillStyle = this.theme.accent;
       ctx.save();
       ctx.translate(PAD + 27, PAD + 30);
@@ -797,7 +832,7 @@ export class Hud {
     const rows = this.hints?.[this.mode] ?? [];
     widget.panel.resize(400 + PAD * 2, 26 + rows.length * 36 + PAD * 2);
     widget.panel.paint((ctx, w, h) => {
-      glass(ctx, PAD, PAD, w - PAD * 2, h - PAD * 2, this.theme, { radius: 18, glow: 0.5 });
+      fade(ctx, 0, PAD, w, h - PAD * 2, this.theme);
       rows.forEach(([key, text], i) => {
         const y = PAD + 16 + i * 36;
         const capW = keyCap(ctx, key, PAD + 18, y, 26, this.theme);
@@ -806,6 +841,26 @@ export class Hud {
         ctx.textBaseline = 'middle';
         ctx.fillText(text, PAD + 18 + capW + 12, y + 14);
       });
+    });
+  }
+
+  /** "K  Controls" in plain text, no panel behind it: a soft shadow keeps it readable over a bright room. */
+  private paintKeysTip(): void {
+    const label = this.controlsOpen ? 'Hide controls' : 'Controls';
+    this.keysTip.widget.panel.paint((ctx, w, h) => {
+      ctx.font = font(500, 15);
+      const textW = ctx.measureText(label).width, capH = 24;
+      ctx.font = font(600, Math.round(capH * 0.52));
+      const capW = Math.max(capH, ctx.measureText('K').width + capH * 0.6);
+      const x = (w - (capW + 10 + textW)) / 2, y = h / 2 - capH / 2;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 8;
+      keyCap(ctx, 'K', x, y, capH, this.theme);
+      ctx.font = font(500, 15);
+      ctx.fillStyle = this.theme.text;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, x + capW + 10, h / 2 + 1);
     });
   }
 

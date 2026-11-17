@@ -16,7 +16,18 @@ export interface Pose {
   readonly seated?: boolean;
 }
 
-export type PoseName = 'stand' | 'standOpen' | 'sit' | 'sitDesk' | 'sitLean';
+export type PoseName = 'stand' | 'standOpen' | 'sit' | 'sitDesk' | 'sitDeskL' | 'sitDeskR' | 'sitLean';
+
+/**
+ * Seated at a classroom table (top 0.585 m, its edge 0.15 m in front of the hips): angles solved against the cast's
+ * measured arms so the wrists rest on the top and the elbows stay behind its edge, clear of the wood.
+ */
+const SEATED_LEGS = { legL: [-80, 0, 4], legR: [-80, 0, -4], shinL: [82, 0, 0], shinR: [82, 0, 0] } as const;
+const ON_DESK_L: Angles = [-56, 0, 9], FORE_ON_DESK_L: Angles = [-48, 0, -18];
+const ON_DESK_R: Angles = [-56, 0, -9], FORE_ON_DESK_R: Angles = [-48, 0, 18];
+/** An arm left hanging at the side, the hand by the seat. */
+const AT_SIDE_L: Angles = [-6, 0, 11], FORE_AT_SIDE_L: Angles = [-16, 0, 0];
+const AT_SIDE_R: Angles = [-6, 0, -11], FORE_AT_SIDE_R: Angles = [-16, 0, 0];
 
 export const POSES: Record<PoseName, Pose> = {
   stand: {
@@ -35,20 +46,27 @@ export const POSES: Record<PoseName, Pose> = {
       armL: [-16, 0, 7], armR: [-16, 0, -7], foreL: [-58, 0, -12], foreR: [-58, 0, 12], spine: [2, 0, 0],
     },
   },
-  /** Forearms resting on a desk. */
+  /** Both forearms resting on the table. */
   sitDesk: {
     hipsY: 0, hipsZ: 0, seated: true,
-    bones: {
-      legL: [-80, 0, 4], legR: [-80, 0, -4], shinL: [82, 0, 0], shinR: [82, 0, 0],
-      armL: [-34, 0, 9], armR: [-34, 0, -9], foreL: [-66, 0, -18], foreR: [-66, 0, 18], spine: [5, 0, 0], chest: [3, 0, 0], head: [-4, 0, 0],
-    },
+    bones: { ...SEATED_LEGS, armL: ON_DESK_L, foreL: FORE_ON_DESK_L, armR: ON_DESK_R, foreR: FORE_ON_DESK_R, spine: [8, 0, 0], chest: [4, 0, 0], head: [-6, 0, 0] },
   },
-  /** Leaning in, elbows on the desk: interested. */
+  /** The left forearm on the table, the right arm down at the side. */
+  sitDeskL: {
+    hipsY: 0, hipsZ: 0, seated: true,
+    bones: { ...SEATED_LEGS, armL: ON_DESK_L, foreL: FORE_ON_DESK_L, armR: AT_SIDE_R, foreR: FORE_AT_SIDE_R, spine: [8, 0, -2], chest: [4, 0, -2], head: [-6, 0, 2] },
+  },
+  /** The right forearm on the table, the left arm down at the side. */
+  sitDeskR: {
+    hipsY: 0, hipsZ: 0, seated: true,
+    bones: { ...SEATED_LEGS, armL: AT_SIDE_L, foreL: FORE_AT_SIDE_L, armR: ON_DESK_R, foreR: FORE_ON_DESK_R, spine: [8, 0, 2], chest: [4, 0, 2], head: [-6, 0, -2] },
+  },
+  /** Leaning in over the table, forearms on it and hands drawn together: interested. */
   sitLean: {
     hipsY: 0, hipsZ: 0, seated: true,
     bones: {
       legL: [-80, 0, 5], legR: [-80, 0, -5], shinL: [86, 0, 0], shinR: [86, 0, 0],
-      armL: [-44, 0, 12], armR: [-44, 0, -12], foreL: [-74, 0, -26], foreR: [-74, 0, 26], spine: [10, 0, 0], chest: [6, 0, 0], head: [-10, 0, 0],
+      armL: [-46, 0, 12], armR: [-46, 0, -12], foreL: [-64, 0, -30], foreR: [-64, 0, 30], spine: [12, 0, 0], chest: [4, 0, 0], head: [-12, 0, 0],
     },
   },
 };

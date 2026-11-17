@@ -6,7 +6,7 @@ import type { Input } from '../input/Input';
 import { cameraYaw, type Anchor } from '../world/World';
 
 /** A twelve-year-old's eye level. */
-export const EYE_STANDING = 1.36;
+export const EYE_STANDING = 1.28;
 export const PLAYER_RADIUS = 0.28;
 const WALK_SPEED = 2.5;
 const PITCH_LIMIT = 1.35;

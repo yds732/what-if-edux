@@ -56,7 +56,7 @@ void main() {
   float n = 0.82 + 0.18 * sin(vWorld.y * 3.1 + vWorld.z * 2.3 + uTime * 0.35) * sin(vWorld.x * 1.7 - uTime * 0.21);
   // below the floor there is nothing to light
   float above = smoothstep(-0.02, 0.12, vWorld.y);
-  gl_FragColor = vec4(uColor * edge * fade * n * above * uStrength * 0.22, 1.0);${finish}
+  gl_FragColor = vec4(uColor * edge * fade * n * above * uStrength * 0.09, 1.0);${finish}
 }`;
 
 const DUST_VS = /* glsl */ `

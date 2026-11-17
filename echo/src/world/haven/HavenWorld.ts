@@ -248,7 +248,7 @@ export class HavenWorld extends World {
     // the lanterns, reeds and shooting stars draw on their own seed, so everything else in Haven stays where it was
     const extra = new Rng(4081);
 
-    // ---- floating lanterns: lining the path from the arrival to the bridge, and scattered over the island ----
+    // ---- floating lanterns: lining the path from the arrival to the bridge, and in a loose ring out past the island's edge ----
     const spots: LanternSpot[] = [];
     // the challenge board is read from where the player arrives and from where they throw: a lantern that would
     // hang between either place and the board floats higher, over the line of sight
@@ -267,14 +267,15 @@ export class HavenWorld extends World {
     };
     for (const z of [3.6, 1.4, -0.8]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
     for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 2.4) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
-    for (let i = 0, made = 0; i < 200 && made < 12; i++) {
-      const a = extra.range(0, TAU), r = extra.range(5, 11.5);
-      const x = Math.cos(a) * r, z = Math.sin(a) * r - 1;
-      // away from the path, the plaza, the tree and each other
-      if (Math.abs(x) < 3 || Math.hypot(x - HAVEN.plaza.x, z - HAVEN.plaza.z) < 4.8 || Math.hypot(x - HAVEN.tree.x, z - HAVEN.tree.z) < 3.4) continue;
-      if (!ground(x, z) || spots.some((s) => Math.hypot(s.x - x, s.z - z) < 2.6)) continue;
-      spot(x, z);
-      made++;
+    // the ring hangs over the open sky around the island, at mixed heights, so the space reads wider than the turf; it
+    // leaves a gap where the bridge sets out, to keep that view clear
+    const RING = 18;
+    for (let i = 0; i < RING; i++) {
+      const a = ((i + extra.range(-0.3, 0.3)) / RING) * TAU;
+      if (Math.abs(Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Math.PI))) < 0.42) continue;
+      const edge = this.mainIsland.outline(a), r = edge * extra.range(1.1, 1.45);
+      const rim = this.mainIsland.heightAt(Math.sin(a) * edge * 0.9, Math.cos(a) * edge * 0.9) ?? 0;
+      spots.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, ground: rim, lift: extra.range(-0.6, 1.8) });
     }
     this.floating = buildLanterns(extra.fork(), spots, { motesEach: Math.round(10 * q.density) + 4, lights: q.tier === 'low' ? 0 : q.tier === 'medium' ? 4 : 6 });
     scene.add(this.floating.group);

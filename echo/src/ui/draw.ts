@@ -87,6 +87,21 @@ export const glass = (ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
   ctx.stroke();
 };
 
+const withAlpha = (rgba: string, a: number): string => rgba.replace(/[\d.]+\)$/, `${a})`);
+
+/**
+ * A soft shade behind text on the left of the screen: dark at the screen edge, thinning to nothing on the right,
+ * with no border or glow, so it reads as shadow rather than as a box.
+ */
+export const fade = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, theme: Theme): void => {
+  const g = ctx.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, theme.glassBottom);
+  g.addColorStop(0.45, withAlpha(theme.glassTop, 0.55));
+  g.addColorStop(1, withAlpha(theme.glassTop, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
+};
+
 /** Greedy word wrap. `measure` returns the width of a string in the units of `maxWidth`. */
 export const wrapText = (measure: (s: string) => number, text: string, maxWidth: number): string[] => {
   const lines: string[] = [];

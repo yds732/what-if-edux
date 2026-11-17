@@ -27,14 +27,16 @@ export type Mood = 'neutral' | 'happy' | 'delighted' | 'thinking' | 'worried' | 
 
 const MOODS: Record<Mood, Partial<FaceState>> = {
   neutral: {},
-  happy: { mouthSmile: 0.8, eyeSmile: 0.25, browRaise: 0.15, blush: 0.4 },
-  delighted: { mouthSmile: 1, mouthOpen: 0.55, eyeSmile: 1, eyeL: 0.12, eyeR: 0.12, browRaise: 0.5, blush: 0.6 },
-  thinking: { mouthSmile: 0.2, mouthWidth: 0.72, browRaise: 0.5, browTilt: 0.04, gazeX: 0.6, gazeY: 0.5 },
-  worried: { mouthSmile: -0.45, mouthWidth: 0.8, browRaise: 0.35, browTilt: 0.9, eyeL: 0.9, eyeR: 0.9 },
-  sad: { mouthSmile: -0.7, browTilt: 0.8, browRaise: -0.1, eyeL: 0.72, eyeR: 0.72, gazeY: -0.5, blush: 0.1 },
-  surprised: { mouthOpen: 0.5, mouthWidth: 0.62, mouthSmile: 0, eyeL: 1.2, eyeR: 1.2, browRaise: 0.9 },
-  firm: { mouthSmile: -0.15, mouthWidth: 0.85, browTilt: -0.35, browRaise: -0.2 },
-  blank: { mouthSmile: 0.55, eyeSmile: 0, browRaise: 0, browTilt: 0, blush: 0.25 },
+  // kept understated: a happy face is a gentle closed smile, not a grin
+  happy: { mouthSmile: 0.55, mouthWidth: 1.06, eyeSmile: 0.1, eyeL: 0.94, eyeR: 0.94, browRaise: 0.12, blush: 0.08 },
+  delighted: { mouthSmile: 0.65, mouthOpen: 0.2, mouthWidth: 1.12, eyeSmile: 0.25, eyeL: 0.8, eyeR: 0.8, browRaise: 0.3, blush: 0.15 },
+  thinking: { mouthSmile: 0, mouthWidth: 0.8, browRaise: 0.35, browTilt: 0.1, gazeX: 0.6, gazeY: 0.5 },
+  worried: { mouthSmile: -0.3, mouthWidth: 0.85, browRaise: 0.3, browTilt: 0.8, eyeL: 0.95, eyeR: 0.95 },
+  sad: { mouthSmile: -0.45, mouthWidth: 0.9, browTilt: 0.7, browRaise: -0.1, eyeL: 0.75, eyeR: 0.75, gazeY: -0.5 },
+  surprised: { mouthOpen: 0.35, mouthWidth: 0.7, mouthSmile: 0, eyeL: 1.18, eyeR: 1.18, browRaise: 0.8 },
+  firm: { mouthSmile: -0.1, mouthWidth: 0.9, browTilt: -0.3, browRaise: -0.2 },
+  // a fixed, polite smile that does not reach the eyes
+  blank: { mouthSmile: 0.45, eyeSmile: 0, browRaise: 0, browTilt: 0, blush: 0 },
 };
 
 const FACE_KEYS = ['eyeL', 'eyeR', 'eyeSmile', 'gazeX', 'gazeY', 'mouthOpen', 'mouthSmile', 'mouthWidth', 'browRaise', 'browTilt', 'blush'] as const;

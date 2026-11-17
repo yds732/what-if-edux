@@ -7,9 +7,11 @@
   --line-hover: rgba(255, 217, 138, 0.5);
   /* buttons: squarer, with a little softness left at the corners */
   --r-btn: 0;
-  /* the corner pixels: a small square just outside each corner of a button */
+  /* the corner pixels: a small square touching each corner of a button from outside. --px-gap is the button's
+     border, so the pixel meets the border's outer corner; on hover and on a click they move outward from there. */
   --px: 3px;
-  --px-gap: 4px;
+  --px-gap: 1px;
+  --px-step: 2px;
   --px-color: rgba(255, 217, 138, 0.7);
   /* motion tokens: press and hover answer at once, the sheen and sparkle are a touch longer */
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
@@ -173,7 +175,7 @@
   background-position: 100% 0;
   pointer-events: none;
 }
-/* four pixels just outside the corners */
+/* four pixels touching the corners */
 .btn::after {
   content: '';
   position: absolute;
@@ -208,7 +210,7 @@
   }
   /* on hover the corner pixels step out a little and brighten */
   .btn:hover::after {
-    inset: calc(-1 * (var(--px-gap) + var(--px) + 2px));
+    inset: calc(-1 * (var(--px-gap) + var(--px) + var(--px-step)));
     opacity: 1;
   }
 }
@@ -252,6 +254,15 @@
   background: linear-gradient(180deg, rgba(54, 34, 92, 0.82), rgba(26, 17, 58, 0.9));
   box-shadow: 0 0 60px rgba(255, 190, 120, 0.16);
   box-sizing: border-box;
+}
+/* the pause card sits lighter over the paused scene, so the room still shows through */
+.menu--veil.menu--light {
+  background: rgba(8, 6, 22, 0.38);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.card--pause {
+  background: linear-gradient(180deg, rgba(54, 34, 92, 0.7), rgba(26, 17, 58, 0.7));
 }
 .card--wide {
   width: min(760px, 94vw);
@@ -573,8 +584,8 @@
 }
 .echo-corner {
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: var(--px);
+  height: var(--px);
   background: #ffe3a8;
   box-shadow: 0 0 6px rgba(255, 210, 130, 0.9);
 }

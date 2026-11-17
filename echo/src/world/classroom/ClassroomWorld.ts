@@ -10,7 +10,8 @@ import { Panel } from '../../ui/Panel';
 import { THEMES, font, glass, roundRect, spaced, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, characterYaw, type Anchor, type BuildContext, type FrameContext } from '../World';
 import type { Obstacle } from '../colliders';
-import { dress, floorOf, framed, sizeOf, type Spot } from '../dressing';
+import { dress, framed, sizeOf, type Spot } from '../dressing';
+import type { PoseName } from '../../characters/motion';
 import { makeHalo } from '../haven/atmosphere';
 import { buildCityscape, type Cityscape } from '../cityscape';
 import { Builder } from '../interior';
@@ -24,15 +25,15 @@ export const EYE_SEATED = 1.0;
 /** The classroom: 10 m wide (x), 12 m deep (z). The display and teacher are on the -Z wall, windows on -X. */
 export const CLASSROOM = {
   /** Monday: the player's desk at the back. */
-  seatMonday: anchor(0.38, 0, 3.42, 0),
+  seatMonday: anchor(1.07, 0, 2.95, 0),
   /** Where "the front of the classroom" is. */
-  front: new THREE.Vector3(1.0, 0, -2.9),
+  front: new THREE.Vector3(0.1, 0, -3.0),
   /** Top of the plinth that holds the headset. */
-  plinth: new THREE.Vector3(1.0, 0.99, -3.9),
+  plinth: new THREE.Vector3(1.0, 0.92, -3.9),
   teacher: anchorToward(-1.5, 0, -4.1, 0.4, 3),
   /** Wednesday: the empty chair beside Jamie. */
-  seatPartner: anchor(2.42, 0, 1.22, 0),
-  jamieSeat: anchor(3.18, 0, 1.22, 0),
+  seatPartner: anchor(2.37, 0, -0.65, 0),
+  jamieSeat: anchor(3.13, 0, -0.65, 0),
   /** Just inside the door, clear of the front desks. */
   door: anchor(4.25, 0, -1.9, 250),
   /** Tuesday: the poster table by the windows. */
@@ -51,24 +52,88 @@ export type ScreenContent =
 const W = 5, D = 6, H = 3.4;
 /** Height of a floor marker: just clear of the floor. */
 export const FLOOR_MARK = 0.02;
-const DESK_ROWS = [-1.6, 0.6, 2.8], DESK_COLS = [-2.8, 0, 2.8];
+/** The ceiling's light panels stand over these columns and rows, as they always have. */
+const LIGHT_COLS = [-2.8, 0, 2.8], LIGHT_ROWS = [-3.6, -0.6, 2.4];
 /** The low stage along the front wall, the teacher's desk on it, and where the bookshelf stands along the right wall. */
-const STAGE_HEIGHT = 0.16, TEACHER_DESK = { x: -2.95, z: -4.75 }, BOOKSHELF_Z = -3.5;
-/** A desk and the chairs behind it, as one obstacle. */
-const DESK_COLLIDER = { dz: 0.1, hx: 0.8, hz: 0.52 };
+const STAGE_HEIGHT = 0.16, TEACHER_DESK = { x: -2.2, z: -4.95, scale: 1.4 }, BOOKSHELF_Z = -3.5;
 
-interface Seating {
-  who: CastName;
-  row: number;
-  col: number;
-  side: -1 | 1;
+/**
+ * A classroom table for two: a beech top on a steel frame, low enough for a child's forearms to rest on it. A pupil's
+ * hips are `seatZ` behind the table's middle, which puts its long edge a hand's width in front of them.
+ */
+const TABLE = { top: 0.585, wide: 1.3, deep: 0.6, seatX: 0.38, seatZ: 0.45 } as const;
+
+/** A chair at a place: pulled out to sit on, tucked under, or left where someone pushed it back. */
+type ChairState = 'out' | 'in' | 'askew';
+interface Place {
+  /** Which end of the table, along its length. */
+  readonly side: -1 | 1;
+  /** 1 sits on the table's +Z side looking across it toward -Z (toward the front when the table is square on); -1 the other side. */
+  readonly facing: 1 | -1;
+  readonly who?: CastName;
+  readonly pose?: PoseName;
+  /** Kept for the player: the chair is out and nothing stands in it. */
+  readonly free?: boolean;
+  readonly chair?: ChairState;
 }
-const SEATING: Seating[] = [
-  { who: 'priya', row: 0, col: 0, side: -1 }, { who: 'theo', row: 0, col: 0, side: 1 }, { who: 'amara', row: 0, col: 1, side: -1 },
-  { who: 'yusra', row: 0, col: 2, side: 1 }, { who: 'leo', row: 1, col: 0, side: -1 }, { who: 'mina', row: 1, col: 1, side: 1 },
-  { who: 'jamie', row: 1, col: 2, side: 1 },
+interface TableSpec {
+  readonly x: number;
+  readonly z: number;
+  /** Turn about the vertical, degrees. */
+  readonly yaw: number;
+  /** Stands in the front group, which is cleared away for Tuesday's after-school club. */
+  readonly front?: boolean;
+  readonly places: readonly Place[];
+}
+
+/** One place at a group: who sits there, or how its empty chair was left. */
+type Seat = Omit<Place, 'side' | 'facing'>;
+const AT = (who: CastName, pose: PoseName): Seat => ({ who, pose });
+const ASKEW: Seat = { chair: 'askew' }, EMPTY: Seat = {}, PLAYER: Seat = { free: true };
+
+/**
+ * A group: four tables pushed into one block, two places on each long side facing each other. `front` and `back` list
+ * the places on the side toward the front of the room and the side toward the back, left to right as seen from the back.
+ */
+const group = (cx: number, cz: number, front: boolean, back: readonly Seat[], fore: readonly Seat[]): TableSpec[] =>
+  [-1, 1].flatMap((half) => ([1, -1] as const).map((facing): TableSpec => {
+    const row = facing === 1 ? back : fore;
+    const first = half < 0 ? 0 : 2;
+    return {
+      x: cx + (half * TABLE.wide) / 2, z: cz + (facing * TABLE.deep) / 2, yaw: 0, front,
+      places: ([-1, 1] as const).map((side, k): Place => ({ side, facing, ...row[first + k] })),
+    };
+  }));
+
+/** Where the four groups stand: two columns either side of one aisle, two rows. */
+const GROUP_X = 2.1, GROUP_Z = [-1.4, 2.2] as const;
+
+/**
+ * The room is set out in four groups of eight. The places the story uses sit inside the pattern: the player's on
+ * Monday at the back right group, and Wednesday's pair at the front right group, beside Jamie.
+ */
+const TABLES: readonly TableSpec[] = [
+  ...group(-GROUP_X, GROUP_Z[0], true, [EMPTY, AT('priya', 'sitDesk'), AT('theo', 'sitDeskL'), ASKEW], [ASKEW, AT('amara', 'sitDeskR'), EMPTY, EMPTY]),
+  ...group(GROUP_X, GROUP_Z[0], true, [EMPTY, ASKEW, PLAYER, AT('jamie', 'sitLean')], [AT('yusra', 'sitDesk'), EMPTY, ASKEW, EMPTY]),
+  ...group(-GROUP_X, GROUP_Z[1], false, [ASKEW, AT('leo', 'sitDeskL'), AT('mina', 'sitDeskR'), EMPTY], [EMPTY, EMPTY, ASKEW, EMPTY]),
+  ...group(GROUP_X, GROUP_Z[1], false, [PLAYER, ASKEW, EMPTY, EMPTY], [EMPTY, ASKEW, EMPTY, EMPTY]),
 ];
-const seatOf = (s: Seating): Anchor => anchor(DESK_COLS[s.col]! + s.side * 0.38, 0, DESK_ROWS[s.row]! + 0.62, 0);
+
+const RAD = Math.PI / 180;
+/** How far each window's blind is pulled down, metres. */
+const BLIND_DROPS = [0.55, 0.3, 0.8, 0.42];
+/** A point given in a table's own frame (x along it, z across it), in the room. */
+const onTable = (t: TableSpec, lx: number, lz: number): [number, number] => {
+  const c = Math.cos(t.yaw * RAD), s = Math.sin(t.yaw * RAD);
+  return [t.x + lx * c + lz * s, t.z - lx * s + lz * c];
+};
+/** Where someone sits at a place, looking straight across the table. */
+const seatAt = (t: TableSpec, p: Place): Anchor => {
+  const [x, z] = onTable(t, p.side * TABLE.seatX, p.facing * TABLE.seatZ);
+  const [tx, tz] = onTable(t, p.side * TABLE.seatX, -p.facing * 0.6);
+  return anchorToward(x, 0, z, tx, tz);
+};
+const SEATING = TABLES.flatMap((t) => t.places.filter((p) => p.who).map((p) => ({ who: p.who!, pose: p.pose ?? 'sitDesk', seat: seatAt(t, p), front: !!t.front })));
 
 export class ClassroomWorld extends World {
   readonly id = 'classroom';
@@ -99,6 +164,8 @@ export class ClassroomWorld extends World {
   private markerRadius = 0.3;
   /** Obstacles that belong to the current arrangement of the room. */
   private sceneColliders: Obstacle[] = [];
+  /** The front tables' obstacles: in the room only while those tables are. */
+  private frontColliders: Obstacle[] = [];
 
   constructor() {
     super();
@@ -124,7 +191,10 @@ export class ClassroomWorld extends World {
     await ctx.step('classroom: city');
 
     // ---- shell ----
-    const floor = floorOf(await ctx.assets.picture('floor-classroom'), W * 2, D * 2, 2.4, 0.5);
+    // grey carpet tiles with a cool blue cast, as most classrooms have
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: carpet(new Rng(2082), W * 2, D * 2), roughness: 0.96 }));
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
     scene.add(floor);
 
     const b = new Builder();
@@ -154,42 +224,63 @@ export class ClassroomWorld extends World {
     b.box('satin', accent, [W * 2, 0.5, 0.02], [0, 0.35, -D + 0.012]);
 
     // ---- the front: a low stage, the display, the plinth ----
-    b.box('satin', 0xdfe3ec, [7.4, STAGE_HEIGHT, 1.9], [0, STAGE_HEIGHT / 2, -5.05], { r: 0.05 });
+    // the stage is wood, the same honey beech as the cubbies at the back: boards running its length, a darker nosing on the edge
+    const STAGE = { wide: 7.4, deep: 1.9, z: -5.05 }, BOARD = 0.158, grain = new Rng(2083);
+    b.box('satin', 0xa47c4f, [STAGE.wide, STAGE_HEIGHT - 0.02, STAGE.deep], [0, (STAGE_HEIGHT - 0.02) / 2, STAGE.z]);
+    const boards = Math.round(STAGE.deep / BOARD);
+    for (let i = 0; i < boards; i++) {
+      const tone = new THREE.Color(0xd6b081).offsetHSL(grain.range(-0.008, 0.008), grain.range(-0.04, 0.04), grain.range(-0.045, 0.03));
+      b.box('satin', tone, [STAGE.wide - 0.04, 0.02, BOARD - 0.006], [0, STAGE_HEIGHT - 0.01, STAGE.z + STAGE.deep / 2 - BOARD / 2 - i * BOARD], { r: 0.003 });
+    }
+    b.box('satin', 0xb98c5a, [STAGE.wide + 0.02, STAGE_HEIGHT + 0.004, 0.05], [0, (STAGE_HEIGHT + 0.004) / 2, STAGE.z + STAGE.deep / 2 - 0.02], { r: 0.012 });
+    for (const s of [-1, 1]) b.box('satin', 0xb98c5a, [0.05, STAGE_HEIGHT + 0.004, STAGE.deep], [s * (STAGE.wide / 2 - 0.02), (STAGE_HEIGHT + 0.004) / 2, STAGE.z], { r: 0.012 });
     b.box('gloss', 0x1a1e2c, [5.0, 2.3, 0.07], [0.2, 2.05, -D + 0.05], { r: 0.035 });
     b.box('metal', 0xd9dde8, [5.16, 2.46, 0.04], [0.2, 2.05, -D + 0.022], { r: 0.05 });
-    // ---- desks for two, their chairs, and a slate at every place ----
-    const taken = new Set(SEATING.map((s) => `${s.row}:${s.col}:${s.side}`));
-    taken.add('2:1:1').add('1:2:-1');
-    const deskTop = (await sizeOf(ctx, 'desk'))[1];
-    // the front row stands in a group of its own: it is cleared away for the after-school club
-    const sets = [this.frontRow, scene].map((to) => ({ to, desks: [] as Spot[], chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[] }));
-    DESK_ROWS.forEach((dz, row) => {
-      const set = sets[row === 0 ? 0 : 1]!;
-      DESK_COLS.forEach((dx, col) => {
-        set.desks.push([dx, 0, dz]);
-        for (const s of [-1, 1]) {
-          const used = taken.has(`${row}:${col}:${s}`);
-          // pupils face the front of the room; a chair nobody is sitting on is pushed in
-          set.chairs.push([dx + s * 0.38, 0, dz + (used ? 0.62 : 0.5), 180]);
-          set.slates.push([dx + s * 0.38, deskTop, dz - 0.06, 180 + s * 4 + rng.range(-6, 6)]);
-          if (used && rng.chance(0.7)) set.bags.push([dx + s * 0.74, 0, dz + 0.5 + rng.range(-0.06, 0.06), 180 + s * 70 + rng.range(-20, 20)]);
+    // ---- tables for two pushed together, their chairs, slates, paper and pencil pots ----
+    // the front tables stand in a group of their own: they are cleared away for the after-school club
+    const sets = [this.frontRow, scene].map((to) => ({ to, b: new Builder(), chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[], colliders: [] as Obstacle[] }));
+    for (const t of TABLES) {
+      const set = sets[t.front ? 0 : 1]!;
+      buildTable(set.b, t, rng);
+      set.colliders.push({ kind: 'box', cx: t.x, cz: t.z, hx: TABLE.wide / 2 + 0.05, hz: TABLE.deep / 2 + 0.05, rot: -t.yaw * RAD });
+      for (const p of t.places) {
+        const used = !!p.who || !!p.free;
+        const state: ChairState = used ? 'out' : p.chair ?? 'in';
+        // a chair faces across the table; one pushed back is turned and shoved aside a little
+        const back = state === 'in' ? 0.33 : state === 'out' ? TABLE.seatZ : 0.62;
+        const [cx, cz] = onTable(t, p.side * TABLE.seatX + (state === 'askew' ? rng.range(-0.12, 0.12) : 0), p.facing * back);
+        const turn = (p.facing === 1 ? 180 : 0) + t.yaw + (state === 'askew' ? rng.pick([-1, 1]) * rng.range(10, 22) : rng.range(-4, 4));
+        set.chairs.push([cx, 0, cz, turn]);
+        if (used || rng.chance(0.4)) {
+          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.13);
+          set.slates.push([sx, TABLE.top, sz, turn + rng.range(-8, 8)]);
         }
-        // the front row's obstacles come and go with it: see setScene
-        if (row > 0) this.colliders.box(dx, dz + DESK_COLLIDER.dz, DESK_COLLIDER.hx, DESK_COLLIDER.hz);
-      });
-    });
+        if (p.who) {
+          set.colliders.push({ kind: 'circle', cx, cz, r: 0.3 });
+          if (rng.chance(0.75)) {
+            const [bx, bz] = onTable(t, p.side * 0.76, p.facing * 0.52);
+            set.bags.push([bx, 0, bz, turn + p.side * 70 + rng.range(-25, 25)]);
+          }
+        }
+      }
+    }
     for (const set of sets) {
-      await dress(ctx, set.to, 'desk', set.desks);
+      set.b.finish(set.to);
       await dress(ctx, set.to, 'chair', set.chairs);
       await dress(ctx, set.to, 'slate', set.slates);
       await dress(ctx, set.to, 'backpack', set.bags);
     }
+    // the back tables' obstacles stay; the front ones come and go with their tables (see setScene)
+    this.colliders.obstacles.push(...sets[1]!.colliders);
+    this.frontColliders = sets[0]!.colliders;
     scene.add(this.frontRow);
     await ctx.step('classroom: desks');
 
     // ---- the front: the headset's plinth, and the teacher's desk up on the stage ----
-    await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]]);
-    await dress(ctx, scene, 'teacher-desk', [[TEACHER_DESK.x, STAGE_HEIGHT, TEACHER_DESK.z, 24]]);
+    // the plinth is cut down to the lower eye line: squashed in height only, so its footprint stays the same
+    const [, plinthTall] = await sizeOf(ctx, 'plinth');
+    (await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]])).scale.y = CLASSROOM.plinth.y / plinthTall;
+    await dress(ctx, scene, 'teacher-desk', [[TEACHER_DESK.x, STAGE_HEIGHT, TEACHER_DESK.z, 18, TEACHER_DESK.scale]]);
 
     // ---- the back wall: cubbies with bags and jumpers ----
     const [cubbyWide, , cubbyDeep] = await sizeOf(ctx, 'lockers');
@@ -211,6 +302,44 @@ export class ClassroomWorld extends World {
       scene.add(hung);
     };
     await hang('pinboard', 3.4, W - 0.005, 1.72, 2.2, -Math.PI / 2);
+    await hang('poster-newstart', 1.0, W - 0.005, 1.75, -0.45, -Math.PI / 2);
+    await hang('poster-stars', 0.66, W - 0.005, 1.8, 4.65, -Math.PI / 2);
+    // "Class 1" over the door: separate cut-out letters on a shallow arch, a quiet slate serif rather than nursery colours
+    {
+      const text = 'Class 1', tall = 0.2, radius = 1.7, door = { z: -1.9, top: 2.1 };
+      const measure = document.createElement('canvas').getContext('2d')!;
+      measure.font = '600 200px Georgia, "Times New Roman", serif';
+      const widths = [...text].map((ch) => (measure.measureText(ch).width / 200) * tall + 0.035);
+      const span = widths.reduce((a, b) => a + b, 0);
+      let along = -span / 2;
+      for (const [i, ch] of [...text].entries()) {
+        const w = widths[i]!;
+        const angle = (along + w / 2) / radius;
+        along += w;
+        if (ch === ' ') continue;
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const g = canvas.getContext('2d')!;
+        g.font = measure.font;
+        g.textAlign = 'center';
+        g.textBaseline = 'alphabetic';
+        g.fillStyle = '#ffffff';
+        g.fillText(ch, 128, 200);
+        const map = new THREE.CanvasTexture(canvas);
+        map.colorSpace = THREE.SRGBColorSpace;
+        map.anisotropy = 4;
+        const letter = new THREE.Mesh(
+          new THREE.PlaneGeometry(tall * 1.28, tall * 1.28),
+          new THREE.MeshStandardMaterial({ map, color: 0x2f4858, roughness: 0.45, metalness: 0.25, alphaTest: 0.5, side: THREE.DoubleSide }),
+        );
+        // the letter canvas puts the baseline at 200/256: centre the arch on the letters' bodies
+        letter.position.set(W - 0.018, door.top + 0.28 - radius + radius * Math.cos(angle), door.z + radius * Math.sin(angle));
+        letter.rotation.set(0, -Math.PI / 2, -angle);
+        letter.castShadow = true;
+        scene.add(letter);
+      }
+    }
     await hang('poster-harbour', 1.5, -3.82, 1.95, -D + 0.005, 0);
     await hang('poster-planets', 0.95, 3.95, 1.9, -D + 0.005, 0);
     // plants in the corners, and a row of little ones along the window sills
@@ -218,6 +347,43 @@ export class ClassroomWorld extends World {
     await dress(ctx, scene, 'plant-tall', corners.map(([x, y, z]): Spot => [x, y, z, rng.range(0, 360)]));
     for (const [x, , z] of corners) this.colliders.circle(x, z, 0.4);
     await dress(ctx, scene, 'plant-small', centres.map((z): Spot => [-W + 0.13, WY0, z + rng.range(-0.6, 0.6), rng.range(0, 360), rng.range(0.9, 1.25)]));
+    // roller blinds, each left at a different height
+    centres.forEach((z, i) => {
+      const drop = BLIND_DROPS[i]!;
+      b.box('matte', 0xe6e2d6, [0.01, drop, WW + 0.06], [-W + 0.06, WY1 - drop / 2, z]);
+      b.box('satin', 0xc9ccd2, [0.025, 0.025, WW + 0.06], [-W + 0.065, WY1 - drop, z], { r: 0.008 });
+      b.box('satin', 0xf0f1f4, [0.09, 0.09, WW + 0.16], [-W + 0.06, WY1 + 0.06, z], { r: 0.02 });
+    });
+    // the room's paper: charts on the piers between the windows, a display board over the cubbies
+    const sheet = (texture: THREE.Texture, wide: number, tall: number, x: number, y: number, z: number, turn: number): void => {
+      const paper = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 }));
+      paper.position.set(x, y, z);
+      paper.rotation.y = turn;
+      paper.receiveShadow = true;
+      scene.add(paper);
+    };
+    sheet(chartPaper(new Rng(7)), 0.62, 0.86, -W + 0.004, 1.75, -2.8, Math.PI / 2);
+    sheet(feelingsChart(), 0.66, 0.66, -W + 0.004, 1.85, 0, Math.PI / 2);
+    sheet(chartPaper(new Rng(11)), 0.62, 0.86, -W + 0.004, 1.7, 2.8, Math.PI / 2);
+    const board = framed(displayBoard(new Rng(9)), 4.2, 1.05, 0xc0392b);
+    board.position.set(-0.3, 2.3, D - 0.005);
+    board.rotation.y = Math.PI;
+    scene.add(board);
+    // a flip chart on its easel in the front corner by the windows
+    const easel = { x: -4.25, z: -3.55, turn: 55 * RAD };
+    const ex = (lx: number, lz: number): [number, number] => [easel.x + lx * Math.cos(easel.turn) + lz * Math.sin(easel.turn), easel.z - lx * Math.sin(easel.turn) + lz * Math.cos(easel.turn)];
+    for (const [lx, lz, lean] of [[-0.3, 0.05, 0.1], [0.3, 0.05, -0.1], [0, -0.28, 0]] as const) {
+      const [x, z] = ex(lx, lz);
+      b.box('metal', 0x8e959e, [0.022, 1.75, 0.022], [x, 0.87, z], { rot: [lz < 0 ? -0.2 : 0.06, easel.turn, lean] });
+    }
+    const [px, pz] = ex(0, 0.09);
+    b.box('satin', 0xf4f4f2, [0.66, 0.84, 0.02], [px, 1.32, pz], { rot: [-0.08, easel.turn, 0] });
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.78), new THREE.MeshStandardMaterial({ map: chartPaper(new Rng(21)), roughness: 0.9 }));
+    const [qx, qz] = ex(0, 0.104);
+    pad.position.set(qx, 1.32, qz);
+    pad.rotation.set(-0.08, easel.turn, 0, 'YXZ');
+    scene.add(pad);
+    this.colliders.circle(easel.x, easel.z, 0.42);
     b.finish(scene);
     await ctx.step('classroom: furniture');
 
@@ -235,12 +401,13 @@ export class ClassroomWorld extends World {
     this.sun.shadow.radius = 5;
     scene.add(this.fill, this.sun, this.sun.target);
     // light you can see: a shaft from each window, and dust that glints where it drifts through one
-    this.beams = buildSunbeams(new Rng(2081), centres.map((z) => ({ x: -W, y0: WY0, y1: WY1, z0: z - WW / 2, z1: z + WW / 2 })),
+    // the light comes in under each blind
+    this.beams = buildSunbeams(new Rng(2081), centres.map((z, i) => ({ x: -W, y0: WY0, y1: WY1 - BLIND_DROPS[i]!, z0: z - WW / 2, z1: z + WW / 2 })),
       { min: new THREE.Vector3(-W, 0.05, -D), max: new THREE.Vector3(W, H - 0.05, D) }, ctx.quality.density);
     scene.add(this.beams.group);
     // ceiling panels: soft rectangles of light over each column of desks
     const panels = new Builder();
-    for (const x of DESK_COLS) for (const z of [-3.6, -0.6, 2.4]) panels.box('glow', 0xffffff, [1.5, 0.02, 0.5], [x, H - 0.012, z], { r: 0.01 });
+    for (const x of LIGHT_COLS) for (const z of LIGHT_ROWS) panels.box('glow', 0xffffff, [1.5, 0.02, 0.5], [x, H - 0.012, z], { r: 0.01 });
     this.ceiling = panels.finish(scene, { glow: 2.2 }).glow!;
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe0ff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false });
     for (const z of centres) {
@@ -286,7 +453,7 @@ export class ClassroomWorld extends World {
     this.colliders.circle(CLASSROOM.teacher.position.x, CLASSROOM.teacher.position.z, 0.4);
     for (const s of SEATING) {
       const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who));
-      person.placeAt(seatOf(s)).setPose(s.who === 'jamie' || s.who === 'mina' ? 'sitLean' : 'sitDesk', { immediate: true, seat: SEAT });
+      person.placeAt(s.seat).setPose(s.pose, { immediate: true, seat: SEAT });
       if (s.who !== 'jamie') person.setLiveliness(0.7);
     }
     // the three voices of Friday's consultation arrive as projections on the stage
@@ -364,7 +531,7 @@ export class ClassroomWorld extends World {
       this.colliders.box(P.x, P.z, 1.15, 0.6);
       for (const [x, z] of Object.values(standing)) this.colliders.circle(x, z, 0.32);
     } else {
-      for (const dx of DESK_COLS) this.colliders.box(dx, DESK_ROWS[0]! + DESK_COLLIDER.dz, DESK_COLLIDER.hx, DESK_COLLIDER.hz);
+      this.colliders.obstacles.push(...this.frontColliders);
     }
     this.sceneColliders = this.colliders.obstacles.slice(kept);
     for (const s of SEATING) {
@@ -378,7 +545,7 @@ export class ClassroomWorld extends World {
         }
       } else {
         person.root.visible = true;
-        person.placeAt(seatOf(s)).setPose(s.who === 'jamie' || s.who === 'mina' ? 'sitLean' : 'sitDesk', { immediate: true, seat: SEAT });
+        person.placeAt(s.seat).setPose(s.pose, { immediate: true, seat: SEAT });
       }
     }
     this.cast.teacher!.root.visible = !poster;
@@ -572,3 +739,185 @@ export class ClassroomWorld extends World {
   }
 }
 
+
+// ---- the room's furniture and paper ----
+
+const STEEL = 0x8e959e;
+
+/** A table for two: a beech top with a darker edge, a steel rail under each long side, four tube legs; now and then a few things left on it. */
+const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
+  const turn = t.yaw * RAD;
+  const at = (lx: number, y: number, lz: number): [number, number, number] => {
+    const [x, z] = onTable(t, lx, lz);
+    return [x, y, z];
+  };
+  b.box('satin', 0xdcb889, [TABLE.wide, 0.022, TABLE.deep], at(0, TABLE.top - 0.011, 0), { r: 0.006, rot: [0, turn, 0] });
+  b.box('satin', 0xa9875c, [TABLE.wide + 0.004, 0.008, TABLE.deep + 0.004], at(0, TABLE.top - 0.026, 0), { rot: [0, turn, 0] });
+  for (const lz of [-1, 1]) b.box('metal', STEEL, [TABLE.wide - 0.1, 0.034, 0.018], at(0, TABLE.top - 0.05, lz * (TABLE.deep / 2 - 0.035)), { rot: [0, turn, 0] });
+  for (const lx of [-1, 1]) {
+    b.box('metal', STEEL, [0.018, 0.034, TABLE.deep - 0.07], at(lx * (TABLE.wide / 2 - 0.045), TABLE.top - 0.05, 0), { rot: [0, turn, 0] });
+    for (const lz of [-1, 1]) b.cyl('metal', STEEL, 0.014, TABLE.top - 0.03, at(lx * (TABLE.wide / 2 - 0.045), 0, lz * (TABLE.deep / 2 - 0.035)), { radial: 10 });
+  }
+  // a sheet or two of paper, a pencil pot, a small stack of exercise books
+  for (let i = rng.int(0, 2); i > 0; i--) {
+    b.box('matte', 0xf7f6f1, [0.21, 0.002, 0.297], at(rng.range(-0.5, 0.5), TABLE.top + 0.001 + i * 0.001, rng.range(-0.12, 0.12)), { rot: [0, turn + rng.range(-0.6, 0.6), 0] });
+  }
+  if (rng.chance(0.45)) {
+    const [x, y, z] = at(rng.pick([-1, 1]) * rng.range(0.05, 0.2), TABLE.top, rng.range(-0.15, 0.15));
+    b.cyl('satin', rng.pick([0x3b6fd0, 0xe25b45, 0x3fa66a, 0xf2b632]), 0.035, 0.085, [x, y, z], { radial: 14 });
+    for (let k = 0; k < 4; k++) b.cyl('satin', rng.pick([0xf2c230, 0x3b6fd0, 0xe25b45, 0x2f9e5f]), 0.004, 0.15, [x + rng.range(-0.015, 0.015), y + 0.02, z + rng.range(-0.015, 0.015)], { radial: 6, rot: [rng.range(-0.25, 0.25), 0, rng.range(-0.25, 0.25)] });
+  }
+  if (rng.chance(0.4)) {
+    const lx = rng.range(-0.45, 0.45), lz = rng.range(-0.1, 0.1), spin = turn + rng.range(-0.4, 0.4);
+    for (let k = 0; k < rng.int(1, 3); k++) b.box('satin', rng.pick([0x2f6fbf, 0xd9473a, 0x39a35b, 0x8a5cc2, 0xf0a830]), [0.17, 0.008, 0.235], at(lx + rng.range(-0.01, 0.01), TABLE.top + 0.004 + k * 0.009, lz), { rot: [0, spin + rng.range(-0.15, 0.15), 0] });
+  }
+};
+
+const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  paint(canvas.getContext('2d')!);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+};
+
+/** Grey carpet tiles with a blue cast: a fine speckle of fibres, half-metre tiles laid with their pile turned, a few worn patches. */
+const carpet = (rng: Rng, wide: number, deep: number): THREE.CanvasTexture => {
+  const N = 512, tile = 128; // one texture covers 2 m: four tiles a side
+  const texture = canvasTexture(N, N, (ctx) => {
+    const image = ctx.createImageData(N, N);
+    const shade = Array.from({ length: 16 }, () => rng.range(-5, 5));
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const t = Math.floor(x / tile) + Math.floor(y / tile) * 4;
+      const grain = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 ? Math.sin(x * 0.9) : Math.sin(y * 0.9);
+      const n = (rng.next() - 0.5) * 26 + grain * 2.5 + shade[t]!;
+      const fleck = rng.chance(0.012) ? rng.range(-30, 24) : 0;
+      const i = (y * N + x) * 4;
+      image.data[i] = 118 + n + fleck;
+      image.data[i + 1] = 126 + n + fleck;
+      image.data[i + 2] = 142 + n * 1.05 + fleck;
+      image.data[i + 3] = 255;
+    }
+    ctx.putImageData(image, 0, 0);
+    // the seams between tiles
+    ctx.strokeStyle = 'rgba(60, 66, 80, 0.22)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k <= N; k += tile) {
+      ctx.beginPath(); ctx.moveTo(k + 0.5, 0); ctx.lineTo(k + 0.5, N); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, k + 0.5); ctx.lineTo(N, k + 0.5); ctx.stroke();
+    }
+  });
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(wide / 2, deep / 2);
+  return texture;
+};
+
+const HAND = '"Segoe Print", "Comic Sans MS", "Bradley Hand", cursive';
+
+/** A sheet of chart paper written up in marker: a heading and a few lines, in two colours. */
+const chartPaper = (rng: Rng): THREE.CanvasTexture => canvasTexture(372, 516, (ctx) => {
+  ctx.fillStyle = '#fbfaf5';
+  ctx.fillRect(0, 0, 372, 516);
+  const ink = rng.pick(['#2d55b5', '#1d1d1d', '#2f8a4a']), accent = rng.pick(['#d6402f', '#e07b1f', '#8a3fb8']);
+  ctx.fillStyle = accent;
+  ctx.font = `700 34px ${HAND}`;
+  ctx.fillText(rng.pick(['Our class rules', 'Story starters', 'Good listening', 'Word bank', 'Today we will']), 24, 58);
+  ctx.fillRect(24, 70, 220, 4);
+  ctx.font = `500 22px ${HAND}`;
+  const words = ['kind', 'listen', 'share', 'try again', 'ask', 'because', 'however', 'suddenly', 'first', 'then', 'finally', 'help', 'explain'];
+  for (let i = 0; i < 9; i++) {
+    ctx.fillStyle = i % 3 === 2 ? accent : ink;
+    let line = '';
+    for (let k = rng.int(2, 4); k > 0; k--) line += rng.pick(words) + ' ';
+    ctx.fillText(`${i < 5 ? `${i + 1}.` : '-'} ${line}`, 30 + rng.range(-4, 4), 120 + i * 42);
+  }
+  // a pin at each top corner
+  for (const x of [16, 356]) {
+    ctx.fillStyle = rng.pick(['#e34b3b', '#3a7bd5', '#f2c230']);
+    ctx.beginPath(); ctx.arc(x, 14, 7, 0, Math.PI * 2); ctx.fill();
+  }
+});
+
+/** A colourful chart of feelings: six round faces, each with a word under it. */
+const feelingsChart = (): THREE.CanvasTexture => canvasTexture(400, 400, (ctx) => {
+  ctx.fillStyle = '#fffdf6';
+  ctx.fillRect(0, 0, 400, 400);
+  ctx.fillStyle = '#3b3f58';
+  ctx.font = `700 30px ${HAND}`;
+  ctx.textAlign = 'center';
+  ctx.fillText('How do you feel?', 200, 46);
+  const faces: [string, string, number][] = [['#f6c445', 'happy', 1], ['#5aa9e6', 'calm', 0.3], ['#e85d4f', 'cross', -0.8], ['#9b7ad8', 'worried', -0.5], ['#5cc28b', 'proud', 0.8], ['#f29a4a', 'excited', 1.2]];
+  faces.forEach(([color, word, smile], i) => {
+    const x = 75 + (i % 3) * 125, y = 125 + Math.floor(i / 3) * 145;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, 42, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a2a2a';
+    for (const dx of [-14, 14]) { ctx.beginPath(); ctx.arc(x + dx, y - 8, 4.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x - 16, y + 16 - smile * 4);
+    ctx.quadraticCurveTo(x, y + 16 + smile * 12, x + 16, y + 16 - smile * 4);
+    ctx.stroke();
+    ctx.fillStyle = '#3b3f58';
+    ctx.font = `600 22px ${HAND}`;
+    ctx.fillText(word, x, y + 68);
+  });
+});
+
+/** The display board over the cubbies: purple backing, a scalloped border, the class's work pinned up at odd angles. */
+const displayBoard = (rng: Rng): THREE.CanvasTexture => canvasTexture(1600, 400, (ctx) => {
+  ctx.fillStyle = '#4b2f86';
+  ctx.fillRect(0, 0, 1600, 400);
+  // scalloped border
+  ctx.fillStyle = '#f2c230';
+  for (let x = 0; x < 1600; x += 40) for (const y of [0, 400]) { ctx.beginPath(); ctx.arc(x + 20, y, 20, 0, Math.PI * 2); ctx.fill(); }
+  for (let y = 0; y < 400; y += 40) for (const x of [0, 1600]) { ctx.beginPath(); ctx.arc(x, y + 20, 20, 0, Math.PI * 2); ctx.fill(); }
+  // the title in cut-out letters
+  const title = 'OUR WRITING';
+  ctx.font = '800 60px "Arial Black", Impact, sans-serif';
+  ctx.textBaseline = 'middle';
+  let tx = 70;
+  for (const ch of title) {
+    ctx.save();
+    ctx.translate(tx, 78);
+    ctx.rotate(rng.range(-0.12, 0.12));
+    ctx.fillStyle = rng.pick(['#e34b3b', '#3fb36b', '#3a8fe0', '#f29a2e', '#ffffff']);
+    ctx.fillText(ch, 0, 0);
+    ctx.restore();
+    tx += ch === ' ' ? 26 : ctx.measureText(ch).width + 6;
+  }
+  // pinned work: paper with lines of writing, little drawings, bright word cards
+  for (let i = 0; i < 9; i++) {
+    const w = rng.range(120, 170), h = rng.range(150, 200), x = 520 + i * 118 + rng.range(-10, 10), y = rng.range(150, 230);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rng.range(-0.08, 0.08));
+    ctx.fillStyle = rng.chance(0.25) ? '#fff3b0' : '#fbfaf5';
+    ctx.fillRect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = rng.pick(['#2d55b5', '#333333', '#7a3fa8']);
+    for (let k = 0; k < 7; k++) ctx.fillRect(-w / 2 + 12, -h / 2 + 22 + k * 20, rng.range(w * 0.45, w - 24), 2.5);
+    if (rng.chance(0.5)) {
+      ctx.fillStyle = rng.pick(['#e34b3b', '#3fb36b', '#f29a2e', '#3a8fe0']);
+      ctx.beginPath(); ctx.arc(rng.range(-20, 20), h / 2 - 30, 18, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#d33';
+    ctx.beginPath(); ctx.arc(0, -h / 2 + 8, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  for (let i = 0; i < 6; i++) {
+    ctx.save();
+    ctx.translate(70 + (i % 3) * 140 + rng.range(-8, 8), 190 + Math.floor(i / 3) * 90);
+    ctx.rotate(rng.range(-0.1, 0.1));
+    ctx.fillStyle = rng.pick(['#ff9f43', '#ff6b9a', '#ffd84d', '#7bed9f']);
+    ctx.fillRect(-60, -28, 120, 56);
+    ctx.fillStyle = '#2b2b2b';
+    ctx.font = `600 26px ${HAND}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(rng.pick(['because', 'although', 'suddenly', 'however', 'meanwhile', 'even though', 'despite', 'while']), 0, 2);
+    ctx.restore();
+  }
+});
