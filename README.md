@@ -6,7 +6,7 @@ It's 2080, and you volunteer to test **Echo**, an AI companion headset, for one 
 
 The game is for ages 11 to 14 and takes a few minutes to play. It is based on Carol Gilligan's ethics of care. No choice is marked right or wrong, and there is no score. The aim is for players to notice whom each choice cares for, and whose needs it leaves out. The story moves from **self** to **other** to **community**.
 
-**Play it:** https://echo-between-two-worlds.vercel.app
+**Play it:** https://echo-two-worlds.vercel.app
 
 ## Technical plan
 

@@ -6,7 +6,7 @@ Built for EduX 2026 UK, Track 4 (*Immersive Worlds for Future Citizenship*). The
 
 Runs in a desktop browser (mouse and keyboard), on phones and tablets (touch), and in a WebXR headset.
 
-**Play it:** https://echo-between-two-worlds.vercel.app
+**Play it:** https://echo-two-worlds.vercel.app
 
 ## Run it
 
@@ -28,7 +28,7 @@ Graphics start on a tier picked for the device (headsets and phones low; tablets
 
 WebXR needs a secure origin: the deployed site has one; a copy you host needs HTTPS (or `localhost`) for *Play in VR* to appear in a headset's browser. To try a Quest against the dev server on your own machine, connect it by USB, run `adb reverse tcp:5173 tcp:5173`, and open `http://localhost:5173` in the headset's browser.
 
-To redeploy the site, run `vercel deploy --prod` in this folder (it is deployed with the Vercel CLI, not from GitHub; `vercel.json` holds the build settings).
+To redeploy the site, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the `echo-two-worlds` project (it is deployed with the Vercel CLI, not from GitHub; `vercel.json` holds the build settings).
 
 ## How it is put together
 
