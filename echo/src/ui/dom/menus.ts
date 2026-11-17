@@ -15,8 +15,8 @@ const TITLE_VIEWS = {
 } as const;
 type TitleView = keyof typeof TITLE_VIEWS;
 
-/** The title camera's orbit: around the plaza and the bridge, 45 degrees above them. */
-const TITLE_ORBIT = { centre: { x: 0, y: 0.5, z: -13 }, radius: 30, tilt: Math.PI / 4, speed: 0.015, start: 0.6 } as const;
+/** The title camera's orbit: around the plaza and the bridge, 30 degrees above them. */
+const TITLE_ORBIT = { centre: { x: 0, y: 0.5, z: -13 }, radius: 30, tilt: Math.PI / 6, speed: 0.015, start: 0.6 } as const;
 
 /** What the title screen keeps while it is open. */
 interface TitleScene {
