@@ -178,8 +178,8 @@ export const openPhone = async (game: Game, bedroom: BedroomWorld, prompt: strin
   game.audio.sfx('phoneTap');
   game.app.tasks.wait(0.5).then(() => game.hands.pose('rest'), () => undefined);
   game.audio.sfx('holoOpen');
-  // frame the hologram in the upper half of the view: choices and subtitles use the lower half
-  game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.24, 0)), 0.9);
+  // frame the hologram wholly in the upper half of the view: choices and subtitles use the lower half
+  game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.3, 0)), 0.9);
 };
 
 /** Adds messages to the hologram one at a time, as if they were arriving. */

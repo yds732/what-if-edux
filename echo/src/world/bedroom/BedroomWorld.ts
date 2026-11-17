@@ -340,7 +340,7 @@ export class BedroomWorld extends World {
     this.phone.group.rotation.y = 0.35;
     scene.add(this.phone.group);
     this.hologram = new Panel(760, 500, { world: true, additive: false });
-    this.hologram.mesh.scale.set(0.95, 0.625, 1);
+    this.hologram.mesh.scale.set(0.78, 0.513, 1);
     this.hologram.mesh.position.copy(BEDROOM.hologram);
     this.hologram.mesh.rotation.set(-0.08, -0.12, 0);
     this.hologram.opacity = 0;
@@ -352,7 +352,7 @@ export class BedroomWorld extends World {
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
       uniforms: { uShow: { value: 0 } },
       vertexShader: /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: /* glsl */ `uniform float uShow; varying vec2 vUv; void main(){ gl_FragColor = vec4(vec3(0.35, 0.65, 1.0) * (1.0 - vUv.y) * 0.5 * uShow, 1.0);
+      fragmentShader: /* glsl */ `uniform float uShow; varying vec2 vUv; void main(){ gl_FragColor = vec4(vec3(0.35, 0.65, 1.0) * pow(1.0 - vUv.y, 2.0) * 0.25 * uShow, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -430,9 +430,6 @@ export class BedroomWorld extends World {
     this.holoTarget = 1;
     const theme = THEMES.real;
     this.hologram.paint((ctx, w, h) => {
-      ctx.fillStyle = 'rgba(10, 14, 26, 0.94)';
-      roundRect(ctx, 24, 24, w - 48, h - 48, 0);
-      ctx.fill();
       glass(ctx, 24, 24, w - 48, h - 48, theme, { radius: 34, glow: 1.6, borderWidth: 2.5, border: 'rgba(160, 205, 255, 0.75)' });
       // header: who is writing
       ctx.fillStyle = '#9fc6ff';
