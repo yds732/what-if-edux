@@ -318,6 +318,20 @@ export class BedroomWorld extends World {
     strip([1.0, 0.006, 0.008], [WARDROBE.x, 1.905, D - 0.04], [WARDROBE.x, 2.1, D - 0.12], 0.8, 2.4);
     // on each shelf, a strip along the front edge of the platform itself, under its lip, lighting the shelf below and the wall
     for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3);
+    // a lit frame all round the routine screen, just clear of its edges, with a soft wash on the wall behind it
+    {
+      const wide = 1.25 + 0.016, tall = H * 0.65 + 0.016, cy = H / 2, cz = 1.2, gap = 0.022, t = 0.008, x = -W + 0.006;
+      const outerZ = wide / 2 + gap + t / 2, outerY = tall / 2 + gap + t / 2, spanZ = wide + 2 * (gap + t), spanY = tall + 2 * gap;
+      strips.box('glow', LED_COLOR, [0.008, t, spanZ], [x, cy + outerY, cz]);
+      strips.box('glow', LED_COLOR, [0.008, t, spanZ], [x, cy - outerY, cz]);
+      strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz + outerZ]);
+      strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz - outerZ]);
+      const halo = new THREE.PointLight(LED_COLOR, 0.35, 1.8, 2);
+      halo.position.set(-W + 0.25, cy, cz);
+      halo.userData.power = 0.35;
+      this.leds.push(halo);
+      scene.add(halo);
+    }
     // and one you can see: a thin warm line along the desk's front edge
     strips.box('glow', LED_COLOR, [W - TOP.retDeep - TOP.bend - TOP.start - 0.06, 0.008, 0.006], [(TOP.start + W - TOP.retDeep - TOP.bend) / 2, TOP.y - TOP.slab - 0.004, -D + TOP.deep + 0.002]);
     this.ledGlow = strips.finish(scene, { glow: 2.2, shadows: false }).glow!;
