@@ -133,6 +133,7 @@ export class HavenWorld extends World {
     await ctx.step('haven: main island');
 
     const gi = HAVEN.gatewayIsland;
+    let gatewayDrop = 0;
     const far: [x: number, y: number, z: number, radius: number, depth: number][] = [
       [gi.x, gi.y, gi.z, 11, 17], [-38, 9, -48, 8, 13], [34, 5, -40, 6.5, 11], [-70, 22, -120, 16, 26], [64, 16, -110, 13, 22],
       [-26, -6, -18, 4.5, 8], [30, -4, 6, 5, 9], [110, 34, -200, 22, 34], [-130, 40, -230, 26, 40], [150, 60, -330, 30, 44],
@@ -146,6 +147,11 @@ export class HavenWorld extends World {
       island.rotation.y = i === 0 ? 5.2 : i * 1.7;
       const baseY = y - kind.turf * scale;
       island.position.set(x, baseY, z);
+      if (i === 0) {
+        island.updateMatrixWorld(true);
+        const hit = new THREE.Raycaster(v3(x, y + 40, HAVEN.bridgeEnd.z - 2), v3(0, -1, 0)).intersectObject(island, true)[0];
+        if (hit) island.position.y += gatewayDrop = HAVEN.bridgeEnd.y - 0.04 - hit.point.y;
+      }
       island.traverse((o) => {
         o.castShadow = o.receiveShadow = false;
       });
@@ -281,7 +287,7 @@ export class HavenWorld extends World {
     this.bonusRing.group.visible = false;
     scene.add(this.bonusRing.group);
     this.gateway = buildGateway(await ctx.assets.instance('gateway'));
-    this.gateway.group.position.set(gi.x, gi.y + 0.9, gi.z + 4.6);
+    this.gateway.group.position.set(gi.x, gi.y + 0.9 + gatewayDrop, gi.z + 4.6);
     scene.add(this.gateway.group);
     const gateGlow = makeHalo(0x8fb4ff, 22, 0.42);
     gateGlow.position.set(gi.x, gi.y + 6, gi.z + 3.5);

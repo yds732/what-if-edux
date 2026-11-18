@@ -421,11 +421,26 @@ export class BedroomWorld extends World {
       ctx.fillStyle = theme.dim;
       ctx.font = font(400, 19);
       ctx.fillText('Classmate · Harbour District School', 126, 104);
-      let y = 150;
-      for (const m of messages) {
-        ctx.font = font(500, 28);
+      const top = 136, bottom = footer ? h - 166 : h - 48;
+      ctx.font = font(500, 28);
+      const laid = messages.map((m) => {
         const lines = wrap(ctx, m.text, w - 230);
-        const bw = Math.min(w - 170, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh = lines.length * 36 + 26;
+        return { m, lines, bw: Math.min(w - 170, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh: lines.length * 36 + 26 };
+      });
+      let y = bottom;
+      const shown: typeof laid = [];
+      for (let i = laid.length - 1; i >= 0; i--) {
+        const item = laid[i]!;
+        if (y - item.bh < top && shown.length) break;
+        y -= item.bh + 12;
+        shown.unshift(item);
+      }
+      y = Math.max(top, y + 12);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, top - 6, w, bottom - top + 12);
+      ctx.clip();
+      for (const { m, lines, bw, bh } of shown) {
         const mine = m.from === 'you';
         const x = mine ? w - 60 - bw : 60;
         ctx.fillStyle = mine ? 'rgba(70, 130, 220, 0.75)' : 'rgba(255, 255, 255, 0.16)';
@@ -435,18 +450,17 @@ export class BedroomWorld extends World {
         lines.forEach((l, i) => ctx.fillText(l, x + 22, y + 31 + i * 36));
         y += bh + 12;
       }
+      ctx.restore();
       if (footer) {
-        const fy = h - 112;
-        ctx.fillStyle = 'rgba(255, 190, 120, 0.2)';
-        roundRect(ctx, 54, fy, w - 108, 62, 16);
-        ctx.fill();
-        ctx.font = font(600, 22);
-        ctx.fillStyle = '#ffd9a8';
-        ctx.fillText(footer.left, 76, fy + 32);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#ffc2ee';
-        ctx.fillText(footer.right, w - 76, fy + 32);
-        ctx.textAlign = 'left';
+        ctx.font = font(600, 21);
+        [[footer.left, 'rgba(255, 190, 120, 0.2)', '#ffd9a8'], [footer.right, 'rgba(255, 140, 220, 0.18)', '#ffc2ee']].forEach(([text, bg, fg], i) => {
+          const fy = h - 150 + i * 52;
+          ctx.fillStyle = bg!;
+          roundRect(ctx, 54, fy, w - 108, 44, 14);
+          ctx.fill();
+          ctx.fillStyle = fg!;
+          ctx.fillText(text!, 76, fy + 23);
+        });
       }
     });
   }
