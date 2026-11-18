@@ -169,6 +169,13 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       await d.wait(1.2);
       game.audio.sfx('notify');
       game.hud.setToast(TUESDAY.notification);
+      player.canMove = false;
+      guide.mode = 'still';
+      guide.person.lookAtPoint(game.playerEye);
+      player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
+      await d.play(MONDAY.lumiSad);
+      guide.mode = 'roam';
+      player.canMove = true;
     }
   }
   d.objective(null);

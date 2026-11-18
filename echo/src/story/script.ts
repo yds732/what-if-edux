@@ -71,7 +71,8 @@ export const MONDAY = {
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
   objectiveFree: 'Explore Haven with Lumi.',
-  objectiveJamie: 'You have a new message from Jamie. Press Q to take off the headset and read it.',
+  objectiveJamie: 'Leave Haven to check Jamie\'s message. Press Q to take off the headset.',
+  lumiSad: [L('lumi', "Oh... you're leaving already?", 'sad', 'handToChest')],
   promptTalk: 'Talk to Lumi',
   askGift: [
     L('lumi', "Not many people have joined the server yet, so nobody's ever given me anything...", 'sad'),
