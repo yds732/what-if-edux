@@ -134,13 +134,16 @@ export const TUESDAY = {
   },
   stay: {
     reply: [L('you', "Thanks, but I can't make it."), L('jamie', 'No worries! Next time :)', 'happy')],
-    back: [L('lumi', 'You came! I knew you would pick me.', 'delighted', 'cheer')],
-    ask: [L('lumi', "Do you know what would make us real friends? A gift! I'd love a gemstone more than anything.", 'delighted', 'present')],
-    given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
-    cheers: [
-      L('lumi', "Best day ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
+    back: [
+      L('lumi', 'You came back! I knew you would pick me.', 'delighted', 'cheer'),
+      L('lumi', "Come on, I want to show you something. Let's cross the Star Bridge together!", 'happy', 'beckon'),
     ],
-    result: { heading: 'Monday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
+    objective: 'Cross the Star Bridge with Lumi.',
+    portal: [
+      L('you', "Lumi... what's behind that glowing portal?"),
+      L('lumi', "Hmm... it's a secret. Spend a few more days with me, and you'll find out.", 'blank', 'handToChest'),
+    ],
+    result: { heading: 'Monday', gained: 'You made Lumi happy and spent the evening in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
 
