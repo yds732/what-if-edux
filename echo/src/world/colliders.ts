@@ -11,7 +11,32 @@ export interface GroundPoint {
   z: number;
 }
 
-export class Walkway {
+export interface Nearest {
+  d: number;
+  y: number;
+  x: number;
+  z: number;
+  past: number;
+  tx: number;
+  tz: number;
+}
+
+export interface Walkable {
+  readonly halfWidth: number;
+  nearest(x: number, z: number): Nearest | null;
+}
+
+export class Disc implements Walkable {
+  open = true;
+
+  constructor(readonly cx: number, readonly cz: number, readonly halfWidth: number, readonly y = 0) {}
+
+  nearest(x: number, z: number): Nearest | null {
+    return this.open ? { d: Math.hypot(x - this.cx, z - this.cz), y: this.y, x: this.cx, z: this.cz, past: 0, tx: 1, tz: 0 } : null;
+  }
+}
+
+export class Walkway implements Walkable {
   reach = 1;
   private readonly cum: number[] = [0];
 
@@ -26,10 +51,10 @@ export class Walkway {
     return this.cum[this.cum.length - 1]!;
   }
 
-  nearest(x: number, z: number): { d: number; y: number; x: number; z: number; past: number; tx: number; tz: number } | null {
+  nearest(x: number, z: number): Nearest | null {
     const limit = this.reach * this.length;
     if (limit <= 0) return null;
-    let best: { d: number; y: number; x: number; z: number; past: number; tx: number; tz: number } | null = null;
+    let best: Nearest | null = null;
     for (let i = 1; i < this.points.length; i++) {
       if (this.cum[i - 1]! >= limit) break;
       const a = this.points[i - 1]!, b = this.points[i]!;
@@ -50,7 +75,7 @@ export class Walkway {
 export class Colliders {
   bounds: Bounds | null = null;
   readonly obstacles: Obstacle[] = [];
-  readonly walkways: Walkway[] = [];
+  readonly walkways: Walkable[] = [];
 
   groundAt(x: number, z: number, radius: number): number | null {
     if (this.insideBounds(x, z, radius)) return null;

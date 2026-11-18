@@ -27,8 +27,8 @@ export interface RigMap {
 
 export interface AssetEntry {
   readonly kind: 'character' | 'prop';
-  readonly world: 'real' | 'haven';
-  readonly tiers: Record<AssetTier, TierFile>;
+  readonly world: 'real' | 'haven' | 'arcade';
+  readonly tiers: Partial<Record<AssetTier, TierFile>>;
   readonly height?: number;
   readonly rig?: RigMap;
   readonly glow?: Glow;
@@ -129,7 +129,8 @@ export class AssetLibrary {
   private async load(id: string, weight: AssetTier = this.tier): Promise<Model> {
     const entry = (await this.entries())[id];
     if (!entry) throw new Error(`there is no generated asset called "${id}"`);
-    const tier = entry.tiers[weight];
+    const tier = entry.tiers[weight] ?? entry.tiers.medium;
+    if (!tier) throw new Error(`the generated asset "${id}" has no model for this device`);
     this.expected += tier.bytes;
     const gltf = await loadGltf(this.base + tier.file, (loaded) => {
       this.fetched.set(id, loaded);

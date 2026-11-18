@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 // Drives the game the way a person does, through real key and mouse events. The scripted player is only used
 // to reach the start of each stretch (`handover`); from there everything goes through the DOM:
-//   1. Haven: advance a line, walk, take an orb with E, hold the mouse to draw back, release to throw, pause.
+//   1. Friday: a line waits to be read, Space moves it on, P pauses and stops time, Resume goes on.
 //   2. Monday: stand up, walk round the desks to the front, pick up the headset.
-//   3. Tuesday: walk in from the door to the poster table, choose a phrase with the number keys.
+//   3. Monday: walk in from the door to the poster table, choose a phrase with the number keys.
 //   4. Wednesday: walk from the door to the chair beside Jamie and sit down.
 //   5. Monday at home: cross the bedroom and put the headset on.
-//   6. Tuesday: take the headset off with Q, open the phone, click a choice card with the mouse.
+//   6. Thursday: take the headset off with Q, open the phone, click a choice card with the mouse.
 //   7. Friday: pause mid-scene, restart the day, toggle pause with P, go back to the title and begin again.
 //   8. The mouse: a click captures it, moving it looks around, losing it pauses, a decision frees and retakes it.
-// Sections 1 to 7 turn the view by setting the player's heading, so that they do not depend on where a mouse
-// happens to be; section 8 is the mouse itself.
+//   9. Thursday in Haven: walk with W and strafe with D, then off the meadow, onto the bridge and along it.
+// Sections 2 to 7 and 9 turn the view by setting the player's heading, so that they do not depend on where a
+// mouse happens to be; section 8 is the mouse itself.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -71,14 +72,10 @@ const open = async (query) => {
   return t;
 };
 
-// ------------------------------------------------------------------------------------------- 1. Haven
+// ------------------------------------------------------------------------------------------- 1. Friday, a line and the pause menu
 {
   const t = await open('?chapter=friday&dpr=1&q=high');
   const { page } = t;
-  const state = () => page.evaluate(() => {
-    const g = window.__game;
-    return { x: g.player.position.x, z: g.player.position.z, holding: g.star?.holding ?? false, lit: g.worlds.haven?.bridge.rings.filter((r) => r.state === 'lit').length ?? 0 };
-  });
   await t.beat('friday.class');
   // the mouse cannot be captured here: let clicks count as they do while a cursor is free
   await page.evaluate(() => { window.__game.input.wantsLock = false; window.__game.director.autoAdvance = false; });
@@ -88,54 +85,13 @@ const open = async (query) => {
   const before = await page.evaluate(() => window.__BEATS.length);
   await page.waitForTimeout(3000);
   check('a line waits for the player when auto-advance is off', (await page.evaluate(() => window.__BEATS.length)) === before);
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(300);
-  await page.keyboard.press('Space');
-  await t.beat('friday.voices', 15000).then(() => check('Space advances dialogue', true), () => check('Space advances dialogue', false));
-
-  const start = await state();
-  await page.keyboard.down('KeyW');
-  await page.waitForTimeout(2900);
-  await page.keyboard.up('KeyW');
-  await page.waitForTimeout(400);
-  const walked = await state();
-  check('W walks forward', start.z - walked.z > 5, `z ${start.z.toFixed(2)} -> ${walked.z.toFixed(2)}`);
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(500);
-  await page.keyboard.up('KeyD');
-  const strafed = await state();
-  check('D strafes right', strafed.x - walked.x > 0.5, `x ${walked.x.toFixed(2)} -> ${strafed.x.toFixed(2)}`);
-
-  const orb = await t.target();
-  if (orb) await t.face(...orb);
-  await page.waitForTimeout(500);
-  await t.shot('1_orb');
-  check('looking at the orb focuses it', await t.focused());
-  await page.keyboard.press('KeyE');
-  await page.waitForTimeout(1200);
-  check('E takes the orb', (await state()).holding);
-
-  // a person adjusts between throws: so does this, trying a little higher or lower each time
-  let hits = 0;
-  const LIFTS = [2.6, 2.0, 3.2, 1.5, 3.8, 2.3, 2.9, 1.0];
-  for (let attempt = 0; attempt < LIFTS.length && hits < 1; attempt++) {
-    await page.waitForFunction(() => window.__game.star.holding, undefined, { timeout: 8000 }).catch(() => undefined);
-    const c = await page.evaluate(() => {
-      const ring = window.__game.worlds.haven.bridge.rings.find((r) => r.state !== 'lit');
-      return [ring.center.x, ring.center.y, ring.center.z];
-    });
-    await t.face(c[0], c[1] + LIFTS[attempt], c[2]); // aim over the ring and let the arc fall into it
-    await page.waitForTimeout(400);
-    await page.mouse.move(640, 360);
-    await page.mouse.down();
-    await page.waitForTimeout(900);
-    if (attempt === 0) await t.shot('2_draw');
-    await page.mouse.up();
-    await page.waitForTimeout(2600);
-    hits = (await state()).lit;
+  // the teacher's opening lines, each typed out by one press and moved on from by the next
+  for (let i = 0; i < 12 && !(await page.evaluate(() => window.__BEATS.includes('friday.voices'))); i++) {
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
   }
-  check('hold and release throws an orb through a ring', hits >= 1, `rings lit: ${hits}`);
-  await t.shot('3_hit');
+  await t.beat('friday.voices', 15000).then(() => check('Space advances dialogue', true), () => check('Space advances dialogue', false));
+  await t.shot('1_voices');
 
   await page.keyboard.press('KeyP');
   await page.waitForSelector('.menu--veil.show', { timeout: 5000 }).then(() => check('P opens the pause menu', true), () => check('P opens the pause menu', false));
@@ -155,8 +111,8 @@ const open = async (query) => {
   await t.beat('monday.walk');
   await page.waitForTimeout(700);
   const from = await t.at();
-  // out from behind the desk, up the aisle between the columns, and across to the mark at the front
-  const route = [[1.4, 3.8], [1.4, -2.3], [1.0, -2.8]];
+  // out from behind the desk to the aisle down the middle of the room, and up it to the mark at the front
+  const route = [[0.2, 3.3], [0.1, -2.2], [0.1, -2.8]];
   let arrived = true;
   for (const [x, z] of route) arrived = arrived && (await t.walk(x, z));
   await t.shot('4_front');
@@ -172,7 +128,7 @@ const open = async (query) => {
   await t.close();
 }
 
-// ------------------------------------------------------------------------------------------- 3. Tuesday, the poster
+// ------------------------------------------------------------------------------------------- 3. Monday, the poster
 {
   const t = await open('?chapter=monday&auto=1&speed=6&handover=monday.poster&tue=meet&dpr=1&q=high');
   const { page } = t;
@@ -237,17 +193,24 @@ const open = async (query) => {
   const t = await open('?chapter=thursday&auto=1&speed=6&handover=thursday.oneMore&dpr=1&q=high');
   const { page } = t;
   await t.beat('thursday.oneMore');
-  await page.waitForTimeout(900);
+  // the day's last lines play out first: Q counts once the story asks for the headset to come off
+  await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 })
+    .then(() => check('Thursday: a prompt asks for the headset to come off, naming the key', true), () => check('Thursday: a prompt asks for the headset to come off, naming the key', false));
   await page.keyboard.press('KeyQ');
-  await t.beat('thursday.bedroom', 30000).then(() => check('Thursday: Q takes the headset off', true), () => check('Thursday: Q takes the headset off', false));
+  // Lumi asks for one more minute: 2 picks Leave
+  await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
+  await page.waitForTimeout(600);
+  await page.keyboard.press('Digit2');
+  await t.beat('thursday.bedroom', 60000).then(() => check('Thursday: Q takes the headset off', true), () => check('Thursday: Q takes the headset off', false));
   await page.waitForFunction(() => [...window.__game.interaction.items].some((i) => i.enabled), undefined, { timeout: 20000 });
   await page.waitForTimeout(1600);
   const phone = await t.target();
   await t.face(...phone);
   await page.waitForTimeout(400);
   await page.keyboard.press('KeyE');
-  await t.beat('thursday.decision', 30000).then(() => check('Thursday: E on the phone opens the message', true), () => check('Thursday: E on the phone opens the message', false));
-  await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 8000 }).catch(() => undefined);
+  // Jamie's messages arrive one by one in the opened phone; a thought is then held on screen before the choice
+  await t.beat('thursday.message', 60000).then(() => check('Thursday: E on the phone opens the message', true), () => check('Thursday: E on the phone opens the message', false));
+  await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 30000 }).catch(() => undefined);
   await page.waitForTimeout(900);
   // the mouse is free while a choice is up: point at the second card and click it
   const card = await page.evaluate(() => {
@@ -355,6 +318,44 @@ const open = async (query) => {
   await page.mouse.click(card.x, card.y);
   await page.waitForTimeout(900);
   check('the click that chooses also takes the mouse back', (await page.evaluate(() => window.__game.state.policyChoice)) === 'combined' && (await locked()) === 'view', `choice ${await page.evaluate(() => window.__game.state.policyChoice)}, lock ${await locked()}`);
+  await t.close();
+}
+
+// ------------------------------------------------------------------------------------------- 9. Thursday, onto the bridge
+{
+  const t = await open('?chapter=thursday&auto=1&speed=6&handover=thursday.festival&dpr=1&q=low');
+  const { page } = t;
+  await t.beat('thursday.festival', 180000);
+  // the welcome is read through, and then the walk is the player's
+  for (let i = 0; i < 30 && !(await page.evaluate(() => window.__game.player.canMove && !window.__game.hud.subtitle)); i++) {
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(350);
+  }
+  // W walks where the player faces, up the meadow towards the bridge, and D steps to the right of that
+  await t.face(0, 1.6, -12.3);
+  const start = await t.at();
+  await page.keyboard.down('KeyW');
+  await page.waitForTimeout(2900);
+  await page.keyboard.up('KeyW');
+  await page.waitForTimeout(400);
+  const walked = await t.at();
+  check('W walks forward', start.z - walked.z > 5, `z ${start.z.toFixed(2)} -> ${walked.z.toFixed(2)}`);
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('KeyD');
+  const strafed = await t.at();
+  check('D strafes right', strafed.x - walked.x > 0.5, `x ${walked.x.toFixed(2)} -> ${strafed.x.toFixed(2)}`);
+  // up the middle of the meadow, over its edge to the bridge's first tile, and along the bridge as it winds
+  const edge = await t.walk(0, -9.4, 0.6, 20000);
+  const tile = await t.walk(0, -12.3, 0.7, 10000);
+  const first = await t.at();
+  check('Thursday: the bridge can be walked onto from the meadow', edge && tile, `(${first.x.toFixed(1)}, ${first.z.toFixed(1)})`);
+  for (let k = 0.03; k <= 0.3001; k += 0.03) {
+    const at = await page.evaluate((u) => { const v = window.__game.app.world.bridge.path.getPointAt(u); return [v.x, v.z]; }, k);
+    await t.walk(at[0], at[1], 0.6, 8000);
+  }
+  await t.shot('9_bridge');
+  await t.beat('thursday.oneMore', 8000).then(() => check('Thursday: walking out along the bridge moves the story on', true), () => check('Thursday: walking out along the bridge moves the story on', false));
   await t.close();
 }
 

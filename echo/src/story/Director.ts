@@ -32,12 +32,12 @@ export class Director {
     this.controller = new AbortController();
   }
 
-  wait(seconds: number): Promise<void> {
-    return this.game.app.tasks.wait(seconds, this.signal);
+  wait(seconds: number, signal: AbortSignal = this.signal): Promise<void> {
+    return this.game.app.tasks.wait(seconds, signal);
   }
 
-  until(predicate: (dt: number) => boolean): Promise<void> {
-    return this.game.app.tasks.until(predicate, this.signal);
+  until(predicate: (dt: number) => boolean, signal: AbortSignal = this.signal): Promise<void> {
+    return this.game.app.tasks.until(predicate, signal);
   }
 
   tween(seconds: number, onUpdate: (k: number) => void, easing: Ease = ease.inOutCubic): Promise<void> {
@@ -55,7 +55,7 @@ export class Director {
     return true;
   }
 
-  async say(line: Line): Promise<void> {
+  async say(line: Line, signal: AbortSignal = this.signal): Promise<void> {
     const { hud, audio, app } = this.game;
     const speaker = SPEAKERS[line.who];
     const person = app.world?.cast[line.who];
@@ -80,7 +80,7 @@ export class Director {
         }
         hud.setSubtitleProgress(shown, false);
         return shown >= total;
-      });
+      }, signal);
     }
     person?.setTalking(0);
     hud.setSubtitleProgress(total, true);
@@ -93,7 +93,7 @@ export class Director {
         return true;
       }
       return (this.autoAdvance || this.auto) && held > reading;
-    });
+    }, signal);
   }
 
   async play(lines: readonly Line[]): Promise<void> {

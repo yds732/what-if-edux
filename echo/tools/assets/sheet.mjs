@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { ASSETS, sheetPrompt, sheetSize } from '../../assets/catalog.mjs';
+import { ASSETS, isMade, sheetPrompt, sheetSize } from '../../assets/catalog.mjs';
 import { CACHE, SHEETS, ensureDir, sheetFile } from './lib/env.mjs';
 import { IMAGE_MODELS, generateImage } from './lib/openai.mjs';
 import { pool } from './lib/pool.mjs';
@@ -18,7 +18,7 @@ const args = process.argv.slice(2);
 const flag = (name) => args.find((a) => a === `--${name}` || a.startsWith(`--${name}=`))?.split('=')[1] ?? (args.includes(`--${name}`) ? true : null);
 const named = args.filter((a) => !a.startsWith('--'));
 // `all` is every asset that has no sheet yet
-const ids = named[0] === 'all' ? Object.keys(ASSETS).filter((id) => !fs.existsSync(sheetFile(id))) : named;
+const ids = named[0] === 'all' ? Object.keys(ASSETS).filter((id) => isMade(id) && !fs.existsSync(sheetFile(id))) : named;
 if (ids.length === 0) {
   console.error(`usage: sheet.mjs <id> [...]\nassets: ${Object.keys(ASSETS).join(', ')}`);
   process.exit(2);
@@ -32,13 +32,14 @@ const one = async (id) => {
   if (!asset) throw new Error(`no asset called "${id}"`);
   const file = sheetFile(take ? `${id}.take${take}` : id);
   if (fs.existsSync(file) && !flag('force')) return `${id}: kept existing sheet`;
-  const refIds = typeof flag('refs') === 'string' ? flag('refs').split(',') : asset.kind === 'key' || asset.kind === 'picture' ? [] : [`key-${asset.world}`];
+  const refIds = typeof flag('refs') === 'string' ? flag('refs').split(',') : asset.refs ?? (asset.kind === 'key' || asset.kind === 'picture' ? [] : [`key-${asset.world}`]);
   const references = refIds.map((ref) => {
     const refFile = sheetFile(ref);
     if (!fs.existsSync(refFile)) throw new Error(`${id} needs the sheet "${ref}" as a reference: make that one first`);
     return { name: path.basename(refFile), buffer: fs.readFileSync(refFile) };
   });
-  const prompt = references.length ? `${sheetPrompt(id)}\n\nThe attached image is the style reference: match its finish, materials, proportions and lighting exactly, but draw only what is described here.` : sheetPrompt(id);
+  const note = asset.refNote ?? 'The attached image is the style reference: match its finish, materials, proportions and lighting exactly, but draw only what is described here.';
+  const prompt = references.length ? `${sheetPrompt(id)}\n\n${note}` : sheetPrompt(id);
   const started = Date.now();
   const png = await generateImage({
     asset: id, prompt, size: sheetSize(id), references,

@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import { FRIDAY, MONDAY, TUESDAY, WEDNESDAY, type Line, type SpeakerId } from '../story/script';
 import { SPACES, type BedName } from './beds';
+import { ARCADE_SFX } from './arcadeSfx';
 import type { SfxName } from './GameAudio';
 import { MAX_ONE_SHOTS, Mixer, type Space } from './mixer';
 import { SFX } from './sfx';
@@ -129,6 +130,7 @@ const expectFaultless = (r: Row, audio: WebAudio): Row => {
 const SCAPE_PEAK: Record<BedName, readonly [number, number]> = {
   title: [-21, -15], haven: [-21, -15], havenEvening: [-22, -15], havenFestival: [-21, -15], ending: [-21, -15],
   classroomWarm: [-21, -15], bedroom: [-22, -15], unease: [-30, -18], classroom: [-42, -24],
+  arcadeRally: [-21, -15], arcadeSprites: [-21, -15], arcadeLanterns: [-21, -15], arcadeDrift: [-21, -15], arcadeDusk: [-21, -15],
 };
 
 const scape = async (name: BedName): Promise<Row> => {
@@ -210,9 +212,9 @@ const silence = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-const IN_HAVEN: ReadonlySet<SfxName> = new Set(['orbAppear', 'orbTake', 'orbThrow', 'ringHit', 'ringRim', 'orbFizzle', 'bridgeBuild', 'bridgeComplete', 'firework', 'gateOpen', 'cheer', 'fail']);
-const LOUD: ReadonlySet<SfxName> = new Set(['ringHit', 'gateOpen']);
-const FAINT: ReadonlySet<SfxName> = new Set(['uiHover', 'advance']);
+const IN_HAVEN: ReadonlySet<SfxName> = new Set<SfxName>(['orbAppear', 'orbTake', 'orbThrow', 'ringHit', 'ringRim', 'orbFizzle', 'bridgeBuild', 'bridgeComplete', 'firework', 'gateOpen', 'cheer', 'fail', ...(Object.keys(ARCADE_SFX) as SfxName[])]);
+const LOUD: ReadonlySet<SfxName> = new Set<SfxName>(['ringHit', 'gateOpen', 'thunder', 'gemPrism']);
+const FAINT: ReadonlySet<SfxName> = new Set<SfxName>(['uiHover', 'advance', 'arcadeCount', 'serveToss', 'ballOut', 'gemPick', 'gemSwap', 'gemBack', 'gemLand', 'gemGather', 'hookCast', 'sparkThrow', 'lingLit', 'mawStruck', 'flockDim']);
 
 const effect = async (name: SfxName, space: Space = IN_HAVEN.has(name) ? 'haven' : 'interior'): Promise<Row> => {
   const seconds = 9;

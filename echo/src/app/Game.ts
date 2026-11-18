@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { Arcade } from '../arcade/Arcade';
+import { runHub } from '../arcade/hub';
+import type { MinigameId } from '../arcade/registry';
 import { NullAudio, type GameAudio } from '../audio/GameAudio';
 import { isCancelled } from '../core/tasks';
 import { StarBridgeGame } from '../game/StarBridgeGame';
@@ -51,6 +54,7 @@ export class Game {
   readonly hud: Hud;
   readonly interaction: Interaction;
   readonly director: Director;
+  readonly arcade: Arcade;
   readonly autopilot = new Autopilot();
   readonly headset: HeadsetProp;
   readonly xr: XRRig;
@@ -94,6 +98,7 @@ export class Game {
       { update: (dt) => this.audio.update(dt, app.camera) },
       { update: () => this.input.endFrame() },
     );
+    this.arcade = new Arcade(this);
     this.xr = new XRRig(this);
     app.senses.push({ update: (dt) => this.xr.update(dt) }, { update: () => this.input.beginFrame() });
     this.input.onGesture.on(() => this.audio.unlock());
@@ -105,7 +110,7 @@ export class Game {
     this.app.systems.splice(this.app.systems.length - 1, 0, { update });
   }
 
-  private context(): BuildContext {
+  context(): BuildContext {
     return { renderer: this.app.renderer, quality: this.app.quality, assets: this.assets, step: () => new Promise((r) => setTimeout(r, 0)) };
   }
 
@@ -150,6 +155,7 @@ export class Game {
 
   clearStage(): void {
     this.director.abort();
+    this.arcade.reset();
     const app = this.app;
     app.zoom = app.fovKick = 0;
     app.lookOverride = null;
@@ -175,6 +181,18 @@ export class Game {
         await CHAPTER_RUNNERS[id](this);
       }
       this.onChapter?.('end');
+    } catch (e) {
+      if (!isCancelled(e)) throw e;
+    }
+  }
+
+  async runArcade(first: MinigameId | null = null): Promise<void> {
+    this.clearStage();
+    this.chapter = null;
+    this.playing = true;
+    this.hud.setControlsTip(true);
+    try {
+      await runHub(this, first);
     } catch (e) {
       if (!isCancelled(e)) throw e;
     }

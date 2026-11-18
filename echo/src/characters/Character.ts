@@ -73,6 +73,7 @@ export class Character {
   private hover = 0;
   private liveliness = 1;
   private seatHeight = 0.36;
+  onPose: ((bones: Rig['bones']) => void) | null = null;
 
   constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {
     this.spec = spec;
@@ -279,6 +280,7 @@ export class Character {
     hips.position.y = lerp(hips.position.y, targetY, k);
     hips.position.x = lerp(hips.position.x, sway * 0.006 * (this.pose === 'stand' ? 1 : 0), k);
     hips.position.z = lerp(hips.position.z, base.hipsZ, k);
+    this.onPose?.(bones);
     this.body.retarget();
   }
 }

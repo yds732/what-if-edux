@@ -44,7 +44,7 @@ try {
     await (await import('./app/shot')).runShot(canvas, params);
   } else {
     await (await import('./app/play')).runGame(canvas, params);
-    if (params.has('chapter') || params.has('auto')) document.querySelector('.boot')?.remove();
+    if (params.has('chapter') || params.has('auto') || params.has('arcade') || params.has('play')) document.querySelector('.boot')?.remove();
   }
 } catch (e) {
   fail(e);
