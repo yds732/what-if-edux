@@ -34,7 +34,7 @@ const TOP = { y: 0.74, slab: 0.03, deep: 0.62, start: -0.15, ret: 1.3, retDeep: 
 const OAK = 0xd6b58e, STEEL_WHITE = 0xeef0f3, SLATE_BLUE = 0x51627e;
 const SCONCE_COLOR = 0xfff1e0, LED_COLOR = 0xfff1e0;
 const SHELF = { under: 0.18, front: 0.13 };
-const MATTRESS_TOP = 0.615;
+const MATTRESS_TOP = 0.56;
 const SUN_DIRECTION = new THREE.Vector3(-0.28, 0.28, -0.96).normalize(), CITY_GLOW = new THREE.Vector3(0.12, 0.16, -1).normalize();
 
 export class BedroomWorld extends World {
@@ -67,7 +67,7 @@ export class BedroomWorld extends World {
   private callTarget = 0;
   private rain!: THREE.Mesh;
   private dust!: Motes;
-  private holoDesk!: { group: THREE.Group; update(time: number): void };
+  private holoDesk!: { group: THREE.Group; update(time: number, hide: number): void };
   private readonly clock = { value: 0 };
   private readonly lightDirection = new THREE.Vector3();
 
@@ -76,7 +76,7 @@ export class BedroomWorld extends World {
     this.near = 0.05;
     this.far = 1200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 0.65, contrast: 0.2, vignette: 0.38, grain: 0.016, chroma: 0.004, dof: 0.75, streak: 0.3,
+      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 0.65, contrast: 0.2, vignette: 0.3, grain: 0.006, chroma: 0, dof: 0, streak: 0.3,
       shadowTint: new THREE.Color(0.0, 0.006, 0.02), highlightTint: new THREE.Color(0, 0, 0),
     }));
     this.clearColor.set(0x0b0d16);
@@ -120,9 +120,9 @@ export class BedroomWorld extends World {
     await ctx.step('bedroom: shell');
 
     const deskTop = (await sizeOf(ctx, 'study-desk'))[1];
-    const [bedWide, , bedLong] = await sizeOf(ctx, 'bed');
+    const bedWide = 1.12, bedLong = 2.06;
     const bx = -W + bedWide / 2 + 0.02, bz = -D + bedLong / 2 + 0.05;
-    await dress(ctx, scene, 'bed', [[bx, 0, bz]]);
+    scene.add(buildBed(bx, bz, bedWide, bedLong));
     const bedside = buildBedside(LAMP.x, LAMP.z);
     scene.add(bedside.group);
     this.lampShade = bedside.shade;
@@ -140,8 +140,16 @@ export class BedroomWorld extends World {
     await dress(ctx, scene, 'plant-small', [[DESK.x - 0.62, deskTop, DESK.z - 0.2, 40, 1.15], [1.7, WY0, -D + 0.1, 200, 1.4]]);
     const sx = W - 0.16;
     scene.add(buildShelf(1.02, -0.72, 'lower'), buildShelf(1.6, -0.3, 'upper'));
-    await dress(ctx, scene, 'wardrobe', [[WARDROBE.x, 0, WARDROBE.z, 180]]);
-    await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
+    scene.add(buildWardrobe(WARDROBE.x, WARDROBE.z));
+    const beanbag = await dress(ctx, scene, 'beanbag', [[BEANBAG.x, 0, BEANBAG.z, -40]]);
+    beanbag.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const m = (o.material as THREE.MeshStandardMaterial).clone();
+      m.map = null;
+      m.color.set(0xeceae6);
+      m.roughness = 0.9;
+      o.material = m;
+    });
     await dress(ctx, scene, 'backpack', [[BAG.x, 0, BAG.z, 35]]);
     await dress(ctx, scene, 'door', [[-1.2, 0, D - 0.07, 180]]);
     const board = buildRoutineBoard(1.25, H * 0.65);
@@ -155,7 +163,7 @@ export class BedroomWorld extends World {
     scene.add(buildBook(bx + 0.08, MATTRESS_TOP, bz + 0.38, 28));
     await ctx.step('bedroom: furniture');
 
-    const rug = new THREE.Mesh(new THREE.CircleGeometry(1.15, 64), new THREE.MeshStandardMaterial({ map: (await ctx.assets.picture('rug')).map, roughness: 0.95 }));
+    const rug = new THREE.Mesh(new THREE.CircleGeometry(1.15, 96), new THREE.MeshStandardMaterial({ map: beigeRug(), roughness: 1 }));
     rug.rotation.x = -Math.PI / 2;
     rug.position.set(0.25, 0.006, 0.35);
     rug.receiveShadow = true;
@@ -307,7 +315,7 @@ export class BedroomWorld extends World {
     this.phone.group.rotation.y = 0.35;
     scene.add(this.phone.group);
     this.hologram = new Panel(760, 500, { world: true, additive: false });
-    this.hologram.mesh.scale.set(0.95, 0.625, 1);
+    this.hologram.mesh.scale.set(0.78, 0.513, 1);
     this.hologram.mesh.position.copy(BEDROOM.hologram);
     this.hologram.mesh.rotation.set(-0.08, -0.12, 0);
     this.hologram.opacity = 0;
@@ -319,7 +327,7 @@ export class BedroomWorld extends World {
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
       uniforms: { uShow: { value: 0 } },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform float uShow; varying vec2 vUv; void main(){ gl_FragColor = vec4(vec3(0.35, 0.65, 1.0) * (1.0 - vUv.y) * 0.5 * uShow, 1.0);
+      fragmentShader: `uniform float uShow; varying vec2 vUv; void main(){ gl_FragColor = vec4(vec3(0.35, 0.65, 1.0) * pow(1.0 - vUv.y, 2.0) * 0.25 * uShow, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -415,16 +423,16 @@ export class BedroomWorld extends World {
       ctx.fillText('Classmate · Harbour District School', 126, 104);
       let y = 150;
       for (const m of messages) {
-        ctx.font = font(400, 25);
-        const lines = wrap(ctx, m.text, w - 250);
-        const bw = Math.min(w - 190, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh = lines.length * 33 + 26;
+        ctx.font = font(500, 28);
+        const lines = wrap(ctx, m.text, w - 230);
+        const bw = Math.min(w - 170, Math.max(...lines.map((l) => ctx.measureText(l).width)) + 44), bh = lines.length * 36 + 26;
         const mine = m.from === 'you';
         const x = mine ? w - 60 - bw : 60;
-        ctx.fillStyle = mine ? 'rgba(120, 190, 255, 0.34)' : 'rgba(255, 255, 255, 0.13)';
+        ctx.fillStyle = mine ? 'rgba(70, 130, 220, 0.75)' : 'rgba(255, 255, 255, 0.16)';
         roundRect(ctx, x, y, bw, bh, 20);
         ctx.fill();
         ctx.fillStyle = theme.text;
-        lines.forEach((l, i) => ctx.fillText(l, x + 22, y + 30 + i * 33));
+        lines.forEach((l, i) => ctx.fillText(l, x + 22, y + 31 + i * 36));
         y += bh + 12;
       }
       if (footer) {
@@ -432,7 +440,7 @@ export class BedroomWorld extends World {
         ctx.fillStyle = 'rgba(255, 190, 120, 0.2)';
         roundRect(ctx, 54, fy, w - 108, 62, 16);
         ctx.fill();
-        ctx.font = font(600, 19);
+        ctx.font = font(600, 22);
         ctx.fillStyle = '#ffd9a8';
         ctx.fillText(footer.left, 76, fy + 32);
         ctx.textAlign = 'right';
@@ -456,7 +464,7 @@ export class BedroomWorld extends World {
     super.update(frame);
     const { dt, time } = frame;
     this.city.update(time);
-    this.holoDesk.update(time);
+    this.holoDesk.update(time, Math.max(this.holoShown, this.callShown));
     this.lampShade.emissiveIntensity = this.lampGlow.value;
     this.clock.value = time;
     this.dust.setPixelHeight(frame.pixelHeight);
@@ -1023,7 +1031,7 @@ const holoCard = (wide: number, tall: number, paint: (c: CanvasRenderingContext2
   return mesh;
 };
 
-const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group; update(time: number): void } => {
+const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group; update(time: number, hide: number): void } => {
   const group = new THREE.Group();
   const puckMat = new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 0.35, metalness: 0.5 });
   const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.024, 48), puckMat);
@@ -1098,7 +1106,10 @@ const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group
   group.rotation.y = -0.22;
   return {
     group,
-    update(time) {
+    update(time, hide) {
+      float.visible = hide < 0.98;
+      float.scale.setScalar(Math.max(0.001, 1 - hide));
+      light.intensity = 0.9 * (1 - hide);
       float.position.y = 0.52 + Math.sin(time * 1.1) * 0.006;
       globe.rotation.y = time * 0.4;
       band.rotation.z = time * 0.15;
@@ -1140,5 +1151,253 @@ const buildBookStack = (x: number, y: number, z: number, yawDeg: number): THREE.
   }
   group.position.set(x, y, z);
   group.rotation.y = THREE.MathUtils.degToRad(yawDeg);
+  return group;
+};
+
+const starryCloth = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 512;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#34446b';
+  c.fillRect(0, 0, 512, 512);
+  const rng = new Rng(311);
+  for (let i = 0; i < 260; i++) {
+    const x = rng.next() * 512, y = rng.next() * 512, r = 0.8 + rng.next() * 1.8;
+    c.fillStyle = rng.next() < 0.25 ? 'rgba(255, 214, 140, 0.9)' : 'rgba(225, 232, 255, 0.75)';
+    if (r > 2.2) {
+      c.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU, rr = k % 2 ? r * 0.35 : r * 2.2;
+        c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      c.fill();
+    } else {
+      c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 4;
+  return map;
+};
+
+const beigeRug = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1024;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#cdb896';
+  c.fillRect(0, 0, 1024, 1024);
+  const rng = new Rng(97);
+  for (let i = 0; i < 26000; i++) {
+    const v = rng.next();
+    c.fillStyle = v < 0.5 ? 'rgba(255, 250, 240, 0.16)' : 'rgba(120, 100, 75, 0.12)';
+    c.fillRect(rng.next() * 1024, rng.next() * 1024, 1 + rng.next() * 2, 1 + rng.next() * 2);
+  }
+  c.strokeStyle = 'rgba(150, 128, 98, 0.35)';
+  c.lineWidth = 14;
+  c.beginPath(); c.arc(512, 512, 470, 0, TAU); c.stroke();
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  return map;
+};
+
+const drape = (wide: number, long: number, y: number, side: number, foot: number, opts: { quilt?: number; seed?: number; nx?: number; nz?: number } = {}): THREE.BufferGeometry => {
+  const nx = opts.nx ?? 72, nz = opts.nz ?? 96, quilt = opts.quilt ?? 0, seed = opts.seed ?? 0, rc = 0.05;
+  const over = (s: number): [number, number] => {
+    if (s <= 0) return [s, 0];
+    const arc = (Math.PI / 2) * rc;
+    if (s < arc) { const t = s / rc; return [rc * Math.sin(t), rc * (1 - Math.cos(t))]; }
+    const hang = s - arc;
+    return [rc + hang * 0.12, rc + hang];
+  };
+  const totalX = wide + 2 * side, totalZ = long + foot;
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= nz; j++) {
+    for (let i = 0; i <= nx; i++) {
+      const u = i / nx, v = j / nz;
+      const sx = u * totalX - totalX / 2, sz = v * totalZ;
+      const ex = Math.abs(sx) - wide / 2, ez = sz - long;
+      const [ox, dx] = over(ex), [oz, dz] = over(ez);
+      let px = ex > 0 ? Math.sign(sx) * (wide / 2 + ox) : sx;
+      let pz = ez > 0 ? long + oz : sz;
+      let py = y - Math.max(dx, dz) - Math.min(dx, dz) * 0.35;
+      const hx = Math.max(0, ex - rc) / Math.max(side, 1e-3), hz = Math.max(0, ez - rc) / Math.max(foot, 1e-3);
+      const ripple = (a: number): number => Math.sin(a * 23 + seed) * 0.6 + Math.sin(a * 41 + seed * 2.3) * 0.4;
+      px += Math.sign(sx) * 0.009 * hx * hx * ripple(pz);
+      pz += 0.009 * hz * hz * ripple(px + 3);
+      if (ex <= 0 && ez <= 0) {
+        const edge = Math.min(1, -ex / 0.12, -ez / 0.12);
+        py += 0.012 * edge;
+        if (quilt > 0) {
+          const qx = Math.abs(Math.sin((Math.PI * sx) / quilt)), qz = Math.abs(Math.sin((Math.PI * sz) / quilt));
+          py += 0.012 * edge * Math.pow(qx * qz, 0.6);
+        }
+        py += 0.004 * Math.sin(sx * 9 + seed) * Math.sin(sz * 7 + seed * 1.7);
+      }
+      pos.push(px, py, pz);
+      uv.push(u * totalX, v * totalZ);
+    }
+  }
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const a = j * (nx + 1) + i, b = a + nx + 1;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+};
+
+const pillowGeo = (w: number, h: number, d: number): THREE.BufferGeometry => {
+  const g = new THREE.BoxGeometry(1, 1, 1, 28, 6, 18);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) * 2, y = p.getY(i) * 2, z = p.getZ(i) * 2;
+    const puff = Math.sqrt(Math.max(0, (1 - x * x) * (1 - z * z)));
+    const pinch = 1 - 0.08 * (1 - puff) * (1 - Math.abs(y));
+    p.setXYZ(i, (x * w * pinch) / 2, (y * h * (0.18 + 0.82 * Math.pow(puff, 0.7))) / 2, (z * d * pinch) / 2);
+  }
+  g.computeVertexNormals();
+  return g;
+};
+
+const knit = (): THREE.CanvasTexture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const c = canvas.getContext('2d')!;
+  c.fillStyle = '#e9e1d2';
+  c.fillRect(0, 0, 256, 256);
+  for (let x = 0; x < 256; x += 16) {
+    const g = c.createLinearGradient(x, 0, x + 16, 0);
+    g.addColorStop(0, 'rgba(140, 120, 95, 0.28)');
+    g.addColorStop(0.5, 'rgba(255, 252, 245, 0.2)');
+    g.addColorStop(1, 'rgba(140, 120, 95, 0.28)');
+    c.fillStyle = g;
+    c.fillRect(x, 0, 16, 256);
+  }
+  for (let y = 0; y < 256; y += 8) { c.fillStyle = 'rgba(120, 100, 80, 0.08)'; c.fillRect(0, y, 256, 2); }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(5, 5);
+  return map;
+};
+
+const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group => {
+  const group = new THREE.Group();
+  const fabric = new THREE.MeshStandardMaterial({ color: 0xa9a7ad, roughness: 0.92 });
+  const sheet = new THREE.MeshStandardMaterial({ color: 0xf3f1ec, roughness: 0.9, side: THREE.DoubleSide });
+  const plinth = new THREE.Mesh(roundBox(wide - 0.2, 0.1, long - 0.2, 0.02, 2), new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.6 }));
+  plinth.position.y = 0.05;
+  const base = new THREE.Mesh(roundBox(wide, 0.2, long, 0.06, 5), fabric);
+  base.position.y = 0.2;
+  const ring = (y: number): THREE.Mesh => {
+    const s = new THREE.Shape(), hw = wide / 2 - 0.004, hl = long / 2 - 0.004, r = 0.055;
+    s.moveTo(-hw + r, -hl); s.lineTo(hw - r, -hl); s.quadraticCurveTo(hw, -hl, hw, -hl + r); s.lineTo(hw, hl - r);
+    s.quadraticCurveTo(hw, hl, hw - r, hl); s.lineTo(-hw + r, hl); s.quadraticCurveTo(-hw, hl, -hw, hl - r); s.lineTo(-hw, -hl + r);
+    s.quadraticCurveTo(-hw, -hl, -hw + r, -hl);
+    const pts = s.getSpacedPoints(160).map((p) => new THREE.Vector3(p.x, y, p.y));
+    return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, 0.007, 8, true), new THREE.MeshStandardMaterial({ color: 0x8f8d94, roughness: 0.8 }));
+  };
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(1.6) });
+  for (const [w, d, dx, dz] of [[wide - 0.2, 0.01, 0, (long - 0.2) / 2], [wide - 0.2, 0.01, 0, -(long - 0.2) / 2], [0.01, long - 0.2, (wide - 0.2) / 2, 0], [0.01, long - 0.2, -(wide - 0.2) / 2, 0]] as const) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(w, 0.006, d), glowMat);
+    s.position.set(dx, 0.097, dz);
+    group.add(s);
+  }
+  const under = new THREE.PointLight(SCONCE_COLOR, 0.25, 1.4, 2);
+  under.position.set(0.35, 0.06, 0);
+  const mw = wide - 0.06, ml = long - 0.06, mTop = 0.5;
+  const mattress = new THREE.Mesh(roundBox(mw, 0.2, ml, 0.07, 6), sheet);
+  mattress.position.set(0, mTop - 0.1, 0);
+  const cloth = new THREE.MeshStandardMaterial({ map: starryCloth(), roughness: 0.92, side: THREE.DoubleSide });
+  cloth.map!.repeat.set(1.4, 1.4);
+  const head = -long / 2 + 0.6, duvetLong = ml / 2 - head;
+  const duvet = new THREE.Mesh(drape(mw, duvetLong, mTop + 0.03, 0.27, 0.26, { quilt: 0.2, seed: 1 }), cloth);
+  duvet.position.set(0, 0, head);
+  const turn = new THREE.Mesh(drape(mw + 0.01, 0.17, mTop + 0.065, 0.27, 0, { seed: 4, nz: 24 }), sheet);
+  turn.position.set(0, 0, head - 0.02);
+  const throwMat = new THREE.MeshStandardMaterial({ map: knit(), roughness: 1, side: THREE.DoubleSide });
+  const blanket = new THREE.Mesh(drape(mw + 0.02, 0.42, mTop + 0.075, 0.3, 0.2, { seed: 7, nz: 40 }), throwMat);
+  blanket.position.set(0, 0, ml / 2 - 0.42);
+  const pillowMat = new THREE.MeshStandardMaterial({ color: 0xf6f5f2, roughness: 0.88 });
+  const front = new THREE.Mesh(pillowGeo(wide * 0.72, 0.13, 0.4), pillowMat);
+  front.position.set(0.03, mTop + 0.06, -long / 2 + 0.3);
+  front.rotation.set(-0.08, 0.04, 0);
+  const star = new THREE.Shape();
+  for (let k = 0; k <= 10; k++) {
+    const a = Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 0.045 : 0.1;
+    if (k === 0) star.moveTo(Math.cos(a) * r, Math.sin(a) * r); else star.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const plush = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.022, bevelSegments: 5 }), new THREE.MeshStandardMaterial({ color: 0xf0c03a, roughness: 0.95 }));
+  plush.position.set(0.2, mTop + 0.15, -long / 2 + 0.3);
+  plush.rotation.set(-0.9, 0.25, 0.2);
+  group.add(plinth, base, ring(0.297), ring(0.103), under, mattress, duvet, turn, blanket, front, plush);
+  group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, 0, z);
+  return group;
+};
+
+const buildWardrobe = (x: number, z: number): THREE.Group => {
+  const group = new THREE.Group();
+  const wide = 1.1, tall = 1.9, deep = 0.58, foot = 0.07, t = 0.025;
+  const body = new THREE.MeshStandardMaterial({ color: 0xe6e4e0, roughness: 0.7 });
+  const inside = new THREE.MeshStandardMaterial({ color: 0x3a4357, roughness: 0.8 });
+  const front = -deep / 2, h = tall - foot, cy = foot + h / 2;
+  const doorsW = 0.74, nicheW = wide - doorsW;
+  const slab = (w: number, hh: number, d: number, px: number, py: number, pz: number, m: THREE.Material = body): void => {
+    const mesh = new THREE.Mesh(roundBox(w, hh, d, Math.min(0.008, w / 3, hh / 3, d / 3), 1), m);
+    mesh.position.set(px, py, pz);
+    group.add(mesh);
+  };
+  const left = wide / 2, right = -wide / 2;
+  slab(t, h, deep, left - t / 2, cy, 0);
+  slab(t, h, deep, right + t / 2, cy, 0);
+  slab(wide, t, deep, 0, tall - t / 2, 0);
+  slab(wide, t, deep, 0, foot + t / 2, 0);
+  slab(wide, h, 0.01, 0, cy, deep / 2 - 0.005, inside);
+  const divider = left - doorsW;
+  slab(t, h, deep, divider, cy, 0);
+  const doorW = doorsW / 2 - 0.006;
+  for (const k of [0, 1]) {
+    const dx = left - doorW / 2 - 0.003 - k * (doorW + 0.006);
+    slab(doorW, h - 0.02, 0.022, dx, cy, front - 0.011);
+    const pull = new THREE.Mesh(roundBox(0.012, 0.2, 0.016, 0.005, 1), new THREE.MeshStandardMaterial({ color: 0x2d323d, roughness: 0.4, metalness: 0.5 }));
+    pull.position.set(left - doorsW / 2 + (k === 0 ? 0.03 : -0.03), 1.05, front - 0.028);
+    group.add(pull);
+  }
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(1.8) });
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.004, h - 0.14, 0.004), glowMat);
+  seam.position.set(left - doorsW / 2, cy, front - 0.014);
+  group.add(seam);
+  const nx = (divider + right) / 2, nw = nicheW - t * 1.5;
+  const levels = [0.5, 0.92, 1.34];
+  for (const y of levels) {
+    slab(nw, 0.02, deep - 0.04, nx, y, 0.01);
+    const led = new THREE.Mesh(new THREE.BoxGeometry(nw - 0.02, 0.004, 0.006), glowMat);
+    led.position.set(nx, y - 0.013, front + 0.04);
+    group.add(led);
+  }
+  const shelfLight = new THREE.PointLight(SCONCE_COLOR, 0.35, 1.2, 2);
+  shelfLight.position.set(nx, 1.1, front + 0.1);
+  group.add(shelfLight);
+  const fold = (w: number, hh: number, color: number, px: number, py: number): void => slab(w, hh, 0.3, px, py + hh / 2, 0.02, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
+  let y = levels[0]! + 0.01;
+  for (const c of [0x4a5a7c, 0xd9d6cf, 0x8a95ab]) { fold(0.24, 0.045, c, nx, y); y += 0.045; }
+  y = levels[1]! + 0.01;
+  for (const c of [0xefe9de, 0x5f6e8c]) { fold(0.25, 0.05, c, nx, y); y += 0.05; }
+  slab(0.24, 0.16, 0.26, nx, levels[2]! + 0.09, 0.03, new THREE.MeshStandardMaterial({ color: 0xc9ced8, roughness: 0.6 }));
+  for (const dx of [-0.06, 0.06]) slab(0.09, 0.07, 0.24, nx + dx, foot + t + 0.035, 0.0, new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7 }));
+  const plinth = new THREE.Mesh(roundBox(wide - 0.08, foot, deep - 0.1, 0.01, 1), new THREE.MeshStandardMaterial({ color: 0x2b303b, roughness: 0.6 }));
+  plinth.position.set(0, foot / 2, 0.03);
+  const under = new THREE.Mesh(new THREE.BoxGeometry(wide - 0.12, 0.005, 0.006), glowMat);
+  under.position.set(0, 0.012, front + 0.05);
+  group.add(plinth, under);
+  group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x, 0, z);
   return group;
 };

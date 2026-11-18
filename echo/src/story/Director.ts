@@ -236,10 +236,11 @@ export class Director {
     app.lookOverride = this.blend;
     lerpLook(this.blend, from.look, to.look, 0);
     audio.sfx('wipe');
+    const toReal = to.theme !== 'haven';
     try {
-      await this.tween(3.1, (k) => {
-        wipe.radius = reach * (0.06 * k + 0.94 * k * k * k);
-        lerpLook(this.blend, from.look, to.look, Math.min(1, k * 1.6));
+      await this.tween(toReal ? 1.8 : 3.1, (k) => {
+        wipe.radius = toReal ? reach * (0.1 * k + 0.9 * k * k) : reach * (0.06 * k + 0.94 * k * k * k);
+        lerpLook(this.blend, from.look, to.look, Math.min(1, k * (toReal ? 2.2 : 1.6)));
       }, ease.linear);
     } finally {
       app.wipe = null;

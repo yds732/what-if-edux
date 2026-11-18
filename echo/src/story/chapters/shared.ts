@@ -161,7 +161,7 @@ export const openPhone = async (game: Game, bedroom: BedroomWorld, prompt: strin
   game.audio.sfx('phoneTap');
   game.app.tasks.wait(0.5).then(() => game.hands.pose('rest'), () => undefined);
   game.audio.sfx('holoOpen');
-  game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.24, 0)), 0.9);
+  game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.3, 0)), 0.9);
 };
 
 export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[], add: readonly ChatMessage[], footer: { left: string; right: string } | null = null): Promise<void> => {
