@@ -43,7 +43,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0xf7e070), b = new THREE.Color(0xfff4b4), glow = new THREE.Color(0xfffad6), c = new THREE.Color();
+  const a = new THREE.Color(0x2f9a3c), b = new THREE.Color(0x7fd65a), glow = new THREE.Color(0xa8f07a), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -52,7 +52,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     if (!g) continue;
     const patch = fbm3(x * 0.22, z * 0.22, 3.3, 3) * 0.5 + 0.5;
     const tuft = fbm3(x * 1.6, z * 1.6, 7.1, 2) * 0.5 + 0.5;
-    const want = Math.min(1, smoothstep(0.38, 0.46, patch) * (0.45 + 0.8 * smoothstep(0.35, 0.6, tuft)) + 0.3);
+    const want = Math.min(1, smoothstep(0.38, 0.46, patch) * (0.45 + 0.8 * smoothstep(0.35, 0.6, tuft)) + 0.025);
     if (rng.next() > want) continue;
     const lush = smoothstep(0.5, 0.66, patch);
     const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
@@ -81,7 +81,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBladeV;\nvarying vec3 vTint;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = vTint * (0.62 + 0.55 * vBladeV);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.3;');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.22;');
   };
   mat.customProgramCacheKey = () => 'echo-grass';
   const mesh = new THREE.Mesh(geo, mat);
@@ -115,8 +115,7 @@ const PETAL_VS = `
 }
 `;
 
-export const buildBlossomTree = (rng: Rng, petalCount: number, palette: 'gold' | 'pink' = 'gold'): Tree => {
-  const pinkTree = palette === 'pink';
+export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
@@ -157,11 +156,11 @@ export const buildBlossomTree = (rng: Rng, petalCount: number, palette: 'gold' |
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const pinkA = new THREE.Color(pinkTree ? 0xeeb0c6 : 0xffd65c), pinkB = new THREE.Color(pinkTree ? 0xfff0e6 : 0xfff4c8), lilac = new THREE.Color(pinkTree ? 0x7c6fa8 : 0xe8b23e);
-  const rose = new THREE.Color(pinkTree ? 0xd6337f : 0xf7c443);
+  const pinkA = new THREE.Color(0xeeb0c6), pinkB = new THREE.Color(0xfff0e6), lilac = new THREE.Color(0x7c6fa8);
+  const rose = new THREE.Color(0xd6337f);
   const masses: THREE.BufferGeometry[] = [];
   const puffs: { p: THREE.Vector3; r: number }[] = [];
-  const dark = new THREE.Color(pinkTree ? 0x6f5a8e : 0xc79a35);
+  const dark = new THREE.Color(0x6f5a8e);
   for (const tip of tips) {
     const n = 3 + Math.round(tip.r * 3);
     for (let i = 0; i < n; i++) {
@@ -177,7 +176,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number, palette: 'gold' |
       masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.35 + 0.35 * normal.y)));
     }
   }
-  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: pinkTree ? 0xffb4a0 : 0xffd27a, emissiveIntensity: pinkTree ? 0.06 : 0.1 }));
+  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffb4a0, emissiveIntensity: 0.06 }));
   massMesh.castShadow = true;
   group.add(massMesh);
 

@@ -144,7 +144,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-export const buildFallingPetals = (count: number, sources: readonly THREE.Vector3[], floor: number, rng: Rng, timeUniform: { value: number }, color = new THREE.Color(1.6, 1.25, 0.55)): THREE.Mesh => {
+export const buildFallingPetals = (count: number, sources: readonly THREE.Vector3[], floor: number, rng: Rng, timeUniform: { value: number }): THREE.Mesh => {
   const card = new THREE.PlaneGeometry(1, 0.8);
   const start = new Float32Array(count * 4), spin = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -161,7 +161,7 @@ export const buildFallingPetals = (count: number, sources: readonly THREE.Vector
   g.instanceCount = count;
   const mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
     vertexShader: PETAL_VS, fragmentShader: PETAL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uTime: timeUniform, uFloor: { value: floor }, uColor: { value: color } },
+    uniforms: { uTime: timeUniform, uFloor: { value: floor }, uColor: { value: new THREE.Color(1.5, 0.9, 1.2) } },
   }));
   mesh.frustumCulled = false;
   return mesh;

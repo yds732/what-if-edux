@@ -42,16 +42,16 @@ void main(){
   vec3 nrm = vec3(q / PR, sqrt(max(1.0 - r * r, 0.0)));
   float lit = clamp(dot(nrm, normalize(vec3(-0.55, 0.5, 0.67))) * 0.75 + 0.42, 0.0, 1.0);
   float bands = fbm2(vec2(q.y / PR * 4.5 + fbm2(q / PR * 2.2) * 0.9, q.x / PR * 0.7));
-  vec3 planet = mix(vec3(0.22, 0.36, 0.82), vec3(1.25, 0.95, 0.5), smoothstep(0.25, 0.75, bands)) * (0.18 + 0.9 * lit * lit);
+  vec3 planet = mix(vec3(0.20, 0.34, 0.78), vec3(1.0, 0.80, 0.50), smoothstep(0.25, 0.75, bands)) * (0.1 + 0.85 * lit * lit);
   planet += vec3(0.5, 0.6, 1.0) * pow(r, 6.0) * 0.28;                       // limb haze
   c = mix(c, planet, disc * 0.96);
-  c += vec3(0.75, 0.78, 0.9) * exp(-max(r - 1.0, 0.0) * 3.4) * 0.18 * facing * (1.0 - disc);   // corona
+  c += vec3(0.55, 0.72, 1.0) * exp(-max(r - 1.0, 0.0) * 3.4) * 0.16 * facing * (1.0 - disc);   // corona
   vec2 rq = mat2(0.906, 0.423, -0.423, 0.906) * q / PR;                                         // ring plane tilted 25 degrees
   float rr = length(vec2(rq.x, rq.y * 3.6));
   float ringMask = smoothstep(1.32, 1.4, rr) * (1.0 - smoothstep(2.05, 2.15, rr)) * facing;
   float gaps = 0.55 + 0.45 * sin(rr * 46.0) * sin(rr * 17.0 + 1.0);
   float behind = step(0.0, rq.y) * disc;                                                         // the far half hides behind the disc
-  c += vec3(1.05, 0.88, 0.62) * ringMask * gaps * (1.0 - behind) * 0.48;
+  c += vec3(1.0, 0.85, 0.62) * ringMask * gaps * (1.0 - behind) * 0.42;
   c += vec3(1.0, 0.75, 0.4) * uFestival * 0.03 * exp(-abs(d.y) * 5.0);
   gl_FragColor = vec4(c, 1.0);
   ${GLSL_OUTPUT}

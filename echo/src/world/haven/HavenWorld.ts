@@ -204,7 +204,7 @@ export class HavenWorld extends World {
       if (Math.hypot(x, z + 0.6) < 9.2) this.gems.push(v3(x, y + 0.45 * scale, z));
       if (color === 0x59d8ff) crystals['crystals-b'].push([x, y, z, rng.range(0, 360), scale * 0.8]);
       else crystals['crystals-a'].push([x, y, z, rng.range(0, 360), scale * 0.95]);
-      const halo = makeHalo(0x8fd4ff, scale * 2.6, 0.28);
+      const halo = makeHalo(color, scale * 3.2, 0.5);
       halo.position.set(x, y + scale * 0.6, z);
       scene.add(halo);
       this.colliders.circle(x, z, scale * 0.5);
@@ -215,13 +215,13 @@ export class HavenWorld extends World {
     }
     await ctx.step('haven: flora');
 
-    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density), 'pink');
+    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density));
     tree.group.position.copy(HAVEN.tree);
     tree.group.scale.setScalar(1.3);
     scene.add(tree.group);
     this.colliders.circle(HAVEN.tree.x, HAVEN.tree.z, 0.75);
     const canopy = tree.canopy.map((p) => p.clone().multiplyScalar(1.3).add(HAVEN.tree));
-    scene.add(buildFallingPetals(Math.round(240 * q.density), canopy, 0.02, rng.fork(), this.time, new THREE.Color(1.5, 0.9, 1.2)));
+    scene.add(buildFallingPetals(Math.round(240 * q.density), canopy, 0.02, rng.fork(), this.time));
     await ctx.step('haven: tree');
 
     const edgeZ = -this.mainIsland.outline(Math.PI) * 0.965;
