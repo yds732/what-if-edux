@@ -87,9 +87,11 @@ export class Interaction {
   update(): void {
     const input = this.input, hud = this.hud;
     if (!this.enabled) {
-      this.setFocus(null);
-      hud.setFocus(false);
-      hud.setPrompt(null);
+      if (this.focus) {
+        this.setFocus(null);
+        hud.setFocus(false);
+        hud.setPrompt(null);
+      }
       return;
     }
     const touch = input.mode === 'touch';

@@ -24,6 +24,13 @@ export const HAVEN = [
   'moonstone, opal, lavender crystal, deep violet rock, blossom pink, fine gold filigree, soft cyan and gold light.',
 ].join(' ');
 
+/** Haven as it is drawn now, and the games behind its portals: the same shapes, in jewel tones at teal twilight. */
+export const ARCADE = [
+  'Setting: Haven, a dreamlike world of floating islands at teal twilight. The same shape language, in jewel tones that glow from within:',
+  'deep cobalt-blue polished stone with fine pale veins, a pale cool silver-blue alloy for every metal part with thin lines of cyan light along its edges, emerald moss and turf, faceted cyan and emerald crystal, opal, blossom pink, and warm amber lantern light.',
+  'There is no yellow gold, brass, bronze or copper anywhere: metal is always the pale cool alloy.',
+].join(' ');
+
 /** Every person in the game is the same kind of figure. */
 export const FIGURE = [
   'Art-toy proportions: a large head about one quarter of the total height, compact body, slightly oversized hands and shoes.',
@@ -41,7 +48,32 @@ export const TURNAROUND = [
   'Identical design, colours and proportions in every view. The four figures must not touch or overlap, with clear empty background between them.',
 ].join(' ');
 
+/** Four views in a row of something that is not a person: a creature, or an object whose back matters. */
+export const TURNAROUND_OBJECT = [
+  'Turnaround reference sheet: exactly four views of the SAME subject in one row, evenly spaced, at the same scale, resting on the same baseline, strictly orthographic with no perspective.',
+  'From left to right: (1) FRONT view; (2) LEFT side profile, the subject facing the left edge of the image; (3) BACK view; (4) RIGHT side profile, the subject facing the right edge of the image.',
+  'Identical design, colours and proportions in every view. The four views must not touch or overlap, with clear empty background between them.',
+].join(' ');
+
+/** Haven's sprites: small creatures, each born from one of Haven's own things. */
+export const SPRITE = [
+  'A small creature in the same art-toy style: one compact, chunky body with a clear readable silhouette, short simple limbs or fins, soft bevelled forms. No thin strands, no loose hair, nothing dangling free of the body.',
+  'Its face is simple and friendly: two round glossy dark eyes with a small highlight, set wide apart, and no mouth at all.',
+  'Neutral resting pose, perfectly symmetrical, looking straight ahead.',
+].join(' ');
+
 /** One object, seen so that a 3D model can be made from the picture. */
+/**
+ * The gloom of Duskbreak: what Haven is not. It stands in place of a world's palette, which would dress the
+ * creature in Haven's stone, alloy and blossom.
+ */
+export const GLOOM = [
+  'A creature of the gloom, in the same art-toy style: it is made of nothing but soft dark indigo-violet smoke, gathered into one solid rounded shape with a satin surface and a few fat wisps curling off its back.',
+  'Its only features are two round eyes that glow pale cyan, set wide apart. No mouth, no teeth, no claws. It is not frightening: more sulky than fierce.',
+  'It is quite bare: it wears and carries nothing at all. No cloth, hood, hat, scarf, cape or tassel, no armour, no metal, no flowers, no moss or leaves, no lantern.',
+  'Neutral resting pose, perfectly symmetrical, looking straight ahead.',
+].join(' ');
+
 export const PRODUCT = [
   'Product design reference: a single object, complete and uncropped, centred, seen from a three-quarter front view slightly above eye level so that its front, one side and its top are all visible.',
   'The object fills most of the frame. No floor, no other objects, no people.',

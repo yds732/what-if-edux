@@ -1,4 +1,5 @@
 import type { Policy } from '../story/script';
+import { isMinigame } from '../arcade/registry';
 import { freshState, isChapter, type ChapterId } from '../story/state';
 import { WebAudio } from '../audio/WebAudio';
 import { Game } from './Game';
@@ -36,6 +37,8 @@ export const runGame = async (canvas: HTMLCanvasElement, params: URLSearchParams
     misses: numberParam(params, 'misses', 0, 0, 99),
   };
   game.speed = Math.round(numberParam(params, 'speed', 1, 1, 16));
+  game.arcade.autoSkill = numberParam(params, 'skill', 1, 0, 1);
+  game.arcade.startLevel = Math.round(numberParam(params, 'level', 0, 0, 2));
   if (params.has('auto')) game.audio.unlock();
 
   const until = params.get('until'), handover = params.get('handover');
@@ -67,7 +70,11 @@ export const runGame = async (canvas: HTMLCanvasElement, params: URLSearchParams
   }
   const chapter = params.get('chapter');
   const menus = (await import('../ui/dom/menus')).createMenus(game, settings, isTier(q));
-  if (isChapter(chapter) || params.has('auto')) {
+  const play = params.get('play');
+  if (params.has('arcade') || isMinigame(play)) {
+    game.input.wantsLock = !params.has('auto') && !isMinigame(play);
+    void game.runArcade(isMinigame(play) ? play : null);
+  } else if (isChapter(chapter) || params.has('auto')) {
     game.input.wantsLock = !params.has('auto');
     void game.run((isChapter(chapter) ? chapter : 'monday') as ChapterId, freshState());
   } else {

@@ -8,7 +8,7 @@
 // records beside them; tools/assets/optimize.mjs makes the files the game loads.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ASSETS, isModel } from '../../assets/catalog.mjs';
+import { ASSETS, isMade, isModel, isTurnaround } from '../../assets/catalog.mjs';
 import { CACHE, ensureDir, sheetFile } from './lib/env.mjs';
 import { MODEL_VERSION, RIG_VERSION, balance, download, runTask, upload } from './lib/tripo.mjs';
 import { pool } from './lib/pool.mjs';
@@ -19,7 +19,7 @@ const args = process.argv.slice(2);
 const has = (name) => args.includes(`--${name}`);
 const named = args.filter((a) => !a.startsWith('--'));
 // `all` is every asset that has a sheet but no model yet
-const ids = named[0] === 'all' ? Object.keys(ASSETS).filter((id) => isModel(id) && fs.existsSync(sheetFile(id)) && !fs.existsSync(path.join(CACHE, 'raw', `${id}.glb`))) : named;
+const ids = named[0] === 'all' ? Object.keys(ASSETS).filter((id) => isModel(id) && isMade(id) && fs.existsSync(sheetFile(id)) && !fs.existsSync(path.join(CACHE, 'raw', `${id}.glb`))) : named;
 if (ids.length === 0) {
   console.error(`usage: model.mjs <id> [...]\nassets: ${Object.keys(ASSETS).filter(isModel).join(', ')}`);
   process.exit(2);
@@ -49,7 +49,7 @@ const generate = async (id) => {
   if (fs.existsSync(file) && !has('force')) return file;
   const sheet = fs.readFileSync(sheetFile(id));
   let body;
-  if (asset.kind === 'character') {
+  if (isTurnaround(id)) {
     const cut = await splitViews(sheet);
     const files = [];
     for (const [i, name] of ['front', 'left', 'back', 'right'].entries()) {
@@ -62,10 +62,11 @@ const generate = async (id) => {
   }
   const task = await runTask(id, body.type, body, { onProgress: progress(id, 'model') });
   await fetchModel(task, file);
-  // Tripo's texturing now and then hands back a grey sheet: the same in every channel
+  // Tripo's texturing now and then hands back a grey sheet: the same in every channel. (`pale: true` in the catalog
+  // says the thing is meant to be nearly white, and is to be judged by eye instead.)
   const colour = await colourStats(file);
   const range = (v) => Math.max(...v) - Math.min(...v);
-  if (!colour || (range(colour.mean) < 3 && range(colour.spread) < 1.5)) {
+  if (!asset.pale && (!colour || (range(colour.mean) < 3 && range(colour.spread) < 1.5))) {
     fs.rmSync(file);
     throw new Error('the model came back without colour: run it again');
   }

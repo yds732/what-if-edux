@@ -130,15 +130,33 @@ const layAlongZ = (doc) => {
 };
 
 /**
+ * Rolls a model that lies along Z about that axis until it is flat: its widest spread across lies along X and its
+ * thinnest along Y. A bat drawn at an angle is modelled at that angle; this lays its blade level.
+ */
+const layFlat = (doc) => {
+  const prims = doc.getRoot().listMeshes().flatMap((m) => m.listPrimitives());
+  let n = 0, mx = 0, my = 0, xx = 0, yy = 0, xy = 0;
+  const each = (fn) => { for (const prim of prims) { const position = prim.getAttribute('POSITION'); for (let i = 0, p = []; i < position.getCount(); i++) fn(position.getElement(i, p)); } };
+  each((p) => { n++; mx += p[0]; my += p[1]; });
+  mx /= n; my /= n;
+  each((p) => { const x = p[0] - mx, y = p[1] - my; xx += x * x; yy += y * y; xy += x * y; });
+  // the direction across the model that its points spread most along, as an angle from +X
+  const angle = 0.5 * Math.atan2(2 * xy, xx - yy), c = Math.cos(-angle), s = Math.sin(-angle);
+  for (const prim of prims) transformPrimitive(prim, [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+};
+
+/**
  * Props leave Tripo facing +X, a unit or so across, floating about their own middle. The game wants them facing
  * +Z, in metres, standing on the origin: that is baked into the vertices so a prop can be placed as it is.
  *
  * `fit` says how big: ['x' | 'y' | 'z', metres] sets the size along an axis; ['top', metres, [u, v]] sets the
  * height of the surface over a spot of the footprint, which is how a chair gets its seat at seat height; and
- * ['box', [x, y, z]] sets all three sizes, for furniture whose footprint and height the room depends on.
+ * ['box', [x, y, z]] sets all three sizes, for furniture whose footprint and height the room depends on (an axis
+ * given as null keeps the thing's own proportion: a raft tile must be square, and as tall as it comes).
  */
 const normaliseProp = (doc, asset) => {
   if (asset.align === 'long-axis') layAlongZ(doc);
+  if (asset.flat) layFlat(doc);
   const yaw = ((asset.yaw ?? (asset.align ? 0 : -90)) * Math.PI) / 180, c = Math.cos(yaw), s = Math.sin(yaw);
   const turn = [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1];
   for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) transformPrimitive(prim, turn);
@@ -146,7 +164,11 @@ const normaliseProp = (doc, asset) => {
   const b = bounds(doc);
   const [axis, metres, spot] = asset.fit ?? ['y', 1];
   const uniform = () => metres / (axis === 'top' ? surfaceHeight(doc, b, spot) : b.size['xyz'.indexOf(axis)]);
-  const [kx, ky, kz] = axis === 'box' ? metres.map((m, a) => m / b.size[a]) : new Array(3).fill(uniform());
+  const boxed = () => {
+    const set = metres.map((m, a) => (m == null ? null : m / b.size[a])), given = set.filter((k) => k != null);
+    return set.map((k) => k ?? given.reduce((sum, v) => sum + v, 0) / given.length);
+  };
+  const [kx, ky, kz] = axis === 'box' ? boxed() : new Array(3).fill(uniform());
   const place = [kx, 0, 0, 0, 0, ky, 0, 0, 0, 0, kz, 0, -kx * (b.min[0] + b.max[0]) / 2, -ky * b.min[1], -kz * (b.min[2] + b.max[2]) / 2, 1];
   for (const mesh of doc.getRoot().listMeshes()) for (const prim of mesh.listPrimitives()) transformPrimitive(prim, place);
   // `band: k` slims a hoop that faces +Z: its band keeps its opening and is narrowed to k of its width
@@ -253,12 +275,13 @@ const notes = (id) => {
 const one = async (id) => {
   const asset = ASSETS[id];
   const character = asset.kind === 'character';
-  const source = path.join(raw, character ? `${id}.rigged.glb` : `${id}.glb`);
+  const source = path.join(raw, character ? `${id}.rigged.glb` : `${asset.raw ?? id}.glb`);
   if (!fs.existsSync(source)) return null;
   const budget = BUDGET[`${asset.kind}/${asset.detail ?? 'standard'}`];
   const entry = { ...notes(id), tiers: {} };
-  for (const tier of TIERS) {
-    const [maxTriangles, textureEdge] = budget[tier];
+  // `only`: the model is kept in one weight, which every graphics tier then loads
+  for (const tier of asset.only ? [asset.only] : TIERS) {
+    const [maxTriangles, textureEdge] = asset.budget ?? budget[tier];
     const doc = await io.read(source);
     doc.setLogger(quiet);
     const before = triangles(doc);

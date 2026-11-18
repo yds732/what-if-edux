@@ -609,6 +609,46 @@
         0.14
       ]
     },
+    "drift-crate": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/drift-crate.medium.glb",
+          "triangles": 2999,
+          "bytes": 235736
+        }
+      },
+      "size": [
+        0.7,
+        0.6044,
+        0.5641
+      ]
+    },
+    "drift-wood": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/drift-wood.medium.glb",
+          "triangles": 3000,
+          "bytes": 197248
+        }
+      },
+      "size": [
+        1,
+        0.7001,
+        0.5847
+      ]
+    },
     "gateway": {
       "kind": "prop",
       "world": "haven",
@@ -637,6 +677,206 @@
         4.6915,
         6.2,
         4.5808
+      ]
+    },
+    "gem-blossom": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.2,
+        "vivid": 0.5
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-blossom.medium.glb",
+          "triangles": 2600,
+          "bytes": 217220
+        }
+      },
+      "size": [
+        0.3003,
+        0.3,
+        0.0719
+      ]
+    },
+    "gem-drop": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.2,
+        "vivid": 0.5
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-drop.medium.glb",
+          "triangles": 2598,
+          "bytes": 149160
+        }
+      },
+      "size": [
+        0.2232,
+        0.3,
+        0.2139
+      ]
+    },
+    "gem-leaf": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.2,
+        "vivid": 0.5
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-leaf.medium.glb",
+          "triangles": 2600,
+          "bytes": 163684
+        }
+      },
+      "size": [
+        0.162,
+        0.3,
+        0.0461
+      ]
+    },
+    "gem-loom": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-loom.medium.glb",
+          "triangles": 25999,
+          "bytes": 1730200
+        }
+      },
+      "size": [
+        3.5,
+        4.1929,
+        0.614
+      ]
+    },
+    "gem-moon": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.2,
+        "vivid": 0.4
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-moon.medium.glb",
+          "triangles": 2600,
+          "bytes": 248756
+        }
+      },
+      "size": [
+        0.2792,
+        0.3,
+        0.109
+      ]
+    },
+    "gem-star": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.4,
+        "vivid": 0.5
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gem-star.medium.glb",
+          "triangles": 2590,
+          "bytes": 188684
+        }
+      },
+      "size": [
+        0.3049,
+        0.3,
+        0.0614
+      ]
+    },
+    "gloom-brute": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "color": "#8ff0ff",
+        "strength": 3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gloom-brute.medium.glb",
+          "triangles": 5000,
+          "bytes": 129032
+        }
+      },
+      "size": [
+        1.6373,
+        1.7,
+        1.1695
+      ]
+    },
+    "gloom-maw": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "color": "#8ff0ff",
+        "strength": 3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gloom-maw.medium.glb",
+          "triangles": 22000,
+          "bytes": 380956
+        }
+      },
+      "size": [
+        4.4647,
+        5.2,
+        3.861
+      ]
+    },
+    "gloomling": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "color": "#8ff0ff",
+        "strength": 3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/gloomling.medium.glb",
+          "triangles": 1800,
+          "bytes": 63356
+        }
+      },
+      "size": [
+        0.5979,
+        0.7,
+        0.5338
+      ]
+    },
+    "glow-buoy": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 2.6,
+        "vivid": 0.3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/glow-buoy.medium.glb",
+          "triangles": 3000,
+          "bytes": 205244
+        }
+      },
+      "size": [
+        0.3938,
+        0.6,
+        0.3737
       ]
     },
     "hand": {
@@ -969,6 +1209,26 @@
           50
         ]
       }
+    },
+    "lighthouse": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 2.4,
+        "vivid": 0.3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/lighthouse.medium.glb",
+          "triangles": 27995,
+          "bytes": 1841276
+        }
+      },
+      "size": [
+        11.2723,
+        16,
+        9.8164
+      ]
     },
     "lockers": {
       "kind": "prop",
@@ -1335,6 +1595,66 @@
         0.58
       ]
     },
+    "portal-gate": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/portal-gate.medium.glb",
+          "triangles": 29998,
+          "bytes": 1604920
+        }
+      },
+      "size": [
+        2.9866,
+        3.6,
+        2.9574
+      ]
+    },
+    "pp-paddle": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/pp-paddle.medium.glb",
+          "triangles": 14000,
+          "bytes": 530332
+        }
+      },
+      "size": [
+        0.1761,
+        0.0467,
+        0.27
+      ]
+    },
+    "pp-table": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/pp-table.medium.glb",
+          "triangles": 30000,
+          "bytes": 1251068
+        }
+      },
+      "size": [
+        2.86,
+        0.76,
+        1.64
+      ]
+    },
     "priya": {
       "kind": "character",
       "world": "real",
@@ -1383,6 +1703,46 @@
           43
         ]
       }
+    },
+    "raft-mast": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 2.4,
+        "vivid": 0.3
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/raft-mast.medium.glb",
+          "triangles": 14000,
+          "bytes": 664200
+        }
+      },
+      "size": [
+        0.9507,
+        2.6,
+        0.6421
+      ]
+    },
+    "raft-tile": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/raft-tile.medium.glb",
+          "triangles": 4999,
+          "bytes": 617340
+        }
+      },
+      "size": [
+        1.1,
+        0.6542,
+        1.1
+      ]
     },
     "riley": {
       "kind": "character",
@@ -1540,6 +1900,166 @@
         0.3,
         0.0433,
         0.2995
+      ]
+    },
+    "sp-arena": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-arena.medium.glb",
+          "triangles": 29999,
+          "bytes": 1527500
+        }
+      },
+      "size": [
+        9,
+        3.6097,
+        8.9867
+      ]
+    },
+    "sp-cindle": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 2.2,
+        "vivid": 0.4
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-cindle.medium.glb",
+          "triangles": 16000,
+          "bytes": 603928
+        }
+      },
+      "size": [
+        0.3896,
+        0.62,
+        0.3884
+      ]
+    },
+    "sp-cindle-lite": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 2.2,
+        "vivid": 0.4
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-cindle-lite.medium.glb",
+          "triangles": 1400,
+          "bytes": 84376
+        }
+      },
+      "size": [
+        0.3896,
+        0.62,
+        0.3884
+      ]
+    },
+    "sp-dewbell": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-dewbell.medium.glb",
+          "triangles": 15999,
+          "bytes": 461224
+        }
+      },
+      "size": [
+        0.3909,
+        0.66,
+        0.3515
+      ]
+    },
+    "sp-kilnip": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-kilnip.medium.glb",
+          "triangles": 15999,
+          "bytes": 602840
+        }
+      },
+      "size": [
+        0.4163,
+        0.5,
+        0.4381
+      ]
+    },
+    "sp-nimbray": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-nimbray.medium.glb",
+          "triangles": 15998,
+          "bytes": 455840
+        }
+      },
+      "size": [
+        0.95,
+        0.7309,
+        0.5427
+      ]
+    },
+    "sp-petalwing": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-petalwing.medium.glb",
+          "triangles": 16000,
+          "bytes": 601340
+        }
+      },
+      "size": [
+        0.9,
+        0.7038,
+        0.3757
+      ]
+    },
+    "sp-tufflet": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/sp-tufflet.medium.glb",
+          "triangles": 15995,
+          "bytes": 634328
+        }
+      },
+      "size": [
+        0.5637,
+        0.56,
+        0.5357
       ]
     },
     "stepping-stone": {
@@ -1729,6 +2249,26 @@
           50
         ]
       }
+    },
+    "tide-wyrm": {
+      "kind": "prop",
+      "world": "arcade",
+      "glow": {
+        "strength": 1.6,
+        "vivid": 0.46
+      },
+      "tiers": {
+        "medium": {
+          "file": "models/tide-wyrm.medium.glb",
+          "triangles": 16000,
+          "bytes": 520944
+        }
+      },
+      "size": [
+        1.011,
+        2.4,
+        1.113
+      ]
     },
     "wall-shelf": {
       "kind": "prop",

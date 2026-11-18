@@ -11,6 +11,7 @@ export const LOOKAHEAD = 0.5;
 export const SPACES: Record<BedName, Space> = {
   title: 'haven', haven: 'haven', havenEvening: 'haven', havenFestival: 'haven', unease: 'haven', ending: 'haven',
   classroom: 'interior', classroomWarm: 'interior', bedroom: 'interior',
+  arcadeRally: 'haven', arcadeSprites: 'haven', arcadeLanterns: 'haven', arcadeDrift: 'haven', arcadeDusk: 'haven',
 };
 
 class Stream {
@@ -168,6 +169,46 @@ const FESTIVAL: HavenStyle = {
   pad: { ...HAVEN.pad, level: -42, cutoff: 2100, sweep: 900 },
   bells: { level: -28.5, low: 72, high: 96, ring: 1.5, every: 1, chance: [0.7, 0.4, 0.14] },
   pulse: -25.5, ticks: -34,
+};
+
+const ARCADE_RALLY: HavenStyle = {
+  ...HAVEN, bpm: 112, chordSteps: 16,
+  pad: { ...HAVEN.pad, level: -43, cutoff: 2300, sweep: 700, attack: 0.9, release: 1.6 },
+  choir: null, sub: -32,
+  bells: { level: -30, low: 76, high: 93, ring: 1.1, every: 2, chance: [0.5, 0.3, 0.1] },
+  pulse: -25, ticks: -32,
+};
+
+const ARCADE_SPRITES: HavenStyle = {
+  ...HAVEN, bpm: 124, chordSteps: 32,
+  pad: { ...HAVEN.pad, level: -43, shape: 'hollow', cutoff: 1700, sweep: 600, attack: 1.2, release: 2 },
+  choir: { level: -40, vowel: 'oo' }, sub: -29,
+  bells: { level: -31, low: 74, high: 91, ring: 0.9, every: 4, chance: [0.6, 0.35, 0.1] },
+  pulse: -24.5, ticks: -31,
+};
+
+const ARCADE_LANTERNS: HavenStyle = {
+  ...HAVEN, bpm: 84,
+  pad: { ...HAVEN.pad, level: -42, cutoff: 1700, sweep: 700 },
+  choir: { level: -38, vowel: 'ah' }, sub: -31,
+  bells: { level: -26, low: 72, high: 98, ring: 1.6, every: 1, chance: [0.85, 0.5, 0.2] },
+  pulse: -29, ticks: null,
+};
+
+const ARCADE_DRIFT: HavenStyle = {
+  ...HAVEN, bpm: 72, chordSteps: 32,
+  pad: { ...HAVEN.pad, level: -42, shape: 'hollow', cutoff: 1400, sweep: 500, attack: 1.8, release: 2.8 },
+  choir: { level: -38, vowel: 'oo' }, sub: -30,
+  bells: { level: -27, low: 69, high: 91, ring: 2.4, every: 2, chance: [0.7, 0.36, 0.12] },
+  pulse: -30, ticks: null,
+};
+
+const ARCADE_DUSK: HavenStyle = {
+  ...HAVEN, bpm: 132, chordSteps: 32,
+  pad: { ...HAVEN.pad, level: -43, shape: 'hollow', cutoff: 1300, sweep: 500, attack: 1.0, release: 1.8 },
+  choir: { level: -41, vowel: 'oo' }, sub: -30.5,
+  bells: { level: -33, low: 72, high: 88, ring: 0.8, every: 4, chance: [0.5, 0.25, 0.08] },
+  pulse: -26.5, ticks: -32,
 };
 
 const PULSE = [0, 2, 4, 2, 1, 3, 4, 3, 0, 2, 4, 2, 1, 3, 4, 2];
@@ -424,6 +465,25 @@ const PHRASES: readonly (readonly (readonly [number, string, number])[])[] = [
   [[0, 'C5', 0.6], [1.3, 'B4', 0.6], [2.7, 'G4', 0.55], [4.4, 'E4', 0.5]],
 ];
 
+const sea = (bed: Bed): void => {
+  const { core, rng, t0 } = bed;
+  [0.11, 0.083].forEach((breath, i) => {
+    const wash = core.gain(dB(-27));
+    core.lfo(breath, dB(-27) * 0.7, t0).connect(wash.gain);
+    core.noise('pink', t0).connect(core.filter('highpass', 300, 0)).connect(core.filter('lowpass', i ? 2600 : 1700, 0)).connect(wash).connect(core.pan(i ? 0.75 : -0.75)).connect(bed.ambience);
+  });
+  core.noise('brown', t0).connect(core.filter('lowpass', 180, 0)).connect(core.gain(dB(-27))).connect(bed.ambience);
+  bed.stream(t0 + 1.5, (t) => {
+    const f = rng.range(240, 520), level = dB(-24) * rng.range(0.5, 1), side = rng.range(-0.7, 0.7);
+    bed.play(t, (p) => {
+      const where = p.pan(side);
+      drip(p, where, t, f, level);
+      where.connect(bed.ambience);
+    });
+    return rng.range(1.2, 4.5);
+  });
+};
+
 const bedroom = (bed: Bed): void => {
   const { core, kit, rng, t0 } = bed;
   bed.setRoot(note('G3'), t0);
@@ -505,4 +565,12 @@ const BEDS: Record<BedName, (bed: Bed) => void> = {
   havenFestival: (bed) => haven(bed, FESTIVAL),
   unease,
   ending,
+  arcadeRally: (bed) => haven(bed, ARCADE_RALLY),
+  arcadeSprites: (bed) => haven(bed, ARCADE_SPRITES),
+  arcadeLanterns: (bed) => haven(bed, ARCADE_LANTERNS),
+  arcadeDusk: (bed) => haven(bed, ARCADE_DUSK),
+  arcadeDrift: (bed) => {
+    haven(bed, ARCADE_DRIFT);
+    sea(bed);
+  },
 };

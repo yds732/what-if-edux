@@ -1,5 +1,6 @@
 import type { Rng } from '../core/math';
 import type { SfxName } from './GameAudio';
+import { ARCADE_SFX } from './arcadeSfx';
 import { bell, choir, formants, padChord, shape, sparkle, thump, tick } from './instruments';
 import type { Space } from './mixer';
 import { SLACK, dB, glide, mtof, notes, pentatonic, swell, swellEnd, type Patch } from './synth';
@@ -73,6 +74,7 @@ const makeCrackle = (ctx: BaseAudioContext, rng: Rng): AudioBuffer => {
 };
 
 export const SFX: Record<SfxName, SfxSpec> = {
+  ...ARCADE_SFX,
 
   uiHover: {
     bus: 'ui',
@@ -112,7 +114,7 @@ export const SFX: Record<SfxName, SfxSpec> = {
 
   taskDone: {
     bus: 'ui',
-    level: 1,
+    level: -6,
     build: (p, c) => {
       const t = p.t, m = p.mix(0.4), root = c.root + 12;
       [0, 4, 7, 12].forEach((semis, i) => bell(p, m, t + 0.07 * i, mtof(root + semis), { level: dB(-17), dur: 0.9, ratio: 2, index: 0.6 }));

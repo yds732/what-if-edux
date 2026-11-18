@@ -111,6 +111,28 @@ export class Hud {
     this.repaintAll();
   }
 
+  attach(widget: Widget, paint: () => void): () => void {
+    const item = this.add(widget, paint);
+    return () => {
+      const i = this.items.indexOf(item);
+      if (i >= 0) this.items.splice(i, 1);
+      widget.panel.mesh.removeFromParent();
+      widget.panel.dispose();
+    };
+  }
+
+  get size(): { readonly w: number; readonly h: number } {
+    return { w: this.vw, h: this.vh };
+  }
+
+  pointerAt(): { x: number; y: number } | null {
+    if (this.follow) return this.rayPoint;
+    const input = this.input;
+    if (!input.pointer.active && !input.tap) return null;
+    const p = input.tap ?? input.pointer;
+    return this.toLayout(p.x, p.y);
+  }
+
   enterWorldSpace(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.follow = camera;
     parent.add(this.root);

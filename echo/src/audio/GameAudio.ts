@@ -1,14 +1,18 @@
 import type * as THREE from 'three';
 import type { SpeakerId } from '../story/script';
+import type { ArcadeSfx } from './arcadeSfx';
 
 export type SfxName =
+  | ArcadeSfx
   | 'uiHover' | 'uiSelect' | 'advance' | 'objective' | 'card' | 'result' | 'notify'
   | 'pickup' | 'putDown' | 'sit' | 'footstep' | 'bell' | 'phoneTap' | 'holoOpen' | 'holoClose' | 'vote' | 'poster'
   | 'headsetOn' | 'headsetOff' | 'wipe'
   | 'orbAppear' | 'orbTake' | 'orbThrow' | 'ringHit' | 'ringRim' | 'orbFizzle' | 'bridgeBuild' | 'bridgeComplete'
   | 'firework' | 'gateOpen' | 'cheer' | 'fail' | 'reveal' | 'taskDone';
 
-export type Soundscape = 'silence' | 'title' | 'classroom' | 'classroomWarm' | 'bedroom' | 'haven' | 'havenEvening' | 'havenFestival' | 'unease' | 'ending';
+export type Soundscape = 'silence' | 'title' | 'classroom' | 'classroomWarm' | 'bedroom' | 'haven' | 'havenEvening' | 'havenFestival' | 'unease' | 'ending' | ArcadeScape;
+
+export type ArcadeScape = 'arcadeRally' | 'arcadeSprites' | 'arcadeLanterns' | 'arcadeDrift' | 'arcadeDusk';
 
 export interface SfxOptions {
   at?: THREE.Vector3;
