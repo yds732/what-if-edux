@@ -12,9 +12,9 @@ varying vec3 vDir;
 vec3 skyColor(vec3 d){
   float h = d.y;
   // a jewel-toned twilight: a thin band of gold at the horizon, deep teal above it, cobalt, then indigo-violet overhead
-  vec3 zenith = vec3(0.05, 0.08, 0.24), mid = vec3(0.10, 0.18, 0.46), low = vec3(0.30, 0.24, 0.46), horizon = vec3(0.95, 0.62, 0.46);
-  vec3 c = mix(horizon, low, smoothstep(-0.02, 0.06, h));
-  c = mix(c, mid, smoothstep(0.06, 0.34, h));
+  vec3 zenith = vec3(0.035, 0.06, 0.20), mid = vec3(0.08, 0.15, 0.42), low = vec3(0.40, 0.28, 0.56), horizon = vec3(1.0, 0.64, 0.44);
+  vec3 c = mix(horizon, low, smoothstep(-0.02, 0.12, h));
+  c = mix(c, mid, smoothstep(0.12, 0.4, h));
   c = mix(c, zenith, smoothstep(0.28, 0.9, h));
   // the glow of the hidden sun gathers under the planet
   float toward = max(dot(normalize(vec3(d.x, 0.0, d.z)), normalize(vec3(uPlanetDir.x, 0.0, uPlanetDir.z))), 0.0);
@@ -43,7 +43,10 @@ void main(){
   vec3 nrm = vec3(q / PR, sqrt(max(1.0 - r * r, 0.0)));
   float lit = clamp(dot(nrm, normalize(vec3(-0.55, 0.5, 0.67))) * 0.75 + 0.42, 0.0, 1.0);
   float bands = fbm2(vec2(q.y / PR * 4.5 + fbm2(q / PR * 2.2) * 0.9, q.x / PR * 0.7));
-  vec3 planet = mix(vec3(0.20, 0.34, 0.78), vec3(1.0, 0.80, 0.50), smoothstep(0.25, 0.75, bands)) * (0.1 + 0.85 * lit * lit);
+  vec3 planet = mix(vec3(0.22, 0.34, 0.80), vec3(0.55, 0.44, 0.86), smoothstep(0.15, 0.3, bands));
+  planet = mix(planet, vec3(1.1, 0.7, 0.48), smoothstep(0.3, 0.45, bands));
+  planet = mix(planet, vec3(1.35, 0.98, 0.45), smoothstep(0.45, 0.62, bands));
+  planet *= 0.2 + 0.9 * lit;
   planet += vec3(0.5, 0.6, 1.0) * pow(r, 6.0) * 0.28;                       // limb haze
   c = mix(c, planet, disc * 0.96);
   c += vec3(0.55, 0.72, 1.0) * exp(-max(r - 1.0, 0.0) * 3.4) * 0.16 * facing * (1.0 - disc);   // corona
@@ -52,7 +55,8 @@ void main(){
   float ringMask = smoothstep(1.32, 1.4, rr) * (1.0 - smoothstep(2.05, 2.15, rr)) * facing;
   float gaps = 0.55 + 0.45 * sin(rr * 46.0) * sin(rr * 17.0 + 1.0);
   float behind = step(0.0, rq.y) * disc;                                                         // the far half hides behind the disc
-  c += vec3(1.0, 0.85, 0.62) * ringMask * gaps * (1.0 - behind) * 0.42;
+  c += vec3(1.1, 0.9, 0.62) * ringMask * gaps * (1.0 - behind) * 0.62;
+  c += vec3(1.2, 0.95, 0.7) * smoothstep(1.66, 1.7, rr) * (1.0 - smoothstep(1.72, 1.78, rr)) * facing * (1.0 - behind) * 0.5;
   c += vec3(1.0, 0.75, 0.4) * uFestival * 0.03 * exp(-abs(d.y) * 5.0);
   gl_FragColor = vec4(c, 1.0);
   ${GLSL_OUTPUT}

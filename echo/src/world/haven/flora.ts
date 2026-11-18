@@ -27,6 +27,8 @@ const BLADE_VS = `
 }
 `;
 
+const GRASS_TONES = [0x2c3f78, 0x4a64a8, 0x879fdf, 0x9a8fc4, 0xb4c6dc].map((c) => new THREE.Color(c));
+
 export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null): THREE.Mesh => {
   const blade = new THREE.BufferGeometry();
   const w = 0.028;
@@ -43,7 +45,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0x3f5f9e), b = new THREE.Color(0xa8c9f0), glow = new THREE.Color(0xc4daf2), c = new THREE.Color();
+  const b = new THREE.Color(0xa8c9f0), glow = new THREE.Color(0xf5d58c), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -58,7 +60,8 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
     data.push(x, z, rng.range(0, TAU), h);
     heights.push(g.y);
-    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.1) ? 0.55 : 0);
+    c.copy(GRASS_TONES[Math.min(GRASS_TONES.length - 1, Math.floor((patch * 0.75 + rng.next() * 0.25) * GRASS_TONES.length))]!).lerp(b, rng.range(0, 0.15));
+    if (rng.chance(0.025)) c.lerp(glow, 0.75);
     tints.push(c.r, c.g, c.b);
     placed++;
   }

@@ -17,7 +17,8 @@ import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
-import { buildCastle, buildMountain } from './castle';
+import { buildMountain } from './castle';
+import { addGoldCracks } from './cracks';
 import { buildBoardFrame, buildHoop } from './minimal';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
@@ -127,6 +128,7 @@ export class HavenWorld extends World {
     scene.add(key, key.target, rim, new THREE.HemisphereLight(0xc4daf2, 0x344e80, 1.1));
 
     const rock = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
+    addGoldCracks(rock, { scale: 0.7, strength: 1.3, sidesOnly: true });
     this.mainIsland = buildIsland({ radius: 13.5, depth: 20, seed: 1, lump: 0.1, hills: 0.9, flat: 0.72 });
     const main = new THREE.Mesh(this.mainIsland.geometry, rock);
     main.receiveShadow = true;
@@ -150,15 +152,11 @@ export class HavenWorld extends World {
         const top = shape.heightAt(0, HAVEN.bridgeEnd.z - 2 - z) ?? 0;
         island.position.y += gatewayDrop = HAVEN.bridgeEnd.y - 0.04 - (y + top);
         const mountain = buildMountain();
-        mountain.position.set(0, (shape.heightAt(0, -7) ?? 0) - 1.5, -15);
+        mountain.position.set(0, (shape.heightAt(0, -6) ?? 0) - 0.5, -9.5);
         island.add(mountain);
-        const castle = buildCastle();
-        castle.scale.setScalar(0.72);
-        castle.position.set(0, (shape.heightAt(0, -2.5) ?? 0) - 0.3, -2.5);
-        island.add(castle);
-        const fall = buildWaterfall(v3(-6.5, 11, -8.6), 3, 60, 0.3, this.time);
+        const fall = buildWaterfall(v3(-5.6, 12.5, -2.6), 3.2, 64, 0.25, this.time);
         island.add(fall);
-        for (const [hx, hy, hz, color, size] of [[-2.2, 2.2, 4.6, 0xb7a5d8, 7], [2.2, 2.2, 4.6, 0xf5d58c, 6], [0, 4, 3.2, 0xc4daf2, 10]] as const) {
+        for (const [hx, hy, hz, color, size] of [[-2.2, 2.2, 4.6, 0xb7a5d8, 7], [2.2, 2.2, 4.6, 0xf5d58c, 6]] as const) {
           const halo = makeHalo(color, size, 0.35);
           halo.position.set(hx, (shape.heightAt(hx, hz) ?? 0) + hy, hz);
           island.add(halo);
@@ -263,9 +261,9 @@ export class HavenWorld extends World {
       const y = this.mainIsland.heightAt(x, z);
       if (y !== null) spots.push({ x, z, ground: y, lift: overBoard(x, z) });
     };
-    for (const z of [3.6, 1.4, -0.8]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
-    for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 2.4) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
-    const RING = 18;
+    for (const z of [1.4]) for (const s of [-1, 1]) spot(s * 1.55 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
+    for (let z = HAVEN.plaza.z - HAVEN.plazaRadius - 1.2; z > edgeZ + 2.6; z -= 5) for (const s of [-1, 1]) spot(s * 2.05 + extra.range(-0.15, 0.15), z + extra.range(-0.3, 0.3));
+    const RING = 7;
     for (let i = 0; i < RING; i++) {
       const a = ((i + extra.range(-0.3, 0.3)) / RING) * TAU;
       if (Math.abs(Math.atan2(Math.sin(a - Math.PI), Math.cos(a - Math.PI))) < 0.42) continue;
@@ -273,7 +271,7 @@ export class HavenWorld extends World {
       const rim = this.mainIsland.heightAt(Math.sin(a) * edge * 0.9, Math.cos(a) * edge * 0.9) ?? 0;
       spots.push({ x: Math.sin(a) * r, z: Math.cos(a) * r, ground: rim, lift: extra.range(-0.6, 1.8) });
     }
-    this.floating = buildLanterns(extra.fork(), spots, { motesEach: Math.round(10 * q.density) + 4, lights: q.tier === 'low' ? 0 : q.tier === 'medium' ? 4 : 6 });
+    this.floating = buildLanterns(extra.fork(), spots, { motesEach: Math.round(4 * q.density) + 2, lights: q.tier === 'low' ? 0 : q.tier === 'medium' ? 4 : 6 });
     scene.add(this.floating.group);
 
     const clumps: ReedClump[] = [];
@@ -311,15 +309,13 @@ export class HavenWorld extends World {
     scene.add(gateGlow);
     await ctx.step('haven: bridge');
 
-    scene.add(buildWaterfall(v3(gi.x - 8.6, gi.y - 0.35, gi.z + 3), 2.4, 30, -1.2, this.time));
-    scene.add(buildWaterfall(v3(gi.x + 8.2, gi.y - 0.35, gi.z + 1), 1.8, 26, 1.1, this.time));
     scene.add(buildWaterfall(v3(11.6, -0.5, -6.5), 1.5, 24, 1.3, this.time));
     for (const i of [3, 4, 7]) {
       const [x, y, z, radius] = far[i]!;
       scene.add(buildWaterfall(v3(x + radius * 0.72, y - 0.4, z + radius * 0.5), radius * 0.2, radius * 2.6, 0.6, this.time));
     }
-    this.motes.push(buildMotes(Math.round(110 * q.density), v3(0, 0.15, -1), v3(11, 3.4, 11), rng.fork(), this.time, { a: 0xffd98a, b: 0x8fe9ff, size: 0.07, gain: 2.2 }));
-    this.motes.push(buildMotes(Math.round(70 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0x6f9cff, size: 0.11, gain: 2.0 }));
+    this.motes.push(buildMotes(Math.round(70 * q.density), v3(0, 0.15, -1), v3(11, 3.4, 11), rng.fork(), this.time, { a: 0xffd98a, b: 0x8fe9ff, size: 0.07, gain: 2.2 }));
+    this.motes.push(buildMotes(Math.round(40 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0x6f9cff, size: 0.11, gain: 2.0 }));
     for (const m of this.motes) scene.add(m.points);
     scene.add(this.bursts.points);
 
