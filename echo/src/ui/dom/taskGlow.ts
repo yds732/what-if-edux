@@ -1,8 +1,3 @@
-/**
- * The reward for finishing a task: the edges of the screen light up gold for a moment and fade, like the room
- * itself is pleased. A plain DOM layer over the canvas, so it costs nothing while it rests.
- */
-
 let layer: HTMLDivElement | null = null;
 
 const reduced = (): boolean => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -12,7 +12,6 @@ export interface System {
 export interface AppOptions {
   readonly canvas: HTMLCanvasElement;
   readonly tier: Tier;
-  /** Pins the internal resolution scale (captures, benchmarks); null lets the governor steer it. */
   readonly fixedScale: number | null;
   readonly maxDpr: number;
 }
@@ -20,38 +19,27 @@ export interface AppOptions {
 const MAX_DT = 1 / 20;
 const BASE_VFOV = 62;
 
-/** The engine: renderer, camera rig, clock, the active world and the systems that run each frame. */
 export class App {
   readonly canvas: HTMLCanvasElement;
   readonly renderer: THREE.WebGLRenderer;
   readonly camera = new THREE.PerspectiveCamera(BASE_VFOV, 1, 0.05, 200);
-  /** Moves through the world; the camera (and XR controllers) ride on it. */
   readonly rig = new THREE.Group();
-  /** HUD drawn over the graded frame at native resolution, through its own camera. */
   overlay: { scene: THREE.Scene; camera: THREE.Camera } | null = null;
-  /** Called after a resize with the canvas size in CSS pixels and the buffer's pixel ratio. */
   onResize: ((width: number, height: number, dpr: number) => void) | null = null;
   readonly tasks = new Tasks();
   readonly fx: ScreenFx = { fade: 0, fadeColor: new THREE.Color(0, 0, 0), dim: 0, flash: 0, kick: 0, focus: 7 };
   readonly post: PostPipeline;
-  /** Whatever reads the player's hands. These run first, so the story sees this frame's presses as the systems do. */
   readonly senses: System[] = [];
-  /** Updated in order after the story, before the frame is drawn. */
   readonly systems: System[] = [];
   readonly info = { frameMs: 0, calls: 0, triangles: 0, scale: 1, tier: 'high' as Tier, gpu: '?', width: 0, height: 0 };
 
   quality: QualitySettings;
   world: World | null = null;
   wipe: WorldWipe | null = null;
-  /** When set, replaces the active world's look (transitions blend two worlds' looks here). */
   lookOverride: Look | null = null;
-  /** How far away the story wants the lens focused, in metres: a speaker's face. Null lets it rest. */
   focus: number | null = null;
-  /** Added to the base field of view by gameplay (drawing back a throw). */
   fovKick = 0;
-  /** 1, or less where the player's device asks for reduced motion: flashes and camera punches step down. */
   private readonly motion = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0.25 : 1;
-  /** Degrees taken off the field of view by the story: leaning in to read a screen. */
   zoom = 0;
   time = 0;
   paused = false;
@@ -70,7 +58,6 @@ export class App {
     this.quality = settingsFor(opts.tier);
     this.info.tier = opts.tier;
 
-    // `antialias` only matters for XR (its layer takes MSAA from the context); flat rendering resolves its own HDR target
     const renderer = new THREE.WebGLRenderer({ canvas: opts.canvas, antialias: true, alpha: false, powerPreference: 'high-performance', stencil: false });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.AgXToneMapping;
@@ -86,7 +73,6 @@ export class App {
     this.post.motion = this.motion;
     this.governor = new ResolutionGovernor(() => (this.sizeDirty = true), opts.fixedScale);
     this.rig.add(this.camera);
-    // a headset has no post pass to fade with: a small shell around the eyes does it instead
     this.xrFade = new THREE.Mesh(new THREE.SphereGeometry(0.3, 24, 16), new THREE.MeshBasicMaterial({ side: THREE.BackSide, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false }));
     this.xrFade.renderOrder = 900;
     this.xrFade.visible = false;
@@ -112,7 +98,7 @@ export class App {
   }
 
   private resize(): void {
-    if (this.renderer.xr.isPresenting) return; // the headset owns the framebuffer; try again when the session ends
+    if (this.renderer.xr.isPresenting) return;
     this.sizeDirty = false;
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     if (w < 2 || h < 2) return;
@@ -121,9 +107,6 @@ export class App {
     this.renderer.setSize(w, h, false);
     const bw = w * dpr, bh = h * dpr;
     const cap = Math.min(1, Math.sqrt(this.quality.maxPixels / (bw * bh)));
-    // never draw the world much below the window's own size: under it, edges step and the scene looks smeared
-    // beside the crisp HUD. On a high-density screen that still leaves room to save work (85% of the window's pixels
-    // across); a fixed scale (captures, `?scale=`) is taken as asked.
     const floor = this.governor.isFixed ? 0 : Math.min(1, 0.85 / dpr);
     const scale = Math.max(floor, cap * this.governor.scale);
     this.post.setSize(bw * scale, bh * scale);
@@ -135,7 +118,6 @@ export class App {
   }
 
   private applyFov(): void {
-    // hold the horizontal view on tall screens: a phone held upright widens vertically instead of cropping the sides
     const aspect = this.camera.aspect;
     const base = aspect >= 1.2 ? BASE_VFOV : clamp(2 * Math.atan(Math.tan((BASE_VFOV * Math.PI) / 360) * (1.2 / aspect)) * (180 / Math.PI), BASE_VFOV, 96);
     const fov = base + this.fovKick * this.motion - this.zoom;
@@ -145,7 +127,6 @@ export class App {
     }
   }
 
-  /** Advances every system by `dt` seconds of game time. */
   step(dt: number): void {
     this.lastDt = dt;
     if (this.paused) return;
@@ -179,10 +160,8 @@ export class App {
       r.setRenderTarget(null);
       r.render(world.scene, this.camera);
     } else {
-      // the lens follows whatever the story is looking at, and rests on the middle distance otherwise
       this.fx.focus += ((this.focus ?? world.restFocus) - this.fx.focus) * (1 - Math.exp(-3 * this.lastDt));
       this.post.render({ scene: world.scene, camera: this.camera, look, time: this.time, fx: this.fx, wipe: this.wipe, overlay: this.overlay, prepass: world.prepass, shafts: world.shafts });
-      // flashes and lens kicks are impulses: whoever raises them need not lower them
       this.fx.flash *= Math.exp(-5 * this.lastDt);
       this.fx.kick *= Math.exp(-6 * this.lastDt);
     }
@@ -190,13 +169,11 @@ export class App {
     this.info.triangles = r.info.render.triangles;
   }
 
-  /** Feeds one displayed frame's wall time to the resolution governor and the frame-time readout. */
   sampleFrame(elapsedMs: number): void {
     this.info.frameMs += (elapsedMs - this.info.frameMs) * 0.1;
     if (!this.renderer.xr.isPresenting && !this.paused && !document.hidden) this.governor.sample(elapsedMs);
   }
 
-  /** Starts the live loop. */
   start(): void {
     this.lastFrameAt = 0;
     this.renderer.setAnimationLoop((now: number) => {
@@ -212,7 +189,6 @@ export class App {
     this.renderer.setAnimationLoop(null);
   }
 
-  /** Deterministic playback for captures and tests: fixed steps up to `seconds`, then one frame. */
   renderAt(seconds: number, fps = 60): void {
     const dt = 1 / fps;
     while (this.time + dt * 0.5 < seconds) this.step(dt);

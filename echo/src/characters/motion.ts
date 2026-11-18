@@ -1,16 +1,9 @@
 import type { BoneName } from './skeleton';
 
-/**
- * Poses and gestures as data. Angles are degrees in YXZ order on bones that are axis-aligned in bind pose:
- *   x  pitch: negative swings an arm or thigh forward, positive nods the head down
- *   y  yaw:   positive turns toward the character's left (+X)
- *   z  roll:  positive lifts the left arm away from the body (use the negative for the right arm)
- */
 type Angles = readonly [x: number, y: number, z: number];
 
 export interface Pose {
   readonly bones: Partial<Record<BoneName, Angles>>;
-  /** Offset of the hips from standing height; `seated` poses are lowered onto the seat by the character. */
   readonly hipsY: number;
   readonly hipsZ: number;
   readonly seated?: boolean;
@@ -18,14 +11,9 @@ export interface Pose {
 
 export type PoseName = 'stand' | 'standOpen' | 'sit' | 'sitDesk' | 'sitDeskL' | 'sitDeskR' | 'sitLean';
 
-/**
- * Seated at a classroom table (top 0.585 m, its edge 0.15 m in front of the hips): angles solved against the cast's
- * measured arms so the wrists rest on the top and the elbows stay behind its edge, clear of the wood.
- */
 const SEATED_LEGS = { legL: [-80, 0, 4], legR: [-80, 0, -4], shinL: [82, 0, 0], shinR: [82, 0, 0] } as const;
 const ON_DESK_L: Angles = [-56, 0, 9], FORE_ON_DESK_L: Angles = [-48, 0, -18];
 const ON_DESK_R: Angles = [-56, 0, -9], FORE_ON_DESK_R: Angles = [-48, 0, 18];
-/** An arm left hanging at the side, the hand by the seat. */
 const AT_SIDE_L: Angles = [-6, 0, 11], FORE_AT_SIDE_L: Angles = [-16, 0, 0];
 const AT_SIDE_R: Angles = [-6, 0, -11], FORE_AT_SIDE_R: Angles = [-16, 0, 0];
 
@@ -34,7 +22,6 @@ export const POSES: Record<PoseName, Pose> = {
     hipsY: 0, hipsZ: 0,
     bones: { armL: [-3, 0, 8], armR: [-3, 0, -8], foreL: [-13, 0, 0], foreR: [-13, 0, 0], legL: [0, 0, 2.5], legR: [0, 0, -2.5], head: [1, 0, 0] },
   },
-  /** Arms a little away from the body, palms forward: a companion's open welcome. */
   standOpen: {
     hipsY: 0, hipsZ: 0,
     bones: { armL: [-8, 0, 16], armR: [-8, 0, -16], foreL: [-24, 0, 0], foreR: [-24, 0, 0], legL: [0, 0, 3], legR: [0, 0, -3], head: [-2, 0, 0], chest: [-2, 0, 0] },
@@ -46,22 +33,18 @@ export const POSES: Record<PoseName, Pose> = {
       armL: [-16, 0, 7], armR: [-16, 0, -7], foreL: [-58, 0, -12], foreR: [-58, 0, 12], spine: [2, 0, 0],
     },
   },
-  /** Both forearms resting on the table. */
   sitDesk: {
     hipsY: 0, hipsZ: 0, seated: true,
     bones: { ...SEATED_LEGS, armL: ON_DESK_L, foreL: FORE_ON_DESK_L, armR: ON_DESK_R, foreR: FORE_ON_DESK_R, spine: [8, 0, 0], chest: [4, 0, 0], head: [-6, 0, 0] },
   },
-  /** The left forearm on the table, the right arm down at the side. */
   sitDeskL: {
     hipsY: 0, hipsZ: 0, seated: true,
     bones: { ...SEATED_LEGS, armL: ON_DESK_L, foreL: FORE_ON_DESK_L, armR: AT_SIDE_R, foreR: FORE_AT_SIDE_R, spine: [8, 0, -2], chest: [4, 0, -2], head: [-6, 0, 2] },
   },
-  /** The right forearm on the table, the left arm down at the side. */
   sitDeskR: {
     hipsY: 0, hipsZ: 0, seated: true,
     bones: { ...SEATED_LEGS, armL: AT_SIDE_L, foreL: FORE_AT_SIDE_L, armR: ON_DESK_R, foreR: FORE_ON_DESK_R, spine: [8, 0, 2], chest: [4, 0, 2], head: [-6, 0, -2] },
   },
-  /** Leaning in over the table, forearms on it and hands drawn together: interested. */
   sitLean: {
     hipsY: 0, hipsZ: 0, seated: true,
     bones: {
@@ -77,7 +60,6 @@ export interface Gesture {
   readonly duration: number;
   readonly loop?: boolean;
   readonly tracks: Partial<Record<BoneName, readonly Key[]>>;
-  /** Vertical lift of the hips over the gesture, metres. */
   readonly hop?: (t: number) => number;
 }
 
@@ -137,7 +119,6 @@ export const GESTURES: Record<GestureName, Gesture> = {
       head: [[0, 1, 0, 0], [0.25, 2, 0, 9], [0.7, 2, 0, 9], [1, 1, 0, 0]],
     },
   },
-  /** One open hand toward what is being shown. */
   present: {
     duration: 2.4,
     tracks: {
@@ -161,7 +142,6 @@ export const GESTURES: Record<GestureName, Gesture> = {
       head: [[0, 1, 0, 0], [0.2, 5, 0, -4], [0.82, 5, 0, -4], [1, 1, 0, 0]],
     },
   },
-  /** Rubbing the back of the neck: nervous. */
   fidget: {
     duration: 2.8,
     tracks: {
@@ -185,7 +165,6 @@ export const GESTURES: Record<GestureName, Gesture> = {
       foreR: [[0, -13, 0, 0], [0.18, -30, 0, 0], [0.34, -96, 0, 0], [0.5, -40, 0, 0], [0.66, -96, 0, 0], [0.84, -40, 0, 0], [1, -13, 0, 0]],
     },
   },
-  /** Shoulders drop, head down: discouraged. Hold it. */
   slump: {
     duration: 1.2,
     tracks: {

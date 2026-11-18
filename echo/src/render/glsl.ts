@@ -1,6 +1,4 @@
-/** GLSL chunks shared by scene shaders and the post pipeline. Kept as strings and spliced with template literals. */
-
-export const GLSL_HASH = /* glsl */ `
+export const GLSL_HASH = `
 float hash11(float p){ p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float hash13(vec3 p3){ p3 = fract(p3 * 0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
@@ -8,7 +6,7 @@ vec2 hash22(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973))
 vec3 hash33(vec3 p3){ p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973)); p3 += dot(p3, p3.yxz + 33.33); return fract((p3.xxy + p3.yxx) * p3.zyx); }
 `;
 
-export const GLSL_NOISE = /* glsl */ `
+export const GLSL_NOISE = `
 ${GLSL_HASH}
 float vnoise(vec2 p){
   vec2 i = floor(p), f = fract(p); vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
@@ -24,13 +22,12 @@ float fbm2(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a
 float fbm3(vec3 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * vnoise3(p); p = p * 2.03 + 11.7; a *= 0.5; } return s; }
 `;
 
-/** Tail every custom *scene* shader must end with so it matches built-in materials on screen, in HDR targets and in XR. */
-export const GLSL_OUTPUT = /* glsl */ `
+export const GLSL_OUTPUT = `
 #include <tonemapping_fragment>
 #include <colorspace_fragment>
 `;
 
-export const FULLSCREEN_VS = /* glsl */ `
+export const FULLSCREEN_VS = `
 varying vec2 vUv;
 void main(){ vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }
 `;

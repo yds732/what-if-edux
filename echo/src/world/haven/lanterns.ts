@@ -4,16 +4,10 @@ import { Rng, TAU } from '../../core/math';
 import { GLSL_OUTPUT } from '../../render/glsl';
 import { makeHalo } from './atmosphere';
 
-/**
- * Paper lanterns that float above Haven's grass, bobbing slowly, each with a few motes of light circling it
- * and fading as they rise. A handful carry a real light, so the grass and stones around them glow warm.
- */
 export interface LanternSpot {
   readonly x: number;
   readonly z: number;
-  /** Ground height under the lantern. */
   readonly ground: number;
-  /** Metres to float above the usual height: for a lantern that would otherwise hang in front of something. */
   readonly lift?: number;
 }
 
@@ -22,7 +16,7 @@ export interface Lanterns {
   update(time: number, pixelHeight: number): void;
 }
 
-const MOTE_VS = /* glsl */ `
+const MOTE_VS = `
 attribute vec4 aHome;    // lantern x, rest height, z, bob phase
 attribute vec4 aBob;     // bob speed, bob amplitude, orbit radius, orbit speed
 attribute vec4 aSeed;    // angle, life rate, life offset, size
@@ -42,7 +36,7 @@ void main() {
   gl_PointSize = min(aSeed.w * uPixel * 0.85 / max(-mv.z, 0.4), 48.0);
 }`;
 
-const MOTE_FS = /* glsl */ `
+const MOTE_FS = `
 uniform vec3 uColor;
 varying float vAlpha;
 void main() {
@@ -55,7 +49,6 @@ void main() {
 export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { motesEach: number; lights: number }): Lanterns => {
   const group = new THREE.Group();
 
-  // a round paper lantern: a bellied shade between two small dark caps, a little loop on top
   const shade = sweep([v3(0, 0, 0), v3(0, 0.38, 0)], (k) => 0.11 + 0.09 * Math.sin(k * Math.PI), { radial: 12, steps: 8, startCap: 'flat', endCap: 'flat' });
   const geo = merge([
     tint(shade, 0xffa54a),
@@ -64,7 +57,6 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
     tint(place(blob(0.018, 0.04, 0.018, 1), [0, 0.44, 0]), 0x6a3a30),
   ]);
   geo.translate(0, -0.19, 0);
-  // lit from inside: the shade glows, brightest at its widest
   const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
   mat.color.setScalar(1.85);
 
@@ -78,7 +70,6 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
     object.add(new THREE.Mesh(geo, mat));
     object.add(makeHalo(0xffb866, rng.range(1.5, 1.9), 0.42));
     object.add(makeHalo(0xffd9a0, 0.55, 0.9));
-    // spread the few real lights evenly through the list, so they fall along the path and around the island
     if (lightCount > 0 && i % Math.max(1, Math.floor(spots.length / lightCount)) === 0 && lit < lightCount) {
       object.add(new THREE.PointLight(0xffb36a, 3.2, 6.5, 1.7));
       lit++;
@@ -87,7 +78,6 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
     lanterns.push({ object, home, speed: rng.range(0.7, 1.15), amp: rng.range(0.1, 0.18), phase: rng.range(0, TAU), sway: rng.range(0.25, 0.45) });
   }
 
-  // the motes: one draw call for every lantern's little circle of light
   const n = spots.length * opts.motesEach;
   const home = new Float32Array(n * 4), bob = new Float32Array(n * 4), seed = new Float32Array(n * 4);
   let k = 0;
@@ -99,7 +89,6 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
     }
   }
   const mg = new THREE.BufferGeometry();
-  // positions are worked out in the shader; this only gives three.js a count
   mg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
   mg.setAttribute('aHome', new THREE.BufferAttribute(home, 4));
   mg.setAttribute('aBob', new THREE.BufferAttribute(bob, 4));
@@ -118,7 +107,6 @@ export const buildLanterns = (rng: Rng, spots: readonly LanternSpot[], opts: { m
       uniforms.uPixel.value = pixelHeight;
       for (const l of lanterns) {
         l.object.position.y = l.home.y + Math.sin(time * l.speed + l.phase) * l.amp;
-        // a lantern on a breath of air turns and tips a little
         l.object.rotation.set(Math.sin(time * 0.5 + l.phase) * 0.05, time * 0.12 * l.sway + l.phase, Math.cos(time * 0.43 + l.phase) * 0.05);
       }
     },

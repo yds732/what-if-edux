@@ -1,6 +1,5 @@
 import { clamp01, ease, type Ease } from './math';
 
-/** Thrown into an awaiting sequence when its AbortSignal fires (chapter restart, skip, shutdown). */
 export class Cancelled extends Error {
   constructor() {
     super('cancelled');
@@ -11,18 +10,12 @@ export class Cancelled extends Error {
 export const isCancelled = (e: unknown): e is Cancelled => e instanceof Cancelled;
 
 interface Task {
-  /** Returns true when finished. */
   step(dt: number): boolean;
 }
 
-/**
- * Game-time scheduler. Everything that waits (dialogue, tweens, cutscenes) waits on this clock, so pausing the
- * game pauses every sequence and a test can run the whole story at `timeScale` 50 without changing its logic.
- */
 export class Tasks {
   private readonly tasks = new Set<Task>();
   timeScale = 1;
-  /** Seconds of game time elapsed. */
   now = 0;
 
   update(dt: number): void {
@@ -74,7 +67,6 @@ export class Tasks {
     }));
   }
 
-  /** Resolves on the first frame where `predicate` holds; `predicate` receives the frame's dt. */
   until(predicate: (dt: number) => boolean, signal?: AbortSignal): Promise<void> {
     return this.run<void>(signal, (resolve) => ({
       step: (dt) => {
@@ -85,7 +77,6 @@ export class Tasks {
     }));
   }
 
-  /** Calls `onUpdate` with an eased 0..1 every frame for `seconds`, always ending on exactly 1. */
   tween(seconds: number, onUpdate: (k: number) => void, easing: Ease = ease.inOutCubic, signal?: AbortSignal): Promise<void> {
     let elapsed = 0;
     if (seconds <= 0) {
@@ -105,7 +96,6 @@ export class Tasks {
     }));
   }
 
-  /** Runs a fire-and-forget per-frame callback until it returns true or the signal aborts. */
   spawn(step: (dt: number) => boolean, signal?: AbortSignal): void {
     const task: Task = { step };
     this.tasks.add(task);
@@ -117,7 +107,6 @@ export class Tasks {
   }
 }
 
-/** Minimal typed event emitter. */
 export class Signal<T = void> {
   private readonly listeners = new Set<(value: T) => void>();
   on(fn: (value: T) => void): () => void {
@@ -127,7 +116,6 @@ export class Signal<T = void> {
   emit(value: T): void {
     for (const fn of [...this.listeners]) fn(value);
   }
-  /** Resolves with the next emitted value, or rejects with Cancelled when the signal aborts. */
   next(signal?: AbortSignal): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       if (signal?.aborted) {

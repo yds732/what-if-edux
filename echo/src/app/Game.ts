@@ -22,12 +22,10 @@ import { App, type AppOptions } from './App';
 
 export type WorldId = 'classroom' | 'bedroom' | 'haven';
 
-/** Decisions a scripted playthrough makes, so every branch can be tested without a person. */
 export interface AutopilotPlan {
   tuesday: 'meet' | 'haven';
   thursday: 'help' | 'haven';
   policy: Policy;
-  /** Number of orbs to waste before each hit, to exercise the miss path. */
   misses: number;
 }
 
@@ -35,7 +33,6 @@ export class Autopilot {
   enabled = false;
   plan: AutopilotPlan = { tuesday: 'meet', thursday: 'help', policy: 'combined', misses: 0 };
 
-  /** Picks the option the plan calls for, by the question being asked. */
   choose(title: string, count: number): Promise<number> {
     const t = title.toLowerCase();
     let index = 0;
@@ -46,10 +43,6 @@ export class Autopilot {
   }
 }
 
-/**
- * The whole game: engine, player, interface, the worlds and the story that runs through them. Systems update
- * in a fixed order each frame; the story itself is the Director's async chapters riding the same clock.
- */
 export class Game {
   readonly app: App;
   readonly input: Input;
@@ -60,32 +53,23 @@ export class Game {
   readonly director: Director;
   readonly autopilot = new Autopilot();
   readonly headset: HeadsetProp;
-  /** The headset session, when the device has one. */
   readonly xr: XRRig;
-  /** Where characters look when they look at the player. */
   readonly playerEye = new THREE.Vector3();
   readonly worlds: Partial<Record<WorldId, World>> = {};
   readonly assets: AssetLibrary;
   state: StoryState = freshState();
   chapter: ChapterId | null = null;
-  /** In the story (not at the title, not paused): the mouse belongs to the game. */
   playing = false;
-  /** Steps of game time per displayed frame; tests run the week at many times real speed. */
   speed = 1;
-  /** The last story beat reached, for tests and captures. */
   beat = '';
-  /** Called whenever the story reaches a named beat. */
   onBeat: ((name: string) => void) | null = null;
-  /** Called when a chapter begins and when the week ends. */
   onChapter: ((chapter: ChapterId | 'end') => void) | null = null;
   star: StarBridgeGame | null = null;
-  /** Shown while a world is being built: which one, and how many bytes of it have arrived so far. */
   onLoading: ((label: string | null, bytes?: number) => void) | null = null;
 
   private readonly factories: Record<WorldId, () => World> = { classroom: () => new ClassroomWorld(), bedroom: () => new BedroomWorld(), haven: () => new HavenWorld() };
   private readonly building = new Map<WorldId, Promise<World>>();
 
-  /** Without an `audio` the game runs silent, which is what captures and unit tests want. */
   constructor(options: AppOptions, readonly audio: GameAudio = new NullAudio()) {
     const app = (this.app = new App(options));
     this.assets = new AssetLibrary(app.quality);
@@ -100,7 +84,6 @@ export class Game {
     app.onResize = (w, h, dpr) => this.hud.resize(w, h, dpr);
     this.headset.setPower(0);
 
-    // order matters: decide what was used, play the orb game, move the body, then dress the frame
     app.systems.push(
       { update: () => this.interaction.update() },
       { update: (dt, t) => this.star?.update(dt, t) },
@@ -112,15 +95,12 @@ export class Game {
       { update: () => this.input.endFrame() },
     );
     this.xr = new XRRig(this);
-    // controllers are polled, not delivered as events: read them before the story runs, or it never sees a button
     app.senses.push({ update: (dt) => this.xr.update(dt) }, { update: () => this.input.beginFrame() });
-    // every gesture, not only the first: a browser may leave sound suspended until a later one
     this.input.onGesture.on(() => this.audio.unlock());
     this.hud.onHover.on(() => this.audio.sfx('uiHover'));
     this.player.onStep.on((speed) => this.audio.sfx('footstep', { gain: 0.35 + 0.4 * speed }));
   }
 
-  /** Adds a per-frame system that runs after the built-in ones but before the frame's input is cleared. */
   addSystem(update: (dt: number, time: number) => void): void {
     this.app.systems.splice(this.app.systems.length - 1, 0, { update });
   }
@@ -129,7 +109,6 @@ export class Game {
     return { renderer: this.app.renderer, quality: this.app.quality, assets: this.assets, step: () => new Promise((r) => setTimeout(r, 0)) };
   }
 
-  /** Returns a world, building it first if this is its first visit. */
   ensureWorld(id: WorldId): Promise<World> {
     const ready = this.worlds[id];
     if (ready) return Promise.resolve(ready);
@@ -140,7 +119,6 @@ export class Game {
         const before = this.assets.loaded;
         this.assets.onProgress = (loaded) => this.onLoading?.(id, loaded - before);
         const world = this.factories[id]();
-        // what the player carries from world to world is fetched alongside the first of them
         await Promise.all([world.build(this.context()), this.hands.ready, this.headset.ready]);
         await this.app.renderer.compileAsync(world.scene, this.app.camera);
         this.worlds[id] = world;
@@ -157,7 +135,6 @@ export class Game {
     return pending;
   }
 
-  /** Makes a world the current one and dresses the interface and the player's hands for it. */
   setWorld(world: World): void {
     this.interaction.clear();
     if (this.star) this.interaction.add(this.star.pedestalItem);
@@ -166,16 +143,11 @@ export class Game {
     this.hands.setStyle(world.theme === 'haven' ? 'haven' : 'real');
   }
 
-  /** Marks a named point in the story. */
   reach(name: string): void {
     this.beat = name;
     this.onBeat?.(name);
   }
 
-  /**
-   * Stops the story and clears away what it had on stage: the camera's lean, the interface, a round of the orb
-   * game, props the worlds had out. Restarting a day or leaving for the title must not carry any of it along.
-   */
   clearStage(): void {
     this.director.abort();
     const app = this.app;
@@ -190,7 +162,6 @@ export class Game {
     for (const world of Object.values(this.worlds)) world.reset();
   }
 
-  /** Plays the week from `from` to its end. Resolves when the story finishes or is aborted. */
   async run(from: ChapterId, state: StoryState = freshState()): Promise<void> {
     this.clearStage();
     this.state = state;
@@ -209,7 +180,6 @@ export class Game {
     }
   }
 
-  /** Starts the frame loop. */
   start(): void {
     const app = this.app;
     let last = 0;

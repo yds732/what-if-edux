@@ -3,10 +3,6 @@ import { damp } from '../core/math';
 
 const unitQuad = new THREE.PlaneGeometry(1, 1);
 
-/**
- * A rectangle of canvas-drawn interface, as a textured quad. The same panel can sit in the flat HUD (measured
- * in layout pixels) or hang in a world (scaled to metres): it is how the game draws all of its text.
- */
 export class Panel {
   readonly mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
   readonly canvas: HTMLCanvasElement;
@@ -34,13 +30,11 @@ export class Panel {
       blending: opts.additive ? THREE.AdditiveBlending : THREE.NormalBlending, side: opts.world ? THREE.DoubleSide : THREE.FrontSide,
     });
     this.mesh = new THREE.Mesh(unitQuad, material);
-    // interface panels ignore depth, so they must also be drawn after everything in the world, whenever they were made
     if (!opts.world) this.mesh.renderOrder = 1000;
     this.mesh.scale.set(width, height, 1);
     this.setDensity(2);
   }
 
-  /** Texture pixels per layout pixel. Changing it clears the canvas; repaint afterwards. */
   setDensity(density: number): boolean {
     const d = Math.min(4, Math.max(0.5, density));
     const w = Math.max(2, Math.round(this.width * d)), h = Math.max(2, Math.round(this.height * d));
@@ -48,7 +42,6 @@ export class Panel {
     this.density = d;
     this.canvas.width = w;
     this.canvas.height = h;
-    // GPU storage is allocated once per size: a resized canvas needs a fresh allocation, not an update in place
     this.texture.dispose();
     return true;
   }
@@ -63,7 +56,6 @@ export class Panel {
     this.setDensity(d);
   }
 
-  /** Clears the panel and draws it in layout pixels. */
   paint(draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): void {
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -87,15 +79,12 @@ export class Panel {
   }
 }
 
-/** A panel that fades and slides in and out. Position is its centre, in layout pixels from the screen's centre, y up. */
 export class Widget {
   readonly panel: Panel;
   x = 0;
   y = 0;
   visible = false;
-  /** Rise, in pixels, as the widget appears. */
   slide = 10;
-  /** Fade rate per second. */
   rate = 9;
   private shown = 0;
 
@@ -108,7 +97,6 @@ export class Widget {
     return this.shown;
   }
 
-  /** Snaps to fully shown or hidden. */
   snap(): void {
     this.shown = this.visible ? 1 : 0;
     this.layout();
@@ -126,7 +114,6 @@ export class Widget {
     this.panel.mesh.position.set(this.x, this.y - (1 - this.shown) * this.slide, 0);
   }
 
-  /** Whether a point in layout coordinates falls on the widget. */
   contains(px: number, py: number): boolean {
     return Math.abs(px - this.x) <= this.panel.width / 2 && Math.abs(py - this.y) <= this.panel.height / 2;
   }

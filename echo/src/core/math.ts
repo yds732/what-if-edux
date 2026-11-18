@@ -1,5 +1,3 @@
-/** Scalar helpers, easing curves, seeded randomness and value noise shared by every system. */
-
 export const TAU = Math.PI * 2;
 export const DEG = Math.PI / 180;
 
@@ -11,11 +9,9 @@ export const smoothstep = (a: number, b: number, x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-/** Frame-rate independent exponential approach: `lambda` is the decay rate per second. */
 export const damp = (current: number, target: number, lambda: number, dt: number): number =>
   lerp(current, target, 1 - Math.exp(-lambda * dt));
 
-/** Shortest signed angular difference b - a, in (-PI, PI]. */
 export const angleDelta = (a: number, b: number): number => {
   let d = (b - a) % TAU;
   if (d > Math.PI) d -= TAU;
@@ -46,7 +42,6 @@ export const ease = {
   },
 } satisfies Record<string, Ease>;
 
-/** Deterministic PRNG (mulberry32). Every procedural builder takes one so worlds are identical on every load. */
 export class Rng {
   private s: number;
   constructor(seed: number) {
@@ -74,7 +69,6 @@ export class Rng {
   chance(p: number): boolean {
     return this.next() < p;
   }
-  /** Approximately normal, mean 0, sd 1. */
   gauss(): number {
     return (this.next() + this.next() + this.next() + this.next() - 2) * 1.7320508;
   }
@@ -89,7 +83,6 @@ const hash3 = (x: number, y: number, z: number): number => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
 
-/** Smooth value noise in [-1, 1]. */
 export const noise3 = (x: number, y: number, z: number): number => {
   const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
   const xf = x - xi, yf = y - yi, zf = z - zi;
@@ -104,7 +97,6 @@ export const noise3 = (x: number, y: number, z: number): number => {
   return lerp(lerp(x00, x10, v), lerp(x01, x11, v), w) * 2 - 1;
 };
 
-/** Fractal value noise in roughly [-1, 1]. */
 export const fbm3 = (x: number, y: number, z: number, octaves = 4, lacunarity = 2, gain = 0.5): number => {
   let amp = 0.5, freq = 1, sum = 0, norm = 0;
   for (let i = 0; i < octaves; i++) {

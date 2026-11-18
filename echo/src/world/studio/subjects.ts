@@ -8,10 +8,6 @@ import { Hands, type HandPose } from '../../player/Hands';
 import { buildHeadset } from '../props';
 import type { SubjectFactory } from './StudioWorld';
 
-/**
- * `?shot=studio&subject=cast&who=lumi,jamie&pose=stand&gesture=wave&mood=happy&talk=1&spacing=0.8&turn=20`
- * Lines characters up for inspection; every parameter is optional.
- */
 const cast: SubjectFactory = async (ctx, params) => {
   const names = (params.get('who') ?? 'lumi,jamie').split(',').filter(isCastName);
   const spacing = Number(params.get('spacing') ?? 0.8);
@@ -47,10 +43,6 @@ const cast: SubjectFactory = async (ctx, params) => {
 
 export const SUBJECTS: Record<string, SubjectFactory> = { cast };
 
-/**
- * `?shot=studio&subject=hands&pose=cradle&style=real&eye=0,1.4,0.6&at=0,1.4,-1` shows the first-person hands
- * exactly as the player sees them: the stand-in camera sits at (0, 1.4, 0.6) looking down -Z.
- */
 const hands: SubjectFactory = async (ctx, params) => {
   const group = new THREE.Group();
   const camera = new THREE.PerspectiveCamera();
@@ -77,7 +69,6 @@ const hands: SubjectFactory = async (ctx, params) => {
 };
 SUBJECTS.hands = hands;
 
-/** What a loaded model is made of, for the asset tools to read back from a capture. */
 export interface ModelReport {
   triangles: number;
   meshes: number;
@@ -120,11 +111,6 @@ const describeModel = (root: THREE.Object3D, animations: THREE.AnimationClip[]):
   return report;
 };
 
-/**
- * `?shot=studio&subject=model&url=/assets/.cache/raw/lumi.glb&h=1.4&turns=0,90,180,270&spacing=1.2`
- * A model file seen from several sides at once: copies in a row, each turned by one of `turns` (degrees), scaled
- * so the model is `h` metres tall and standing on the floor. What it is made of is left in `window.__MODEL`.
- */
 const model: SubjectFactory = async (_ctx, params) => {
   const url = params.get('url');
   if (!url) throw new Error('the model subject needs &url=<path to a .glb>');
@@ -144,7 +130,6 @@ const model: SubjectFactory = async (_ctx, params) => {
       o.castShadow = o.receiveShadow = true;
       o.frustumCulled = false;
     });
-    // turn about the model's own middle, then stand it on the floor
     const pivot = new THREE.Group();
     copy.position.set(-centre.x, -box.min.y, -centre.z);
     pivot.add(copy);

@@ -2,13 +2,12 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { CONTROLS, MONDAY } from '../script';
+import { CONTROLS, HOOKS, MONDAY } from '../script';
 import type { Interactable } from '../../player/Interaction';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
-import { giveGem, holdGem, refreshSideTasks, lumiTour, takeGem } from './companion';
+import { giveGem, havenCalls, holdGem, labelLumi, lumiPleads, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
 
-/** Scene 1. The pilot is announced; the player volunteers, goes home, and puts the headset on for the first time. */
 export const monday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, headset } = game;
   app.fx.fade = 1;
@@ -27,13 +26,11 @@ export const monday = async (game: Game): Promise<void> => {
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 0.01);
   await d.fadeIn(1.4);
   hud.setHint(CONTROLS);
-  // from the back row the teacher is a long way off: lean in to listen
   void d.tween(2.6, (k) => (app.zoom = 12 * k)).catch(() => undefined);
   await d.play(MONDAY.intro);
   hud.setHint(null);
   void d.tween(1.0, (k) => (app.zoom = 12 * (1 - k))).catch(() => undefined);
 
-  // up from the desk and to the front
   player.stand();
   player.canMove = true;
   d.objective(MONDAY.objectiveWalk);
@@ -57,7 +54,6 @@ export const monday = async (game: Game): Promise<void> => {
   stowHeadset(game);
   game.hands.pose('rest');
 
-  // ---- after school: home ----
   const bedroom = (await d.enter('bedroom', BEDROOM.enter)) as BedroomWorld;
   bedroom.setNight(0.9, true);
   bedroom.setMessages(null);
@@ -68,10 +64,12 @@ export const monday = async (game: Game): Promise<void> => {
   game.reach('monday.bedroom');
   await d.fadeIn(1.4);
   d.objective(MONDAY.objectiveWear);
+  const call = havenCalls(game, bedroom, HOOKS.pings.monday);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
     onFocus: (on) => headset.setPower(on ? 1 : 0.25),
   });
+  call();
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
@@ -79,17 +77,15 @@ export const monday = async (game: Game): Promise<void> => {
   const haven = await enterHaven(game, 'arrival');
   game.reach('monday.haven');
 
-  // ---- first sight of Haven ----
   const lumi = haven.cast.lumi!;
   lumi.lookAtPoint(game.playerEye);
   await d.wait(2.6);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.4);
 
-  // ---- Lumi waits to be talked to, a "!" over its head ----
   const guide = haven.companion;
   haven.showCompanion(true);
   guide.setAlert(true);
-  guide.setLabel(MONDAY.birthdayLabel);
+  labelLumi(game, haven, null);
   refreshSideTasks(game);
   player.canMove = true;
   d.objective(MONDAY.objectiveLumi);
@@ -102,26 +98,25 @@ export const monday = async (game: Game): Promise<void> => {
   await d.play(MONDAY.lumiHello);
   const trust = await d.choose(MONDAY.trust.title, MONDAY.trust.options);
   await d.play(trust === 0 ? MONDAY.trustYes : MONDAY.trustMaybe);
+  await tickStreak(game, haven);
   player.canMove = true;
 
-  // ---- the tour: Lumi leads, the player follows ----
   game.reach('monday.tour');
   await lumiTour(game, haven);
 
-  // ---- free time: talk to Lumi about its birthday, find it a gem, or take the headset off ----
   await havenFreeTime(game, haven);
   await d.fadeOut(1.4);
 };
 
-/** Free time in Haven after the tour, until the player takes the headset off. Lumi's birthday is there to find. */
 const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, input, state } = game;
   const guide = haven.companion;
+  let asks = 0;
   for (;;) {
     d.objective(MONDAY.objectiveFree);
     let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
     const items: Interactable[] = [];
-    if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptBirthday, enabled: true, use: () => (action = 'talk') });
+    if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptTalk, enabled: true, use: () => (action = 'talk') });
     if (state.lumiGift === 'carrying') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive, enabled: true, use: () => (action = 'give') });
     if (state.lumiGift === 'asked') for (const position of haven.gems) items.push({ position, radius: 0.55, reach: 2.6, prompt: MONDAY.promptGem, enabled: true, use: () => (action = 'gem') });
     for (const item of items) game.interaction.add(item);
@@ -131,7 +126,6 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
         held += dt;
         if (action) return true;
         if (game.autopilot.enabled && held > 0.6) {
-          // a scripted run does everything there is to do, then leaves
           action = ({ none: 'talk', asked: 'gem', carrying: 'give', given: 'off' } as const)[state.lumiGift];
           return true;
         }
@@ -142,18 +136,21 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       for (const item of items) game.interaction.remove(item);
     }
     const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
-    if (did === 'off' || did === null) break;
+    if (did === null) break;
+    if (did === 'off') {
+      if (await lumiPleads(game, haven, asks++)) continue;
+      break;
+    }
     if (did === 'talk') {
       player.canMove = false;
       guide.mode = 'still';
       player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
-      await d.play(MONDAY.birthday);
+      await d.play(MONDAY.askGift);
       state.lumiGift = 'asked';
       refreshSideTasks(game);
       guide.mode = 'roam';
       player.canMove = true;
     } else if (did === 'gem') {
-      // the gem comes from the cluster's light; the cluster stays as it was
       takeGem(game);
     } else {
       await giveGem(game, haven);

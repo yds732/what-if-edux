@@ -13,13 +13,9 @@ import { getHaloTexture } from '../world/haven/atmosphere';
 
 export interface CharacterSpec {
   readonly name: string;
-  /** How the face the game draws on them looks: the colour of eyes and brows, the size of the eyes. */
   readonly face?: Partial<FaceLook>;
-  /** Haven's companions hover a little and carry a light of this colour about them. */
   readonly aura?: THREE.ColorRepresentation;
-  /** Resting expression the face returns to. */
   readonly rest?: Partial<FaceState>;
-  /** Uniform scale on the finished character. */
   readonly scale?: number;
 }
 
@@ -27,7 +23,6 @@ export type Mood = 'neutral' | 'happy' | 'delighted' | 'thinking' | 'worried' | 
 
 const MOODS: Record<Mood, Partial<FaceState>> = {
   neutral: {},
-  // kept understated: a happy face is a gentle closed smile, not a grin
   happy: { mouthSmile: 0.55, mouthWidth: 1.06, eyeSmile: 0.1, eyeL: 0.94, eyeR: 0.94, browRaise: 0.12, blush: 0.08 },
   delighted: { mouthSmile: 0.65, mouthOpen: 0.2, mouthWidth: 1.12, eyeSmile: 0.25, eyeL: 0.8, eyeR: 0.8, browRaise: 0.3, blush: 0.15 },
   thinking: { mouthSmile: 0, mouthWidth: 0.8, browRaise: 0.35, browTilt: 0.1, gazeX: 0.6, gazeY: 0.5 },
@@ -35,7 +30,6 @@ const MOODS: Record<Mood, Partial<FaceState>> = {
   sad: { mouthSmile: -0.45, mouthWidth: 0.9, browTilt: 0.7, browRaise: -0.1, eyeL: 0.75, eyeR: 0.75, gazeY: -0.5 },
   surprised: { mouthOpen: 0.35, mouthWidth: 0.7, mouthSmile: 0, eyeL: 1.18, eyeR: 1.18, browRaise: 0.8 },
   firm: { mouthSmile: -0.1, mouthWidth: 0.9, browTilt: -0.3, browRaise: -0.2 },
-  // a fixed, polite smile that does not reach the eyes
   blank: { mouthSmile: 0.45, eyeSmile: 0, browRaise: 0, browTilt: 0, blush: 0 },
 };
 
@@ -46,16 +40,10 @@ const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 
-/**
- * A person: a generated figure with a face drawn on it by shader, and an animator that layers a base pose, idle
- * life, one gesture, a look-at and speech. There are no animation files; every motion is a few numbers eased
- * toward their targets.
- */
 export class Character {
   readonly root = new THREE.Group();
   readonly rig: Rig;
   readonly spec: CharacterSpec;
-  /** Height of the eyes above the character's origin when standing. */
   readonly eyeHeight: number;
 
   private readonly faceMat: FaceLayer;
@@ -86,7 +74,6 @@ export class Character {
   private liveliness = 1;
   private seatHeight = 0.36;
 
-  /** `shadowMaps` false paints a soft shadow at the feet instead. */
   constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {
     this.spec = spec;
     this.rng = new Rng(hashName(spec.name));
@@ -126,13 +113,10 @@ export class Character {
     this.applyPose(1e6);
   }
 
-  /** Makes a member of the cast for a world, fetching their figure. */
-  /** `weight` caps the model's weight below the device's tier: for someone only ever seen across a room. */
   static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows, weight?: 'medium' | 'low'): Promise<Character> {
     return new Character(spec, await ctx.assets.model(id, weight), shadowMaps);
   }
 
-  /** Places the character at a point with `rotation.y` = `yawRad` (0 faces +Z). */
   place(x: number, y: number, z: number, yawRad = 0): this {
     this.root.position.set(x, y, z);
     this.root.rotation.y = yawRad;
@@ -143,7 +127,6 @@ export class Character {
     return this.place(a.position.x, a.position.y, a.position.z, characterYaw(a));
   }
 
-  /** `seat` is the height of the chair's seat above the character's origin, used by seated poses. */
   setPose(pose: PoseName, opts: { immediate?: boolean; seat?: number } = {}): this {
     this.pose = pose;
     if (opts.seat !== undefined) this.seatHeight = opts.seat;
@@ -151,7 +134,6 @@ export class Character {
     return this;
   }
 
-  /** Plays a gesture once; `hold` keeps its last frame until another gesture or `clearGesture`. */
   play(name: GestureName, hold = false): this {
     this.gesture = { name, time: 0, hold };
     return this;
@@ -162,19 +144,15 @@ export class Character {
     return this;
   }
 
-  /** Eases the face toward a mood; pass overrides to adjust single features. */
   setMood(mood: Mood, overrides: Partial<FaceState> = {}): this {
     Object.assign(this.faceTarget, this.restFace, MOODS[mood], overrides);
     return this;
   }
 
-  /** World-space point to look at with eyes, head and a little of the chest; null to look ahead. */
-  /** Size of the head: the radius of the face's sphere, in the figure's own units. */
   get headRadius(): number {
     return this.body.face.radius;
   }
 
-  /** Puts something on the head (a cap, a crown): the item is in head space, origin at the middle of the face sphere, +Z forward. */
   wear(item: THREE.Object3D): this {
     this.head.add(item);
     return this;
@@ -185,33 +163,28 @@ export class Character {
     return this;
   }
 
-  /** 0 silent .. 1 speaking: opens the mouth in syllables and adds the small motions of talking. */
   setTalking(amount: number): this {
     this.talkTarget = amount;
     return this;
   }
 
-  /** Shows the figure as a projection in this colour: someone present only as a hologram. Null brings them back. */
   setProjected(color: THREE.ColorRepresentation | null): this {
     this.hologram.amount.value = color === null ? 0 : 1;
     if (color !== null) this.hologram.color.set(color).multiplyScalar(2.6);
     return this;
   }
 
-  /** Scales idle motion; background characters can be calmer. */
   setLiveliness(k: number): this {
     this.liveliness = k;
     return this;
   }
 
-  /** World position of the face, for name tags and for other characters to look at. */
   headWorld(out: THREE.Vector3): THREE.Vector3 {
     return this.head.getWorldPosition(out);
   }
 
   update(dt: number, time: number): void {
     const t = time + this.phase;
-    // ---- face ----
     this.blinkIn -= dt;
     if (this.blinkIn <= 0) {
       this.blink = 1;
@@ -222,7 +195,6 @@ export class Character {
     this.talk = damp(this.talk, this.talkTarget, 10, dt);
     if (this.talk > 0.02) {
       this.talkPhase += dt * (9 + 3 * Math.sin(t * 2.3));
-      // syllables: an uneven chatter, never fully shut while speaking
       this.syllable = 0.25 + 0.75 * Math.abs(Math.sin(this.talkPhase) * Math.sin(this.talkPhase * 0.37 + 1.3));
     }
     const f = this.face, g = this.faceTarget;
@@ -231,12 +203,10 @@ export class Character {
     shown.eyeL *= lid;
     shown.eyeR *= lid;
     shown.mouthOpen = clamp(f.mouthOpen + this.talk * this.syllable * 0.62, 0, 1);
-    // eyes lead the head when looking at something
     shown.gazeX = clamp(f.gazeX + this.lookYaw * 1.6, -1, 1);
     shown.gazeY = clamp(f.gazeY - this.lookPitch * 1.6, -1, 1);
     this.faceMat.apply(shown);
 
-    // ---- body ----
     this.hover = this.spec.aura === undefined ? 0 : Math.sin(t * 1.1) * 0.018 + 0.03;
     this.hologram.time.value = t;
     this.applyPose(dt, t);
@@ -259,7 +229,6 @@ export class Character {
       if (!gesture.loop && !this.gesture.hold && u >= 1) this.gesture = null;
     }
 
-    // look-at: yaw and pitch of the target in the character's frame, shared out along the spine
     let yaw = 0, pitch = 0;
     if (this.lookAt) {
       this.head.getWorldPosition(_v);
@@ -285,7 +254,6 @@ export class Character {
           z = lerp(z, v[2], gw);
         }
       }
-      // idle life
       switch (name) {
         case 'spine': x += breath * 0.5; z += sway * 0.9; break;
         case 'chest': x += breath * 0.9 - talk * 1.2 * Math.sin(t * 3.1); z -= sway * 0.6; y += this.lookYaw * 12; break;
@@ -305,14 +273,12 @@ export class Character {
       _q.setFromEuler(_e);
       bones[name].quaternion.slerp(_q, k);
     }
-    // hips: seat height and the weight shifting from foot to foot
     const hips = bones.hips;
     const seatedY = base.seated ? this.seatHeight + 0.07 - this.bindY : 0;
     const targetY = this.bindY + base.hipsY + seatedY + this.hover + (gesture?.hop ? gesture.hop(gt) * gw : 0);
     hips.position.y = lerp(hips.position.y, targetY, k);
     hips.position.x = lerp(hips.position.x, sway * 0.006 * (this.pose === 'stand' ? 1 : 0), k);
     hips.position.z = lerp(hips.position.z, base.hipsZ, k);
-    // the figure's own skeleton is turned to match this one
     this.body.retarget();
   }
 }

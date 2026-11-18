@@ -9,7 +9,6 @@ const KEY_ACTIONS: Record<string, Action> = {
   KeyE: 'interact', KeyF: 'interact', Space: 'advance', Enter: 'advance', Digit1: 'choice1', Digit2: 'choice2', Digit3: 'choice3',
   Numpad1: 'choice1', Numpad2: 'choice2', Numpad3: 'choice3', KeyQ: 'headset', KeyP: 'pause', KeyK: 'controls',
 };
-/** What a prompt tells the player to press for an action, in each way of playing. Kept beside the bindings it describes. */
 export const ACTION_LABELS: Record<InputMode, Record<'interact' | 'headset', string>> = {
   mouse: { interact: 'E', headset: 'Q' },
   touch: { interact: 'TAP', headset: 'TAP' },
@@ -21,41 +20,27 @@ const MOVE_KEYS: Record<string, [x: number, y: number]> = {
 };
 
 export interface PointerState {
-  /** Position in CSS pixels from the canvas's top-left. */
   x: number;
   y: number;
-  /** True while a free cursor or a finger is on screen: the HUD hit-tests against it. */
   active: boolean;
 }
 
-/** A touch this short and this still was a tap. */
 const isTap = (travelPx: number, startedMs: number): boolean => travelPx < 14 && performance.now() - startedMs < 320;
 
-/**
- * One description of what the player wants this frame, whatever they are holding: keyboard and mouse, a touch
- * screen, or XR controllers. Systems read `move`, `look` and the action sets; nothing else touches the DOM.
- */
 export class Input {
-  /** x strafes right, y walks forward, each -1..1. */
   readonly move = new THREE.Vector2();
-  /** Yaw and pitch to apply this frame, radians. Cleared by `endFrame`. */
   readonly look = new THREE.Vector2();
   readonly pressed = new Set<Action>();
   readonly released = new Set<Action>();
   readonly held = new Set<Action>();
   readonly pointer: PointerState = { x: 0, y: 0, active: false };
-  /** In a headset: the ray the player points with, in world space. */
   xrRay: THREE.Ray | null = null;
-  /** Position of the click or tap that produced this frame's `primary`, if it came from a free pointer or a finger. */
   tap: { x: number; y: number } | null = null;
   mode: InputMode = 'mouse';
-  /** Mouse capture is wanted (in play, no menu open). The canvas re-captures on the next click. */
   wantsLock = false;
   sensitivity = 1;
   readonly onModeChange = new Signal<InputMode>();
-  /** The browser took the mouse away (Esc): the game should pause. */
   readonly onLockLost = new Signal();
-  /** A key, a button or a finger, going down or coming up: the moments a browser will let sound start. */
   readonly onGesture = new Signal();
 
   private readonly keys = new Set<string>();
@@ -74,7 +59,6 @@ export class Input {
   private touchTap = false;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
-    // a phone or tablet is a touch device from the first frame, before any finger has come down on the picture
     if (matchMedia('(pointer: coarse)').matches) this.mode = 'touch';
     addEventListener('keydown', (e) => this.onKey(e, true));
     addEventListener('keyup', (e) => this.onKey(e, false));
@@ -96,13 +80,11 @@ export class Input {
     return document.pointerLockElement === this.canvas;
   }
 
-  /** Lets go of the mouse so the player can point at a menu or a choice. */
   freePointer(): void {
     this.wantsLock = false;
     if (this.locked) document.exitPointerLock();
   }
 
-  /** Captures the mouse; only succeeds inside a user gesture, so call it from the click that asked for it. */
   capturePointer(): void {
     this.wantsLock = true;
     if (this.mode === 'mouse' && !this.locked) this.canvas.requestPointerLock()?.catch?.(() => undefined);
@@ -162,7 +144,6 @@ export class Input {
     this.gesture();
     this.setMode('mouse');
     if (this.wantsLock && !this.locked) {
-      // this click only takes the mouse back; it is not a game action
       this.capturePointer();
       return;
     }
@@ -177,7 +158,6 @@ export class Input {
     if (this.mode === 'touch') return;
     if (this.locked) {
       const k = 0.0021 * this.sensitivity;
-      // one frame of a stuck browser can deliver a huge jump: clamp it
       this.look.x -= clamp(e.movementX, -120, 120) * k;
       this.look.y -= clamp(e.movementY, -120, 120) * k;
       this.pointer.active = false;
@@ -212,7 +192,6 @@ export class Input {
           this.pointer.x = p.x;
           this.pointer.y = p.y;
           this.pointer.active = true;
-          // a hold on this side draws back a throw, so the press counts at once; whether it was a tap is known on release
           this.held.add('primary');
           this.pressed.add('primary');
         }
@@ -240,7 +219,6 @@ export class Input {
       if (t.identifier === this.stickId) {
         this.stickId = null;
         this.stick.set(0, 0);
-        // a thumb that came down and went straight up was not steering: it was a tap on whatever is there
         if (isTap(this.stickTravel, this.stickStart)) {
           this.pointer.x = this.stickLast.x;
           this.pointer.y = this.stickLast.y;
@@ -261,24 +239,20 @@ export class Input {
     this.tap = { x: at.x, y: at.y };
   }
 
-  /** True in the frame a finger lifts having barely moved or lingered: a tap, rather than a look, a hold or a push of the stick. */
   get wasTap(): boolean {
     return this.touchTap;
   }
 
-  /** Where a touch stick is anchored and deflected, for drawing it; null when no thumb is down. */
   get stickView(): { ox: number; oy: number; dx: number; dy: number } | null {
     return this.stickId === null ? null : { ox: this.stickOrigin.x, oy: this.stickOrigin.y, dx: this.stick.x, dy: this.stick.y };
   }
 
-  /** Entering or leaving a headset: while inside, the controllers are the input. */
   useXR(active: boolean): void {
     this.xr = active;
     this.xrMove.set(0, 0);
     this.setMode(active ? 'xr' : 'mouse');
   }
 
-  /** For controller buttons: the same press and release a key produces. */
   press(action: Action): void {
     this.gesture();
     this.down(action);
@@ -290,7 +264,6 @@ export class Input {
     this.xrMove.set(x, y);
   }
 
-  /** Call once at the start of each frame, before systems read the state. */
   beginFrame(): void {
     let x = 0, y = 0;
     for (const code of this.keys) {
@@ -310,7 +283,6 @@ export class Input {
     this.move.set(x, y);
   }
 
-  /** Call once at the end of each frame. */
   endFrame(): void {
     this.pressed.clear();
     this.released.clear();
@@ -319,13 +291,11 @@ export class Input {
     this.touchTap = false;
   }
 
-  /** Forgets presses that were never read: what was typed at a menu must not land in the game when it closes. */
   flush(): void {
     this.pressed.clear();
     this.released.clear();
   }
 
-  /** For tests and the autopilot: presses and releases an action within one frame. */
   inject(action: Action): void {
     this.pressed.add(action);
     this.released.add(action);

@@ -5,10 +5,6 @@ import { TAU, damp } from '../core/math';
 import type { Input } from '../input/Input';
 import type { Player } from './Player';
 
-/**
- * A pose in camera space (+x right, +y up, -z ahead), written for the RIGHT hand; the left mirrors it.
- * `fingers` is where the fingertips point and `palm` the way the palm faces.
- */
 interface Pose {
   readonly at: readonly [number, number, number];
   readonly fingers: readonly [number, number, number];
@@ -18,21 +14,14 @@ interface Pose {
 export type HandPose = 'rest' | 'away' | 'hold' | 'windUp' | 'release' | 'reach' | 'cradle' | 'face' | 'offer';
 
 const POSES: Record<HandPose, Pose> = {
-  /** Low in the frame, relaxed: just enough to know you have a body. */
   rest: { at: [0.3, -0.37, -0.5], fingers: [-0.3, 0.2, -1], palm: [-0.75, 0.6, 0.25] },
   away: { at: [0.34, -0.72, -0.34], fingers: [-0.2, -0.2, -1], palm: [-0.8, 0.5, 0.2] },
-  /** Palm up, something resting just above it. */
   hold: { at: [0.25, -0.27, -0.52], fingers: [-0.18, 0.28, -1], palm: [-0.12, 1, 0.18] },
-  /** Drawn back beside the shoulder, loading a throw. */
   windUp: { at: [0.33, -0.2, -0.44], fingers: [0.0, 0.7, -0.7], palm: [-0.3, 0.6, 0.74] },
-  /** Arm long, palm down: the end of a throw. */
   release: { at: [0.1, -0.08, -0.78], fingers: [-0.05, -0.25, -1], palm: [0, -1, 0.2] },
   reach: { at: [0.13, -0.17, -0.62], fingers: [-0.05, 0.08, -1], palm: [-0.2, -0.95, 0] },
-  /** Both hands holding something between them. */
   cradle: { at: [0.16, -0.25, -0.44], fingers: [-0.32, 0.22, -1], palm: [-1, 0.1, 0] },
-  /** Hands at the temples: settling a headset over the eyes. */
   face: { at: [0.165, -0.09, -0.2], fingers: [-0.12, 0.6, -0.75], palm: [-1, 0, 0.1] },
-  /** Open, toward someone. */
   offer: { at: [0.22, -0.2, -0.56], fingers: [-0.2, 0.2, -1], palm: [-0.2, 0.95, 0.25] },
 };
 
@@ -41,7 +30,6 @@ export type HandStyle = 'real' | 'haven';
 const _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3(), _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 
 const orientation = (pose: Pose, side: 1 | -1, out: THREE.Quaternion): THREE.Quaternion => {
-  // the hand mesh has fingers along -Y; a right hand's palm faces +X
   _y.set(-pose.fingers[0] * side, -pose.fingers[1], -pose.fingers[2]).normalize();
   _x.set(pose.palm[0] * side, pose.palm[1], pose.palm[2]).multiplyScalar(side);
   _x.addScaledVector(_y, -_x.dot(_y)).normalize();
@@ -49,21 +37,12 @@ const orientation = (pose: Pose, side: 1 | -1, out: THREE.Quaternion): THREE.Qua
   return out.setFromRotationMatrix(_m.makeBasis(_x, _y, _z));
 };
 
-/** Where the wrist is in the hand model, in metres from its origin. */
 const WRIST = new THREE.Vector3(0, 0.064, 0.085);
-/** The skin as the model's texture has it painted: what the player's chosen tone is measured against. */
 const PAINTED_SKIN = new THREE.Color(0xe7a671);
 
-/** Where the player's elbows are, about the camera: the sleeves run back to them, out of sight. */
 const ELBOW = new THREE.Vector3(0.27, -0.5, 0.16);
 const BACK = new THREE.Vector3(0, 0, -1);
 
-/**
- * Gives the hand model a wrist. The model is one stiff piece; with two bones, and every vertex given to the hand,
- * the forearm or (through the cuff) a share of each, the sleeve can turn where the hand does not.
- *
- * @returns the forearm's bone, which lies along -Z from the wrist until it is turned
- */
 const articulate = (model: THREE.Object3D): THREE.Bone => {
   const hand = new THREE.Bone(), forearm = new THREE.Bone();
   hand.position.copy(WRIST);
@@ -77,7 +56,6 @@ const articulate = (model: THREE.Object3D): THREE.Bone => {
   });
   for (const mesh of meshes) {
     const geometry = mesh.geometry as THREE.BufferGeometry;
-    // the two hands share their geometry: the first to arrive works the weights out
     if (!geometry.getAttribute('skinIndex')) {
       const position = geometry.getAttribute('position');
       const index = new Uint8Array(position.count * 4), weight = new Float32Array(position.count * 4);
@@ -107,7 +85,6 @@ const articulate = (model: THREE.Object3D): THREE.Bone => {
 
 class Hand {
   readonly group = new THREE.Group();
-  /** A point just above the palm, for things the hand carries. */
   readonly palm = new THREE.Group();
   pose: HandPose = 'rest';
   private forearm: THREE.Bone | null = null;
@@ -119,11 +96,6 @@ class Hand {
     this.palm.position.set(side * 0.062, -0.052, 0.004);
   }
 
-  /**
-   * Puts the generated hand and sleeve on. The model is a right hand lying along Z, fingers to +Z and palm down;
-   * here a hand has its wrist on the origin, its fingers along -Y and, on the right, its palm to +X. The left
-   * hand is the right one in a mirror.
-   */
   wear(model: THREE.Object3D): void {
     this.forearm = articulate(model);
     const fitted = new THREE.Group();
@@ -136,7 +108,6 @@ class Hand {
     this.group.add(sided);
   }
 
-  /** Turns the forearm at the wrist to run back to the elbow, a point in the world. */
   aim(elbow: THREE.Vector3): void {
     if (!this.forearm) return;
     this.forearm.parent!.worldToLocal(_v.copy(elbow));
@@ -159,21 +130,14 @@ class Hand {
   }
 }
 
-/**
- * The player's own hands, hung on the camera. They rest low in view, lag a little behind the head, and take
- * poses on request: holding an orb, drawing back to throw, lifting a headset to the face.
- */
 export class Hands {
   readonly root = new THREE.Group();
   readonly right: Hand;
   readonly left: Hand;
-  /** Higher is snappier. */
   rate = 11;
-  /** Settles once the hands have their models on. */
   readonly ready: Promise<void>;
   private readonly uniforms = { uSkin: { value: new THREE.Color(0xf7efe6) }, uPainted: { value: PAINTED_SKIN }, uGlow: { value: 0 } };
   private swayX = 0;
-  /** How far into a walk the player is, 0 standing to 1 walking, and where they were last frame. */
   private walking = 0;
   private lastTravelled = 0;
   private swayY = 0;
@@ -187,7 +151,6 @@ export class Hands {
     this.root.add(this.right.group, this.left.group);
     this.right.snap();
     this.left.snap();
-    // a little of the room's light comes back off the player's own body: without it, hands in a dark room go grey
     const bounce = new THREE.PointLight(0xffe6d0, 0.09, 1.3, 2);
     bounce.position.set(0, -0.1, -0.16);
     this.root.add(bounce);
@@ -210,7 +173,6 @@ export class Hands {
     }
   }
 
-  /** One material for both hands: the painted skin takes the player's tone, and in Haven the hands turn to light. */
   private tone(painted: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
     const material = painted.clone();
     material.onBeforeCompile = (shader) => {
@@ -235,21 +197,15 @@ export class Hands {
     return material;
   }
 
-  /** The real world's hand colour: a neutral warm white by default. */
   setSkin(color: THREE.ColorRepresentation): void {
     this.uniforms.uSkin.value.set(color);
   }
 
-  /** The real world's sleeves and skin, or Haven's hands of light. */
   setStyle(style: HandStyle, immediate = false): void {
     this.glowTarget = style === 'haven' ? 1 : 0;
     if (immediate) this.glow = this.uniforms.uGlow.value = this.glowTarget;
   }
 
-  /**
-   * In a headset the hands leave the camera and sit on the controller grips; pass nulls to bring them back.
-   * A hand whose controller is missing is hidden.
-   */
   attach(leftGrip: THREE.Object3D | null, rightGrip: THREE.Object3D | null): void {
     this.gripped = !!(leftGrip || rightGrip);
     for (const [hand, grip] of [[this.left, leftGrip], [this.right, rightGrip]] as const) {
@@ -257,7 +213,6 @@ export class Hands {
         hand.group.visible = !!grip;
         if (!grip) continue;
         grip.add(hand.group);
-        // fingers along the controller's forward, palm inward, thumb up
         hand.group.position.set(0, -0.01, 0.06);
         hand.group.quaternion.setFromRotationMatrix(_m.makeBasis(_x.set(-1, 0, 0), _y.set(0, 0, 1), _z.set(0, 1, 0)));
       } else {
@@ -280,11 +235,8 @@ export class Hands {
   }
 
   update(dt: number): void {
-    // hands trail the head a touch when it turns, and ride the walk
     this.swayX = damp(this.swayX, this.input.look.x * -1.6, 9, dt);
     this.swayY = damp(this.swayY, this.input.look.y * 1.2, 9, dt);
-    // walking: the hands swing one after the other, forward and back in time with the steps (one full swing per two
-    // steps), dipping a little at the bottom of each swing; they settle back when the player stops
     const speed = dt > 0 ? (this.player.travelled - this.lastTravelled) / dt : 0;
     this.lastTravelled = this.player.travelled;
     this.walking = damp(this.walking, Math.min(1, Math.max(0, speed) / 1.4), 6, dt);
@@ -300,7 +252,6 @@ export class Hands {
     this.aimForearms();
   }
 
-  /** The sleeves run back from wherever the hands are to the player's elbows. */
   private aimForearms(): void {
     this.root.updateWorldMatrix(true, true);
     for (const hand of [this.right, this.left]) hand.aim(this.root.localToWorld(_x.set(ELBOW.x * hand.side, ELBOW.y, ELBOW.z)));

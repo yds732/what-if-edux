@@ -3,10 +3,10 @@ import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, SEAT, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
 import { HAVEN } from '../../world/haven/HavenWorld';
-import { MONDAY, WEDNESDAY } from '../script';
+import { HOOKS, MONDAY, WEDNESDAY } from '../script';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { havenCalls, labelLumi, tickStreak } from './companion';
 
-/** Scene 3. A disagreement with a classmate, and a companion who agrees with everyone. */
 export const wednesday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, state, headset } = game;
   app.fx.fade = 1;
@@ -26,7 +26,6 @@ export const wednesday = async (game: Game): Promise<void> => {
   await d.fadeIn(1.4);
   await d.play(WEDNESDAY.intro);
 
-  // ---- find Jamie ----
   jamie.lookAtPoint(game.playerEye).setMood('happy').play('wave');
   const seat = CLASSROOM.seatPartner.position;
   room.setMarker(new THREE.Vector3(seat.x, SEAT + 0.02, seat.z - 0.02));
@@ -44,9 +43,7 @@ export const wednesday = async (game: Game): Promise<void> => {
   player.faceToward(jamie.headWorld(new THREE.Vector3()), 0.9);
   game.reach('wednesday.partner');
 
-  // ---- two different perspectives ----
   await d.play(WEDNESDAY.greeting);
-  // Jamie only mentions Tuesday if there was one: a week begun from the chapter list has no yesterday
   if (state.tuesdayChoice) await d.play(state.tuesdayChoice === 'meet' ? WEDNESDAY.greetingMet : WEDNESDAY.greetingStayed);
   await d.play(WEDNESDAY.discussion);
   jamie.setMood('happy');
@@ -57,7 +54,6 @@ export const wednesday = async (game: Game): Promise<void> => {
   await d.fadeOut(1.2);
   player.stand();
 
-  // ---- evening: back to Haven ----
   const bedroom = (await d.enter('bedroom', BEDROOM.enter)) as BedroomWorld;
   bedroom.setNight(1, true);
   bedroom.setMessages(null);
@@ -68,10 +64,12 @@ export const wednesday = async (game: Game): Promise<void> => {
   game.reach('wednesday.bedroom');
   await d.fadeIn(1.4);
   d.objective(WEDNESDAY.objectiveWear);
+  const call = havenCalls(game, bedroom, HOOKS.pings.wednesday);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
     onFocus: (on) => headset.setPower(on ? 1 : 0.25),
   });
+  call();
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
@@ -81,16 +79,16 @@ export const wednesday = async (game: Game): Promise<void> => {
   lumi.lookAtPoint(game.playerEye);
   await d.wait(1.2);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.1);
+  labelLumi(game, haven, null);
+  await tickStreak(game, haven);
   await d.play(WEDNESDAY.evening);
 
-  // ---- the pause ----
   await d.wait(1.6);
   audio.setSoundscape('unease', 3);
   game.reach('wednesday.pause');
   await d.play(WEDNESDAY.pause);
   await d.wait(1.8);
   await d.play(WEDNESDAY.offer);
-  // silence. Haven stays beautiful; Lumi goes on smiling.
   lumi.setMood('blank').clearGesture();
   game.reach('wednesday.silence');
   await d.wait(3.4);

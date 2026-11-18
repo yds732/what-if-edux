@@ -8,31 +8,18 @@ import { dB } from './synth';
 import { VOICES, loadKeySamples, syllablePitch } from './voices';
 import { WebAudio } from './WebAudio';
 
-/**
- * The listening test nobody can do by ear: renders the game's sound offline and measures it. Not part of the
- * game: `tools/audio-check.mjs` bundles this file, runs it in Chrome, prints the table and fails on any row
- * with a problem.
- */
-
 const RATE = 48000;
-/** Seconds of sound between engine updates while rendering: the game's frames. */
 const FRAME = 0.05;
-/** Anything below this is silence. */
 const GATE_DB = -60;
 
 export interface Row {
   group: string;
   name: string;
-  /** Loudest sample, in dBFS. */
   peak: number;
-  /** RMS in dBFS of the parts that are not silent. */
   rms: number;
-  /** Seconds that are not silent. */
   active: number;
-  /** Seconds rendered. */
   seconds: number;
   note: string;
-  /** Why the row fails; empty when it passes. */
   problems: string[];
 }
 
@@ -40,9 +27,7 @@ interface Level {
   peak: number;
   rms: number;
   active: number;
-  /** Largest jump between neighbouring samples. */
   step: number;
-  /** Peak of the left and right channel alone. */
   sides: [number, number];
   finite: boolean;
 }
@@ -50,7 +35,6 @@ interface Level {
 const toDb = (linear: number): number => (linear > 0 ? 20 * Math.log10(linear) : -Infinity);
 const round = (value: number, places = 1): number => (Number.isFinite(value) ? Number(value.toFixed(places)) : value);
 
-/** Measures a stretch of a rendered buffer, in 10 ms windows. */
 const measure = (buffer: AudioBuffer, from = 0, to = buffer.duration): Level => {
   const rate = buffer.sampleRate, a = Math.max(0, Math.floor(from * rate)), b = Math.min(buffer.length, Math.floor(to * rate));
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c));
@@ -79,10 +63,8 @@ const measure = (buffer: AudioBuffer, from = 0, to = buffer.duration): Level => 
   return { peak: toDb(Math.max(...sides)), rms: toDb(Math.sqrt(activeCount ? activePower / activeCount : 0)), active: activeWindows / 100, step, sides: [toDb(sides[0]), toDb(sides[1])], finite };
 };
 
-/** A stand-in camera at a position, looking down -Z with +X to its right: all the engine reads is the matrix. */
 const cameraAt = (x = 0, y = 0, z = 0): THREE.Camera => ({ matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1] } }) as unknown as THREE.Camera;
 
-/** A world position, as the game would pass one. */
 const point = (x: number, y: number, z: number): THREE.Vector3 => ({ x, y, z }) as unknown as THREE.Vector3;
 
 interface Take {
@@ -90,13 +72,8 @@ interface Take {
   audio: WebAudio;
 }
 
-/** The most recent render, kept so that it can be saved and listened to. */
 let lastRender: AudioBuffer | null = null;
 
-/**
- * Renders `seconds` of the engine offline. `script` is called once per frame with the time, to do what the
- * game would do then; it returns false for frames on which the game is paused and does not update the engine.
- */
 const render = async (seconds: number, script: (audio: WebAudio, time: number, frame: number) => boolean | void, frameSeconds = FRAME): Promise<Take> => {
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * RATE), RATE);
   const audio = new WebAudio();
@@ -110,7 +87,6 @@ const render = async (seconds: number, script: (audio: WebAudio, time: number, f
       failure ??= e;
     }
   };
-  // each frame books the next stop itself: a context with thousands of stops waiting renders in slow motion
   const stopAt = (i: number): void => {
     if (i * frameSeconds >= seconds) return;
     void ctx.suspend(i * frameSeconds).then(() => {
@@ -124,12 +100,10 @@ const render = async (seconds: number, script: (audio: WebAudio, time: number, f
   const buffer = await ctx.startRendering();
   lastRender = buffer;
   if (failure) throw failure;
-  // one more frame after the last sample, so anything that has ended is taken down before it is counted
   audio.update(frameSeconds, camera);
   return { buffer, audio };
 };
 
-/** Calls `action` on the first frame at or after `time`. */
 const at = (time: number, now: number, frameSeconds: number, action: () => void): void => {
   if (now >= time - 1e-9 && now < time + frameSeconds - 1e-9) action();
 };
@@ -152,9 +126,6 @@ const expectFaultless = (r: Row, audio: WebAudio): Row => {
   return r;
 };
 
-// ---------------------------------------------------------------------------------------------------- soundscapes
-
-/** Where each bed's loudest moment should fall, in dBFS: music around -18, a plain room well under it. */
 const SCAPE_PEAK: Record<BedName, readonly [number, number]> = {
   title: [-21, -15], haven: [-21, -15], havenEvening: [-22, -15], havenFestival: [-21, -15], ending: [-21, -15],
   classroomWarm: [-21, -15], bedroom: [-22, -15], unease: [-30, -18], classroom: [-42, -24],
@@ -171,7 +142,6 @@ const scape = async (name: BedName): Promise<Row> => {
   return expectFaultless(expectPeak(r, SCAPE_PEAK[name]), audio);
 };
 
-/** How much a stretch of sound moves: the spread, in dB, of its level taken every 200 ms. */
 const movement = (buffer: AudioBuffer, from: number, to: number): number => {
   const levels: number[] = [];
   for (let t = from; t + 0.2 <= to; t += 0.2) levels.push(measure(buffer, t, t + 0.2).rms);
@@ -179,7 +149,6 @@ const movement = (buffer: AudioBuffer, from: number, to: number): number => {
   return Math.sqrt(levels.reduce((sum, v) => sum + (v - mean) ** 2, 0) / levels.length);
 };
 
-/** The headset going on as the story plays it: the bedroom, the lift, the whir, and Haven arriving under the wipe. */
 const arrival = async (): Promise<Row> => {
   const seconds = 12;
   const { buffer, audio } = await render(seconds, (a, t, frame) => {
@@ -198,10 +167,6 @@ const arrival = async (): Promise<Row> => {
   return expectFaultless(expectPeak(r, [-14, -6]), audio);
 };
 
-/**
- * Wednesday's turn. Nothing may jump out: the level stays where it was. But where the evening bed swells and
- * rings, what replaces it must hold still.
- */
 const turn = async (): Promise<Row> => {
   const seconds = 26;
   const { buffer, audio } = await render(seconds, (a, t, frame) => {
@@ -217,7 +182,6 @@ const turn = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-/** A minute of the busiest bed: it must neither grow, nor fall silent, nor drift from its level. */
 const marathon = async (): Promise<Row> => {
   const seconds = 60, counts: number[] = [];
   const { buffer, audio } = await render(seconds, (a, t, frame) => {
@@ -232,7 +196,6 @@ const marathon = async (): Promise<Row> => {
   return expectFaultless(expectPeak(r, [SCAPE_PEAK.havenFestival[0], SCAPE_PEAK.havenFestival[1] + 1.5]), audio);
 };
 
-/** Haven, then silence: the fade must end in true silence with nothing left running. */
 const silence = async (): Promise<Row> => {
   const seconds = 12;
   const { buffer, audio } = await render(seconds, (a, t, frame) => {
@@ -247,11 +210,7 @@ const silence = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-// ---------------------------------------------------------------------------------------------------- effects
-
-/** Effects that are only ever heard in Haven, and so are measured in its acoustics. */
 const IN_HAVEN: ReadonlySet<SfxName> = new Set(['orbAppear', 'orbTake', 'orbThrow', 'ringHit', 'ringRim', 'orbFizzle', 'bridgeBuild', 'bridgeComplete', 'firework', 'gateOpen', 'cheer', 'fail']);
-/** The two sounds allowed to be loudest, and the two meant to be barely there. Everything else sits around -10. */
 const LOUD: ReadonlySet<SfxName> = new Set(['ringHit', 'gateOpen']);
 const FAINT: ReadonlySet<SfxName> = new Set(['uiHover', 'advance']);
 
@@ -267,7 +226,6 @@ const effect = async (name: SfxName, space: Space = IN_HAVEN.has(name) ? 'haven'
   return expectFaultless(expectPeak(r, LOUD.has(name) ? [-8.5, -5.5] : FAINT.has(name) ? [-30, -17] : [-16, -8.5]), audio);
 };
 
-/** How often a stretch of sound crosses zero each second: a plain measure of how high it sits. */
 const crossings = (buffer: AudioBuffer): number => {
   const data = buffer.getChannelData(0);
   let count = 0;
@@ -275,7 +233,6 @@ const crossings = (buffer: AudioBuffer): number => {
   return count / buffer.duration;
 };
 
-/** The two options the game passes: a footstep at a third of the gain, and a throw at both ends of its pitch range. */
 const options = async (): Promise<Row> => {
   const take = async (name: SfxName, o: { gain?: number; pitch?: number }): Promise<AudioBuffer> =>
     (await render(1.5, (a, _t, frame) => {
@@ -290,7 +247,6 @@ const options = async (): Promise<Row> => {
   return r;
 };
 
-/** A hit to the right must lean right, and a distant one must be quieter but still there. */
 const placement = async (): Promise<Row> => {
   const peaks: Level[] = [];
   for (const where of [undefined, point(8, 0, -2), point(0, 0, -70)]) {
@@ -307,8 +263,6 @@ const placement = async (): Promise<Row> => {
   return r;
 };
 
-// ---------------------------------------------------------------------------------------------------- voices
-
 const SAMPLE_LINES: Record<SpeakerId, Line> = {
   teacher: MONDAY.intro[0],
   jamie: WEDNESDAY.discussion[4],
@@ -321,11 +275,9 @@ const SAMPLE_LINES: Record<SpeakerId, Line> = {
   riley: FRIDAY.voices[6],
 };
 
-/** The Director's typewriter: this many characters a second, a syllable on every third if it is a letter or digit. */
 const TYPE_SPEED = 46;
 
 const voice = async (speaker: SpeakerId): Promise<Row> => {
-  // real-world speakers type with the recorded keystrokes: have them ready before the line is rendered
   await loadKeySamples(new OfflineAudioContext(1, 1, 48000));
   const text = SAMPLE_LINES[speaker].text, frameSeconds = 1 / 60, seconds = round(text.length / TYPE_SPEED + 1.5, 2);
   let typed = 0, spoken = 0;
@@ -342,15 +294,11 @@ const voice = async (speaker: SpeakerId): Promise<Row> => {
   }, frameSeconds);
   const low = Math.min(...pitches), high = Math.max(...pitches);
   const r = row('voice', speaker, measure(buffer), seconds, `${spoken} syllables, ${round(low, 0)}..${round(high, 0)} Hz around ${round(VOICES[speaker].base, 0)}`);
-  // the same speaker and character must always give the same pitch
   for (const ch of 'abcxyz019') if (syllablePitch(speaker, ch) !== syllablePitch(speaker, ch)) r.problems.push(`pitch of "${ch}" is not repeatable`);
   if (!(low < VOICES[speaker].base && high > VOICES[speaker].base)) r.problems.push('the line does not move around the speaker\'s pitch');
   return expectFaultless(expectPeak(r, speaker === 'you' ? [-26, -15] : [-19, -10]), audio);
 };
 
-// ---------------------------------------------------------------------------------------------------- behaviour
-
-/** The charging tone: silent at rest, never a click on the way up or down, and nothing left running after. */
 const charge = async (): Promise<Row> => {
   const seconds = 4;
   let idleNodes = -1;
@@ -365,20 +313,17 @@ const charge = async (): Promise<Row> => {
   if (idleNodes !== 0) r.problems.push(`${idleNodes} nodes exist at zero charge`);
   if (!(full.peak > -30)) r.problems.push('inaudible at full charge');
   if (!(measure(buffer, 0.5, 0.9).rms < measure(buffer, 1.3, 1.7).rms)) r.problems.push('does not grow as the throw is drawn back');
-  // a click is a jump between samples bigger than the tone itself ever makes
   if (rising.step > full.step * 1.2 || falling.step > full.step * 1.2) r.problems.push('clicks while changing');
   if (s.patches || s.nodes) r.problems.push(`still running at zero charge: ${s.patches} patches, ${s.nodes} nodes`);
   return expectFaultless(expectPeak(r, [-26, -14]), audio);
 };
 
-/** Pause must duck everything smoothly, stop the composing, and resume must bring it all back. */
 const pause = async (): Promise<Row> => {
   const seconds = 9;
   const { buffer, audio } = await render(seconds, (a, t, frame) => {
     if (frame === 0) a.setSoundscape('haven', 1);
     at(3.5, t, FRAME, () => a.setPaused(true));
     at(5.5, t, FRAME, () => a.setPaused(false));
-    // the game does not run its systems while paused
     return t < 3.5 || t >= 5.5;
   });
   const playing = measure(buffer, 2, 3.5), ducking = measure(buffer, 3.5, 3.7), paused = measure(buffer, 4.5, 5.5), resumed = measure(buffer, 7, 9);
@@ -390,7 +335,6 @@ const pause = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-/** Far more one-shots than the cap, all at once: the count must hold, nothing may clip, and all must be taken down. */
 const flood = async (): Promise<Row> => {
   const seconds = 6;
   let most = 0;
@@ -405,7 +349,6 @@ const flood = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-/** The safety limiter must leave a quiet signal exactly as it found it. */
 const unity = async (): Promise<Row> => {
   const ctx = new OfflineAudioContext(2, RATE, RATE), mixer = new Mixer(ctx);
   const tone = ctx.createOscillator(), level = ctx.createGain();
@@ -419,7 +362,6 @@ const unity = async (): Promise<Row> => {
   return r;
 };
 
-/** The busiest moment in the game, and then some: the festival finale with everything going off together. */
 const finale = async (): Promise<Row> => {
   const seconds = 12, frameSeconds = 1 / 60;
   const rockets = Array.from({ length: 18 }, (_, i) => ({ time: 3 + i / 3 + (i % 3) * 0.07, at: point(-24 + ((i * 37) % 48), 13 + ((i * 11) % 17), -58 + ((i * 23) % 40)) }));
@@ -440,15 +382,11 @@ const finale = async (): Promise<Row> => {
   return expectFaultless(r, audio);
 };
 
-// ---------------------------------------------------------------------------------------------------- the real thing
-
 export interface LiveReport {
   ok: boolean;
   state: string;
   sampleRate: number;
-  /** Seconds the context's clock advanced. */
   ran: number;
-  /** RMS in dBFS of the live output while playing, while paused, and after resuming. */
   playing: number;
   paused: number;
   resumed: number;
@@ -456,13 +394,8 @@ export interface LiveReport {
   problems: string[];
 }
 
-/**
- * A few seconds of the real thing: a realtime AudioContext made by the engine itself, driven from animation
- * frames as the game drives it, with a meter on the output.
- */
 export const live = async (): Promise<LiveReport> => {
   const audio = new WebAudio(), problems: string[] = [];
-  // everything before unlock must be remembered, and must not create a context
   audio.setVolume(0.8);
   audio.setSoundscape('haven', 0.4);
   audio.sfx('uiSelect');
@@ -482,7 +415,6 @@ export const live = async (): Promise<LiveReport> => {
     requestAnimationFrame(loop);
   };
   loop();
-  /** Waits, then returns the loudest RMS seen over the last `listen` seconds of the wait. */
   const listen = async (wait: number, listenFor: number): Promise<number> => {
     await new Promise((resolve) => setTimeout(resolve, (wait - listenFor) * 1000));
     let loudest = -Infinity;
@@ -524,7 +456,6 @@ export const live = async (): Promise<LiveReport> => {
   return report;
 };
 
-/** With no Web Audio at all, the engine must do nothing, quietly. */
 export const missing = (): string[] => {
   const scope = globalThis as { AudioContext?: unknown }, real = scope.AudioContext, problems: string[] = [];
   const warn = console.warn;
@@ -550,8 +481,6 @@ export const missing = (): string[] => {
   return problems;
 };
 
-// ---------------------------------------------------------------------------------------------------- the plan
-
 const PLAN: { name: string; run: () => Promise<Row> }[] = [
   ...(Object.keys(SCAPE_PEAK) as BedName[]).map((name) => ({ name: `scape ${name}`, run: () => scape(name) })),
   { name: 'scape silence', run: silence },
@@ -570,10 +499,8 @@ const PLAN: { name: string; run: () => Promise<Row> }[] = [
   { name: 'marathon', run: marathon },
 ];
 
-/** The offline renders, in order. */
 export const plan = (): string[] => PLAN.map((item) => item.name);
 
-/** The most recent render as a 16-bit WAV file, base64 encoded, for anyone who would rather hear it than read it. */
 export const wav = (): string | null => {
   const buffer = lastRender;
   if (!buffer) return null;

@@ -2,30 +2,20 @@ import * as THREE from 'three';
 import type { QualitySettings } from '../app/quality';
 import { FULLSCREEN_VS, GLSL_NOISE } from './glsl';
 
-/** Per-world grade. Worlds own one; transitions lerp between two. */
 export interface Look {
   exposure: number;
-  /** Lerp toward the bloom pyramid: 0.04 is a clean lens, 0.2 is a dream. */
   bloom: number;
-  /** Ambient occlusion strength, 0..1. */
   ao: number;
-  /** 1 is neutral. */
   saturation: number;
-  /** S-curve mix, 0 is neutral. */
   contrast: number;
-  /** Small offsets added to the dark and the bright end after tone mapping. */
   shadowTint: THREE.Color;
   highlightTint: THREE.Color;
   vignette: number;
   grain: number;
-  /** Chromatic aberration at the frame corners. */
   chroma: number;
-  /** Light shafts: how strongly the bright sky streams past whatever stands in front of it. 0 is none. */
   shafts: number;
   shaftColor: THREE.Color;
-  /** Depth of field: how soft the distance goes behind what the lens is focused on. 0 keeps everything sharp. */
   dof: number;
-  /** Anamorphic streaks: how far the brightest lights smear sideways across the lens. */
   streak: number;
 }
 
@@ -66,40 +56,26 @@ export const lerpLook = (out: Look, a: Look, b: Look, k: number): Look => {
   return out;
 };
 
-/**
- * One world dissolving into another: the outgoing world is drawn to its own target and survives only beyond a
- * wavefront `radius` metres from the eye, so near things change first and the horizon last.
- */
 export interface WorldWipe {
   scene: THREE.Scene;
   radius: number;
   softness: number;
-  /** HDR colour of the lit rim that rides the wavefront. */
   color: THREE.Color;
 }
 
-/** How far a full `dim` takes the picture toward the fade colour. */
 const DIM_DEPTH = 0.46;
 
 export interface ScreenFx {
-  /** 0..1 blend of the whole frame toward `fadeColor`. */
   fade: number;
   fadeColor: THREE.Color;
-  /** 0..1: the world steps back behind the interface, for a decision that wants the player's whole attention. */
   dim: number;
-  /** Additive burst of the bloom pyramid, for flashes. */
   flash: number;
-  /** Radial lens punch, 0 is neutral. */
   kick: number;
-  /** How far away the lens is focused, in metres: what lies well beyond it softens by the look's `dof`. */
   focus: number;
 }
 
-/** Where a world's light shafts come from. */
 export interface ShaftSource {
-  /** Unit vector from anywhere in the world toward the light. */
   readonly direction: THREE.Vector3;
-  /** Whatever is further from the eye than this many metres is open sky: the light the shafts are made of. */
   readonly skyFrom: number;
 }
 
@@ -110,21 +86,17 @@ export interface FrameInput {
   time: number;
   fx: ScreenFx;
   wipe: WorldWipe | null;
-  /** Drawn over the graded frame at native resolution, untouched by bloom or grain. */
   overlay: { scene: THREE.Scene; camera: THREE.Camera } | null;
-  /** Extra passes a world needs before its main draw (planar mirror). */
   prepass: ((renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera) => void) | null;
-  /** Where the world's light shafts come from, if it has any. */
   shafts: ShaftSource | null;
 }
 
-const DEPTH_GLSL = /* glsl */ `
+const DEPTH_GLSL = `
 uniform float uNear, uFar; uniform vec2 uInvProj;
 float viewZ(float d){ return (uNear * uFar) / ((uFar - uNear) * d - uFar); }
 `;
 
-/** `sceneColor(uv)`: the lit HDR frame both the bloom prefilter and the grade read, with AO and any wipe folded in. */
-const SCENE_COLOR_GLSL = /* glsl */ `
+const SCENE_COLOR_GLSL = `
 uniform sampler2D tScene, tAO; uniform float uAO;
 vec3 sane(vec3 c){ return min(max(c, vec3(0.0)), vec3(64.0)); }   // max() first: on every GPU we target it drops a NaN, so one bad pixel never reaches the bloom pyramid
 vec3 mainColor(vec2 uv){ return sane(texture2D(tScene, uv).rgb) * mix(1.0, texture2D(tAO, uv).r, uAO); }
@@ -149,7 +121,7 @@ vec3 sceneColor(vec2 uv){
 #endif
 `;
 
-const AO_FS = /* glsl */ `
+const AO_FS = `
 uniform sampler2D tDepth; uniform vec2 uTexel; uniform float uRadius; varying vec2 vUv;
 ${DEPTH_GLSL}
 vec3 viewPos(vec2 uv){ float z = viewZ(textureLod(tDepth, uv, 0.0).x); return vec3((uv * 2.0 - 1.0) * uInvProj * -z, z); }
@@ -176,11 +148,7 @@ void main(){
   gl_FragColor = vec4(ao, 1.0 - d0, 0.0, 1.0);
 }`;
 
-/**
- * Light shafts: every pixel looks toward the light and gathers what open sky it can see along the way, so the
- * sky's brightness streams out past the edges of whatever stands in front of it.
- */
-const SHAFT_FS = /* glsl */ `
+const SHAFT_FS = `
 uniform sampler2D tScene, tDepth; uniform vec2 uLight; uniform float uSkyFrom; varying vec2 vUv;
 ${DEPTH_GLSL}
 float sky(vec2 uv){
@@ -199,7 +167,7 @@ void main(){
   gl_FragColor = vec4(vec3(sum / float(N)), 1.0);
 }`;
 
-const AO_BLUR_FS = /* glsl */ `
+const AO_BLUR_FS = `
 uniform sampler2D tA; uniform vec2 uDir; varying vec2 vUv;
 void main(){
   vec2 c = texture2D(tA, vUv).xy; float s = c.x * 0.30, w = 0.30;
@@ -210,8 +178,7 @@ void main(){
   gl_FragColor = vec4(s / w, c.y, 0.0, 1.0);
 }`;
 
-/** Full resolution to half: four bilinear taps, each weighted against fireflies. */
-const DOWN0_FS = /* glsl */ `
+const DOWN0_FS = `
 uniform vec2 uT; varying vec2 vUv;
 ${SCENE_COLOR_GLSL}
 float kw(vec3 c){ return 1.0 / (1.0 + max(c.r, max(c.g, c.b))); }
@@ -221,7 +188,7 @@ void main(){
   gl_FragColor = vec4((a * wa + b * wb + c * wc + d * wd) / (wa + wb + wc + wd), 1.0);
 }`;
 
-const DOWN_FS = /* glsl */ `
+const DOWN_FS = `
 uniform sampler2D tC; uniform vec2 uT; varying vec2 vUv;
 vec3 S(vec2 o){ return texture2D(tC, vUv + o * uT).rgb; }
 void main(){
@@ -231,7 +198,7 @@ void main(){
   gl_FragColor = vec4(max(o, 0.0), 1.0);
 }`;
 
-const UP_FS = /* glsl */ `
+const UP_FS = `
 uniform sampler2D tC, tB; uniform vec2 uT; uniform float uMix; varying vec2 vUv;
 void main(){
   vec3 s = texture2D(tC, vUv + vec2(-1, 1) * uT).rgb + texture2D(tC, vUv + vec2(1, 1) * uT).rgb + texture2D(tC, vUv + vec2(-1, -1) * uT).rgb + texture2D(tC, vUv + vec2(1, -1) * uT).rgb;
@@ -240,7 +207,7 @@ void main(){
   gl_FragColor = vec4(mix(texture2D(tB, vUv).rgb, s, uMix), 1.0);
 }`;
 
-const FINAL_FS = /* glsl */ `
+const FINAL_FS = `
 #include <tonemapping_pars_fragment>
 uniform sampler2D tBloom, tDepth, tSoft, tSofter, tShafts; uniform float uBloom, uSaturation, uContrast, uVignette, uGrain, uChroma, uFade, uFlash, uKick, uClock, uDof, uFocus, uShafts, uStreak; uniform vec3 uShadowTint, uHighlightTint, uFadeColor, uShaftColor;
 varying vec2 vUv;
@@ -289,7 +256,6 @@ const _light = new THREE.Vector3();
 const HALF_FLOAT = { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false } as const;
 
 export class PostPipeline {
-  /** Scales the flash and the lens punch: below 1 for a player who has asked their device for less motion. */
   motion = 1;
   private readonly quad: THREE.Mesh;
   private readonly quadScene = new THREE.Scene();
@@ -372,7 +338,6 @@ export class PostPipeline {
     if (w && h) this.setSize(w, h);
   }
 
-  /** Size of the internal scene targets in pixels. The canvas itself is sized by the caller. */
   setSize(w: number, h: number): void {
     w = Math.max(2, Math.round(w));
     h = Math.max(2, Math.round(h));
@@ -421,7 +386,6 @@ export class PostPipeline {
     return this.rtAlt;
   }
 
-  /** Releases the second world's target once a wipe has finished. */
   releaseWipe(): void {
     this.rtAlt?.depthTexture?.dispose();
     this.rtAlt?.dispose();
@@ -479,13 +443,11 @@ export class PostPipeline {
       this.sceneU.uAO.value = 0;
     }
 
-    // light shafts, when the world has a light to make them of and the eye is turned its way
     const u = this.finalU;
     u.tShafts.value = this.black;
     u.uShafts.value = 0;
     if (this.rtShafts && f.shafts && look.shafts > 0.001) {
       const toLight = _light.copy(f.shafts.direction).transformDirection(camera.matrixWorldInverse);
-      // behind the eye there is nothing to gather; it comes on as the light swings into view
       const facing = THREE.MathUtils.smoothstep(-toLight.z, 0.0, 0.5);
       if (facing > 0.001) {
         _light.multiplyScalar(1000).applyMatrix4(camera.projectionMatrix);
@@ -500,7 +462,6 @@ export class PostPipeline {
       }
     }
 
-    // bloom: prefilter from the lit frame, walk down, then back up blending each level into the one above
     const blooms = this.blooms;
     let src: THREE.Texture = main.texture, sw = this.width, sh = this.height;
     for (let i = 0; i < blooms.length; i++) {
@@ -529,7 +490,6 @@ export class PostPipeline {
     }
 
     u.tBloom.value = up.texture;
-    // the bloom pyramid's first two steps are the frame at half and quarter size: the soft focus is made of them
     u.tDepth.value = main.depthTexture;
     u.tSoft.value = blooms[0]![0].texture;
     u.tSofter.value = (blooms[1] ?? blooms[0]!)[0].texture;
@@ -560,7 +520,6 @@ export class PostPipeline {
     }
   }
 
-  /** Compiles both grade variants behind the loader so the first wipe never stalls on a shader build. */
   warm(): void {
     const t = new THREE.WebGLRenderTarget(4, 4, { depthBuffer: false });
     for (const m of [this.mDown0.wipe, this.mFinal.wipe, this.mDown0.plain, this.mFinal.plain, this.mAO, this.mAOBlur, this.mShafts, this.mDown, this.mUp]) this.run(m, t);

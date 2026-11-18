@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { CLASSROOM, EYE_SEATED, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { FRIDAY, SPEAKERS } from '../script';
+import { HOOKS, FRIDAY, SPEAKERS } from '../script';
 import { holdToRead, stowHeadset } from './shared';
+import { hookPayoff } from './companion';
 
-/** Scene 5. Other young people's experiences, one vote, and a look at where it might lead. */
 export const friday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, state } = game;
   app.fx.fade = 1;
@@ -26,7 +26,6 @@ export const friday = async (game: Game): Promise<void> => {
   await d.fadeIn(1.4);
   await d.play(FRIDAY.intro);
 
-  // ---- three experiences of the same technology ----
   player.faceToward(front, 1.2);
   void d.tween(1.6, (k) => (app.zoom = 18 * k)).catch(() => undefined);
   game.reach('friday.voices');
@@ -49,14 +48,12 @@ export const friday = async (game: Game): Promise<void> => {
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 1.0);
   await d.play(FRIDAY.framing);
 
-  // ---- the vote ----
   game.reach('friday.vote');
   const pick = await d.choose(FRIDAY.vote.title, FRIDAY.vote.options);
   const policy = FRIDAY.vote.policies[pick] ?? 'combined';
   state.policyChoice = policy;
   audio.sfx('vote');
 
-  // ---- the Future Viewer ----
   room.setVariant('viewer');
   player.faceToward(new THREE.Vector3(0.2, 2.0, -5.9), 1.2);
   void d.tween(1.8, (k) => (app.zoom = 27 * k)).catch(() => undefined);
@@ -74,10 +71,16 @@ export const friday = async (game: Game): Promise<void> => {
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 1.0);
   await d.play(FRIDAY.closing);
 
-  // ---- reflection, and the end ----
   await d.wait(0.6);
   await d.fadeOut(1.6, 0x0b0d1a);
   audio.setSoundscape('ending', 3);
+  game.reach('friday.hooks');
+  for (const [heading, detail] of hookPayoff(state)) {
+    hud.setReflection([HOOKS.payoffTitle, '', heading, '', detail]);
+    await holdToRead(game, 3.5, 20);
+    hud.setReflection(null);
+    await d.wait(0.5);
+  }
   game.reach('friday.reflection');
   hud.setReflection([FRIDAY.reflectionTitle, '', ...FRIDAY.reflectionQuestions.flatMap((q, i) => (i ? ['', q] : [q]))]);
   await holdToRead(game, 9, 60);

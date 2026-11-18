@@ -6,17 +6,14 @@ import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
 import { Walkway } from '../colliders';
 import { recolourMaterial } from './recolour';
 
-/** Centres of the three rings of the Star Bridge challenge, near to far. */
 export const RING_POINTS = [new THREE.Vector3(2.3, 2.8, -12.8), new THREE.Vector3(-3.1, 4.0, -18.6), new THREE.Vector3(1.1, 5.4, -25.2)] as const;
 export const RING_RADIUS = 1.25;
 
 const TILES = 40;
-/** Tiles that already stand when the player first arrives: the bridge is begun, not absent. */
 const STUB = 4;
-/** The bridge's light: a cool cyan-white hard light, more engineered than the gold it replaced. */
 const GOLD = new THREE.Color(0.45, 0.84, 1.0);
 
-const TILE_VS = /* glsl */ `
+const TILE_VS = `
 attribute float aTile; attribute vec3 aCenter;
 uniform float uReveal, uTime;
 varying vec2 vUv; varying float vBuilt, vTile;
@@ -30,7 +27,7 @@ void main(){
   p.y += (1.0 - k) * -0.18 + sin(uTime * 1.1 + aTile * 0.7) * 0.02 * k;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
-const TILE_FS = /* glsl */ `
+const TILE_FS = `
 uniform float uTime, uFestival; uniform vec3 uGold;
 varying vec2 vUv; varying float vBuilt, vTile;
 float sdBox(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
@@ -62,8 +59,8 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const FILM_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const FILM_FS = /* glsl */ `
+const FILM_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const FILM_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uPower; uniform vec3 uColor;
 varying vec2 vUv;
@@ -81,7 +78,6 @@ export type RingState = 'dormant' | 'target' | 'lit';
 
 const _v = new THREE.Vector3();
 
-/** Middle and size of the hole through a ring-shaped model that faces +Z and stands on its origin. */
 const openingOf = (model: THREE.Object3D): { centreY: number; radius: number } => {
   model.updateMatrixWorld(true);
   const centreY = new THREE.Box3().setFromObject(model).getCenter(_v).y;
@@ -100,12 +96,10 @@ const openingOf = (model: THREE.Object3D): { centreY: number; radius: number } =
 export class Ring {
   readonly group = new THREE.Group();
   readonly center: THREE.Vector3;
-  /** Unit normal of the ring's plane, pointing back toward the plaza. */
   readonly normal: THREE.Vector3;
   readonly radius: number;
   state: RingState = 'dormant';
   private readonly hoopMat: THREE.MeshStandardMaterial;
-  /** The hoop's painted gold and opal, which shine brighter as the ring wakes. */
   private readonly paint: { value: number };
   private readonly filmU = { uTime: { value: 0 }, uPower: { value: 1 }, uColor: { value: GOLD.clone() } };
   private readonly dashes: THREE.Mesh;
@@ -113,7 +107,6 @@ export class Ring {
   private glow = 0.5;
   private flash = 0;
 
-  /** `hoop` is a copy of the ring model, which this ring keeps: it is sized so that its opening is `radius`. */
   constructor(center: THREE.Vector3, facing: THREE.Vector3, hoop: THREE.Object3D, radius = RING_RADIUS) {
     this.center = center.clone();
     this.radius = radius;
@@ -128,7 +121,6 @@ export class Ring {
     let material: THREE.MeshStandardMaterial | null = null, paint: { value: number } | null = null;
     hoop.traverse((o) => {
       if (!(o instanceof THREE.Mesh)) return;
-      // every ring wakes on its own, so each has a material of its own
       if (!material) {
         material = (o.material as THREE.MeshStandardMaterial).clone();
         recolourMaterial(material, 'ring');
@@ -148,7 +140,6 @@ export class Ring {
     }));
     this.group.add(film);
 
-    // a slowly turning dashed halo marks the ring to aim for
     const dashGeo: THREE.BufferGeometry[] = [];
     for (let i = 0; i < 16; i++) {
       const a = (i / 16) * TAU;
@@ -159,13 +150,11 @@ export class Ring {
     this.group.add(this.dashes);
   }
 
-  /** `quiet` changes the state without the flash of a fresh hit (used when a scene is being arranged). */
   setState(state: RingState, quiet = false): void {
     if (state === 'lit' && this.state !== 'lit' && !quiet) this.flash = 1;
     this.state = state;
   }
 
-  /** Moves the ring; its plane keeps facing the way it was built to face. */
   moveTo(center: THREE.Vector3): void {
     this.center.copy(center);
     this.group.position.copy(center);
@@ -177,7 +166,6 @@ export class Ring {
     this.glow = damp(this.glow, target, 6, dt);
     this.flash = Math.max(0, this.flash - dt * 1.6);
     const level = this.glow + this.flash * 14;
-    // asleep, a ring is its own gold and opal; it only gives off light once it is the one to aim for
     this.hoopMat.emissiveIntensity = 0.014 * Math.max(0, level - 0.75);
     this.paint.value = 0.1 + 0.42 * Math.max(0, level - 0.75);
     this.filmU.uTime.value = time;
@@ -194,28 +182,21 @@ export interface StarBridge {
   readonly group: THREE.Group;
   readonly rings: Ring[];
   readonly path: THREE.CatmullRomCurve3;
-  /** The deck as a path to walk on: only the tiles that stand can be walked. */
   readonly walkway: Walkway;
-  /** The gateway island beyond the far end, walkable once the bridge is whole. */
   readonly landing: Walkway;
-  /** 0..3: how many sections stand. Fractions are mid-build. */
   built: number;
-  /** Sets the target number of sections; the deck grows toward it tile by tile. */
   setSections(n: number, immediate?: boolean): void;
   setFestival(k: number): void;
   update(dt: number, time: number): void;
 }
 
-/** `hoops` are three copies of the ring model, one for each ring. */
 export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops: readonly THREE.Object3D[]): StarBridge => {
   const group = new THREE.Group();
-  // the deck runs through the foot of each ring, like a road through a gate
   const under = (p: THREE.Vector3): THREE.Vector3 => v3(p.x, p.y - 2.05, p.z);
   const path = new THREE.CatmullRomCurve3([
     start.clone(), under(RING_POINTS[0]), under(RING_POINTS[1]), under(RING_POINTS[2]), v3(0.4, lerpY(start, end, 0.68), start.z + (end.z - start.z) * 0.68), end.clone(),
   ], false, 'centripetal');
 
-  // deck: one quad per tile, laid along the path
   const pos: number[] = [], uv: number[] = [], tile: number[] = [], center: number[] = [], idx: number[] = [];
   const W = 1.35, up = v3(0, 1, 0);
   const a = new THREE.Vector3(), b = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3(), c = new THREE.Vector3();
@@ -252,7 +233,6 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
   const rings = RING_POINTS.map((p, i) => new Ring(p, start, hoops[i]!));
   for (const r of rings) group.add(r.group);
 
-  // the walkable deck follows the same curve as the tiles, a little narrower than they are
   const line: THREE.Vector3[] = [];
   for (let i = 0; i <= 160; i++) line.push(path.getPointAt(i / 160));
   const walkway = new Walkway(line, W - 0.1);
@@ -276,11 +256,9 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
     update(dt, time) {
       deckU.uTime.value = time;
       const want = revealFor(target);
-      // tiles arrive one after another: about a third of a second each, faster for long stretches
       const speed = Math.max(9, Math.abs(want - deckU.uReveal.value) * 1.6);
       deckU.uReveal.value += Math.sign(want - deckU.uReveal.value) * Math.min(Math.abs(want - deckU.uReveal.value), speed * dt);
       bridge.built = (Math.max(0, deckU.uReveal.value - STUB) / (TILES - STUB)) * 3;
-      // a tile can be stood on once it has settled into place
       walkway.reach = Math.min(1, Math.max(0, Math.floor(deckU.uReveal.value) - 0.1) / TILES);
       landing.reach = bridge.built >= 2.999 ? 1 : 0;
       for (const r of rings) r.update(dt, time);
@@ -291,9 +269,7 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
 
 const lerpY = (a: THREE.Vector3, b: THREE.Vector3, k: number): number => a.y + (b.y - a.y) * k;
 
-// ---------------------------------------------------------------------------------------------------- gateway
-
-const PORTAL_FS = /* glsl */ `
+const PORTAL_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uOpen; uniform vec3 uColor;
 varying vec2 vUv;
@@ -310,24 +286,19 @@ void main(){
 
 export interface Gateway {
   readonly group: THREE.Group;
-  /** 0 dormant .. 1 open. */
   setOpen(k: number): void;
   update(dt: number, time: number): void;
 }
 
-/** The gateway model is made this many times its own size: it has to be seen from the far end of the bridge. */
 const GATEWAY_SCALE = 1.5;
-/** The arch's opening in the model, in its own metres: half its width, its threshold and its peak. */
 const ARCH = { halfWidth: 1.07, floor: 0.79, top: 5.05 };
 
-/** `model` is a copy of the gateway model, which the gateway keeps. */
 export const buildGateway = (model: THREE.Object3D): Gateway => {
   const group = new THREE.Group();
   model.scale.setScalar(GATEWAY_SCALE);
   group.add(model);
 
   const portalU = { uTime: { value: 0 }, uOpen: { value: 0 }, uColor: { value: new THREE.Color(0.55, 0.75, 1.0) } };
-  // the portal fills the arch, a little over its edges so that no gap shows
   const wide = ARCH.halfWidth * 2 * GATEWAY_SCALE * 1.12, tall = (ARCH.top - ARCH.floor) * GATEWAY_SCALE * 1.04;
   const portal = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.ShaderMaterial({
     vertexShader: FILM_VS, fragmentShader: PORTAL_FS, uniforms: portalU, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
@@ -335,7 +306,6 @@ export const buildGateway = (model: THREE.Object3D): Gateway => {
   portal.position.set(0, ARCH.floor * GATEWAY_SCALE + tall / 2, 0);
   group.add(portal);
 
-  // a star turning above the keystone
   const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.85, 0.5).multiplyScalar(3) }));
   star.position.set(0, 6.2 * GATEWAY_SCALE + 0.7, 0);
   star.scale.set(0.7, 1.4, 0.7);

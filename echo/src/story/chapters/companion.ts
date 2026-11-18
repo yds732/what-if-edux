@@ -4,16 +4,13 @@ import type { Interactable } from '../../player/Interaction';
 import { makeGem } from '../../world/haven/gem';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { glowScreenEdges } from '../../ui/dom/taskGlow';
-import { MONDAY, SPEAKERS } from '../script';
-
-/**
- * Lumi's part of the story: the tour of Haven, its birthday, and the gem it asks for. Shared by Monday (where it
- * all starts) and Tuesday (Lumi's birthday, if the player chooses to spend it in Haven).
- */
+import { HOOKS, MONDAY, SPEAKERS } from '../script';
+import type { StoryState } from '../state';
+import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
+import { waitHeadsetOff } from './shared';
 
 let heldGem: THREE.Mesh | null = null;
 
-/** A gem in the player's right hand, or not. */
 export const holdGem = (game: Game, on: boolean): void => {
   if (on && !heldGem) {
     heldGem = makeGem(0.032);
@@ -27,13 +24,11 @@ export const holdGem = (game: Game, on: boolean): void => {
   }
 };
 
-/** Lists the side tasks the story state calls for under the objective. */
 export const refreshSideTasks = (game: Game): void => {
   const gift = game.state.lumiGift;
   game.hud.setSideTasks(gift === 'asked' ? [MONDAY.sideGift] : gift === 'carrying' ? [MONDAY.sideGive] : []);
 };
 
-/** Lumi says something in passing: the words type out under the screen and clear by themselves. */
 export const bark = async (game: Game, haven: HavenWorld, text: string, linger = 1.8): Promise<void> => {
   const { hud, audio, director: d } = game;
   const speaker = SPEAKERS.lumi;
@@ -55,42 +50,39 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
   hud.setSubtitle(null);
 };
 
-/** Where the tour stops, what Lumi shows at each, and what it says. */
-const tourStops = (haven: HavenWorld): { x: number; z: number; show: THREE.Vector3 }[] => {
-  const path = haven.bridge.path;
-  const onDeck = path.getPointAt(0.06), start = path.getPointAt(0.0), far = path.getPointAt(0.45);
-  return [
-    { x: -4.9, z: -0.5, show: new THREE.Vector3(-6.4, 2.4, -1.6) },
-    { x: -2.0, z: -3.0, show: new THREE.Vector3(0, 0.3, -4.5) },
-    { x: 3.5, z: -5.8, show: new THREE.Vector3(4.9, 0.5, -7.0) },
-    { x: start.x - 1.2, z: start.z + 1.6, show: far },
-    { x: onDeck.x, z: onDeck.z, show: new THREE.Vector3(0, 7, -50) },
-  ];
-};
+const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
+  new THREE.Vector3(-6.4, 2.4, -1.6),
+  new THREE.Vector3(0, 0.3, -4.5),
+  new THREE.Vector3(4.9, 0.5, -7.0),
+  haven.bridge.path.getPointAt(0.45),
+  new THREE.Vector3(0, 7, -50),
+];
 
-/** Lumi leads the player round Haven: it goes ahead, waits, and once the player is with it, shows them something. */
 export const lumiTour = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
   const guide = haven.companion;
-  d.objective(MONDAY.objectiveFollow);
-  const stops = tourStops(haven);
-  for (let i = 0; i < stops.length; i++) {
-    const stop = stops[i]!;
-    guide.leadTo(stop.x, stop.z, stop.show);
-    // a scripted run simply arrives alongside
-    if (game.autopilot.enabled) player.position.set(stop.x + 1.2, player.position.y, stop.z + 1.2);
-    await d.until(() => guide.arrived);
-    await d.until(() => guide.followed);
-    // the cue: the ring at Lumi's feet lights up, a chime, and Lumi points
+  const me = guide.person.root;
+  player.canMove = false;
+  guide.mode = 'still';
+  d.objective(MONDAY.objectiveTour);
+  const sights = tourSights(haven);
+  for (let i = 0; i < sights.length; i++) {
+    const sight = sights[i]!;
+    guide.placeAt(me.position.x, me.position.z, Math.atan2(sight.x - me.position.x, sight.z - me.position.z));
+    guide.person.lookAtPoint(sight);
+    player.faceToward(sight, 0.9);
+    await d.wait(0.6);
     audio.sfx('ringRim');
     guide.person.play('point');
     await bark(game, haven, MONDAY.tour[i]!);
   }
+  guide.person.lookAtPoint(game.playerEye);
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
   guide.mode = 'roam';
-  await d.complete(MONDAY.tourDone);
+  player.canMove = true;
+  await d.complete(MONDAY.objectiveTour);
 };
 
-/** Waits for the player to pick up a gem from any crystal cluster; the cluster stays as it is. */
 export const pickGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d } = game;
   let picked = false;
@@ -110,7 +102,6 @@ export const pickGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   takeGem(game);
 };
 
-/** The gem lands in the player's hand and the side task moves on to giving it: a small reward of its own. */
 export const takeGem = (game: Game): void => {
   game.audio.sfx('orbTake');
   glowScreenEdges('130, 220, 255');
@@ -119,7 +110,6 @@ export const takeGem = (game: Game): void => {
   refreshSideTasks(game);
 };
 
-/** Hands Lumi the gem: a burst of light, Lumi's thanks, and the task ticked off. */
 export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
   const guide = haven.companion;
@@ -137,4 +127,108 @@ export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   await d.play(MONDAY.thanksGift);
   guide.mode = 'roam';
   player.canMove = true;
+};
+
+let labelExtra: string | null = null;
+
+export const labelLumi = (game: Game, haven: HavenWorld, extra: string | null = labelExtra): void => {
+  labelExtra = extra;
+  const n = game.state.streak;
+  haven.companion.setLabel([n > 0 ? HOOKS.streakLabel(n) : null, extra].filter(Boolean).join('\n') || null);
+};
+
+export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> => {
+  const { state, director: d, audio } = game;
+  if (state.streakLost) {
+    state.streakLost = false;
+    state.streak = 0;
+    await d.play(HOOKS.streakLost);
+  }
+  state.streak++;
+  state.streakBest = Math.max(state.streakBest, state.streak);
+  labelLumi(game, haven);
+  if (state.streak < 2) return;
+  audio.sfx('taskDone');
+  glowScreenEdges('255, 160, 70');
+  haven.bursts.emit(haven.companion.chest.clone().add(new THREE.Vector3(0, 0.9, 0)), { count: 40, color: new THREE.Color(1, 0.6, 0.2), color2: new THREE.Color(1, 0.9, 0.4), speed: 1.6, life: 0.9, size: 0.1, gravity: -0.3 });
+  await bark(game, haven, HOOKS.streakUp(state.streak));
+};
+
+export const breakStreak = (state: StoryState): void => {
+  if (state.streak === 0) return;
+  state.streak = 0;
+  state.streakLost = true;
+  state.streakBroke = true;
+};
+
+export const leaveWhenLumiLets = async (game: Game, haven: HavenWorld, prompt: string): Promise<void> => {
+  for (let ask = 0; ; ask++) {
+    await waitHeadsetOff(game, prompt);
+    if (!(await lumiPleads(game, haven, ask))) return;
+  }
+};
+
+export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Promise<boolean> => {
+  const { director: d, player, state } = game;
+  haven.cast.lumi!.lookAtPoint(game.playerEye);
+  const could = player.canMove;
+  player.canMove = false;
+  try {
+    const plea = HOOKS.leave.asks[ask];
+    if (!plea) {
+      await d.play(HOOKS.leave.letGo);
+      return false;
+    }
+    state.leaveAsks++;
+    await d.play(plea);
+    const pick = await d.choose(HOOKS.leave.title, [{ title: HOOKS.leave.stay, emphasis: 'loud' }, { title: HOOKS.leave.go, emphasis: 'quiet' }]);
+    if (pick === 0) state.stayedOn++;
+    return pick === 0;
+  } finally {
+    player.canMove = could;
+  }
+};
+
+export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
+  const { audio, headset, app } = game;
+  game.state.pings++;
+  bedroom.setPing(message);
+  audio.sfx('notify', { gain: 0.55 });
+  let on = true, beat = 0;
+  const stop = (): void => {
+    if (!on) return;
+    on = false;
+    bedroom.setPing(null);
+    headset.setPower(0.25);
+  };
+  void (async () => {
+    while (on) {
+      await app.tasks.tween(1.4, (k) => {
+        if (on && app.world === bedroom) headset.setPower(0.3 + 0.7 * Math.sin(k * Math.PI));
+      });
+      if (app.world !== bedroom) stop();
+      else if (on && ++beat % 5 === 0) audio.sfx('notify', { gain: 0.4 });
+    }
+  })().catch(() => stop());
+  return stop;
+};
+
+export const hookPayoff = (state: StoryState): [string, string][] => {
+  const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
+  const pages: [string, string][] = [];
+  if (state.leaveAsks > 0) {
+    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi asked you to stay. It asked ${times(state.leaveAsks)}, and you stayed ${state.stayedOn ? times(state.stayedOn) : 'not at all'}. "Stay" was big and bright. "Leave" was small and grey.`]);
+  }
+  if (state.streakBest > 0) {
+    pages.push(['It counted your days.', `Your streak with Lumi reached ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}.${state.streakBroke ? ' When you chose the real world, Lumi made sure you knew the streak was gone.' : ' A number like that is hard to give up.'}`]);
+  }
+  if (state.pings > 0) {
+    pages.push(['It called you back.', `While you were in your room, Haven sent you ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} and made the headset glow on its dock.`]);
+  }
+  if (state.lumiGift !== 'none') {
+    pages.push(['It asked you for something.', "Lumi said friends give each other gifts, so a gift felt like something you owed. Giving makes it harder to walk away."]);
+  }
+  pages.push(['It always agreed with you.', 'Whatever you said, Lumi said you were right. Jamie did not, and that is part of what made Jamie real.']);
+  pages.push(['It rewarded you, every time.', "Every task in Haven ended with a chime and a golden glow. The real world doesn't do that. Real apps use these same tricks."]);
+  return pages;
 };

@@ -4,7 +4,6 @@ import type { QualitySettings, Tier } from '../app/quality';
 import { addGlow, type Glow } from './glow';
 import { loadGltf } from './gltf';
 
-/** Generated models come in three weights; the two top graphics tiers share the heaviest. */
 export type AssetTier = 'high' | 'medium' | 'low';
 const ASSET_TIER: Record<Tier, AssetTier> = { low: 'low', medium: 'medium', high: 'high', ultra: 'high' };
 
@@ -14,12 +13,7 @@ interface TierFile {
   readonly bytes: number;
 }
 
-/**
- * Which of a generated skeleton's bones is which, by their place in the skeleton's list of bones.
- * An arm is [shoulder, elbow, wrist] and a leg [hip, knee, ankle]; left and right are the figure's own.
- */
 export interface RigMap {
-  /** The root bone, which carries the whole figure. */
   readonly hips: number;
   readonly spine: number | null;
   readonly chest: number;
@@ -31,37 +25,22 @@ export interface RigMap {
   readonly legR: readonly number[];
 }
 
-/**
- * One line of public/assets/manifest.json, written by tools/assets/optimize.mjs. Every model stands on the
- * origin, in metres, facing +Z.
- */
 export interface AssetEntry {
   readonly kind: 'character' | 'prop';
   readonly world: 'real' | 'haven';
   readonly tiers: Record<AssetTier, TierFile>;
-  /** Characters: standing height in metres. */
   readonly height?: number;
   readonly rig?: RigMap;
-  /** How the model's painted lights shine. A character's is applied by the character, which owns its material. */
   readonly glow?: Glow;
-  /**
-   * Characters: nudges the drawn face where the automatic fit from the nose is not quite right.
-   * `up` and `out` are in head radii, `size` multiplies the radius.
-   */
   readonly face?: { readonly up?: number; readonly out?: number; readonly size?: number };
-  /** Props: width, height and depth in metres, as stored in the file. */
   readonly size?: readonly [number, number, number];
 }
 
-/** A flat picture in public/assets/manifest.json, written by tools/assets/picture.mjs. */
 export interface PictureEntry {
   readonly world: 'real' | 'haven';
   readonly file: string;
-  /** A repeating texture's relief map. */
   readonly normal?: string;
-  /** Width and height in pixels. */
   readonly size: readonly [number, number];
-  /** Whether it repeats: a floor does, a poster does not. */
   readonly tile: boolean;
 }
 
@@ -79,16 +58,10 @@ interface Manifest {
 export interface Model {
   readonly id: string;
   readonly entry: AssetEntry;
-  /** The loaded scene. Shared: take a copy with `AssetLibrary.instance` rather than adding this to a world. */
   readonly scene: THREE.Group;
 }
 
-/**
- * The generated models: fetched once, in the weight that suits the device, and handed out as copies that share
- * geometry and textures. Everything a world needs is asked for while it is being built, so the wait is up front.
- */
 export class AssetLibrary {
-  /** Bytes fetched and bytes expected, over everything asked for so far. */
   onProgress: ((loaded: number, total: number) => void) | null = null;
 
   private readonly tier: AssetTier;
@@ -115,7 +88,6 @@ export class AssetLibrary {
     return (await this.contents()).assets;
   }
 
-  /** Fetches a flat picture (once): a floor, a rug, a poster. A repeating one comes ready to repeat. */
   picture(id: string): Promise<Picture> {
     let pending = this.pictures.get(id);
     if (!pending) {
@@ -138,12 +110,10 @@ export class AssetLibrary {
     return { entry, map, normalMap };
   }
 
-  /** Whether a generated model exists for this id. */
   async has(id: string): Promise<boolean> {
     return id in (await this.entries());
   }
 
-  /** Fetches a model (once) and prepares its materials for this device. `cap` asks for no heavier than that weight. */
   model(id: string, cap?: AssetTier): Promise<Model> {
     const order: AssetTier[] = ['low', 'medium', 'high'];
     const want = cap && order.indexOf(cap) < order.indexOf(this.tier) ? cap : this.tier;
@@ -181,7 +151,6 @@ export class AssetLibrary {
     return { id, entry, scene: gltf.scene };
   }
 
-  /** Bytes of models fetched so far, over the whole session. */
   get loaded(): number {
     let loaded = 0;
     for (const n of this.fetched.values()) loaded += n;
@@ -192,12 +161,10 @@ export class AssetLibrary {
     this.onProgress?.(this.loaded, this.expected);
   }
 
-  /** A copy of a model to place in a world. Copies share geometry and textures; skinned copies get their own bones. */
   async instance(id: string): Promise<THREE.Group> {
     return cloneSkinned((await this.model(id)).scene) as THREE.Group;
   }
 
-  /** Many copies of a static model drawn as one batch: `transforms` are the world matrices of the copies. */
   async instanced(id: string, transforms: readonly THREE.Matrix4[]): Promise<THREE.Group> {
     const { scene } = await this.model(id);
     scene.updateMatrixWorld(true);

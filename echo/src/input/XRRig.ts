@@ -16,11 +16,6 @@ interface Wand {
   gamepad: Gamepad | null;
 }
 
-/**
- * Everything that is different in a headset: entering and leaving the session, reading the controllers into
- * the same `Input` the keyboard feeds, a pointing ray, hands that follow the grips, and a floor height that
- * keeps the player at a child's eye level whether they are standing or sitting in the real room.
- */
 export class XRRig {
   readonly onEnd: (() => void)[] = [];
   private readonly wands: Wand[] = [];
@@ -64,7 +59,6 @@ export class XRRig {
     return this.game.app.renderer.xr.isPresenting;
   }
 
-  /** Starts an immersive session. Must be called from a click or key press. */
   async enter(): Promise<void> {
     const xr = navigator.xr;
     if (!xr) throw new Error('WebXR is not available in this browser');
@@ -93,7 +87,6 @@ export class XRRig {
     });
   }
 
-  /** Puts the game's hands on the grips, and the pointing beam on the right one (or the only one). */
   private dressHands(): void {
     if (!this.presenting) return;
     const left = this.wands.find((w) => w.handedness === 'left') ?? null;
@@ -110,7 +103,6 @@ export class XRRig {
     else this.game.input.release(action);
   }
 
-  /** Reads the controllers. Call at the start of each frame, before anything looks at the input. */
   update(dt: number): void {
     if (!this.presenting) return;
     const { input, app, hud, player } = this.game;
@@ -131,7 +123,6 @@ export class XRRig {
         this.button('l-y', b(5), 'headset');
       } else {
         pointer = w;
-        // snap turn: one step per flick of the stick
         if (Math.abs(stickX) < 0.3) this.turnArmed = true;
         else if (this.turnArmed && Math.abs(stickX) > 0.65) {
           this.turnArmed = false;
@@ -145,7 +136,6 @@ export class XRRig {
     }
     input.setXRMove(moveX, moveY);
 
-    // the pointing ray: where things are aimed, used and thrown from
     const src = pointer ?? this.wands.find((w) => w.gamepad) ?? null;
     if (src) {
       src.ray.updateWorldMatrix(true, false);
@@ -161,11 +151,9 @@ export class XRRig {
       hud.setRay(null);
     }
 
-    // head height: keep the eyes where the story wants them, whatever the real floor says
     const head = app.camera.position.y;
     if (head > 0.2) this.floor = damp(this.floor, player.eyeHeight - head, 3, dt);
     player.xrFloor = this.floor;
-    // the head's own turn, so walking follows the gaze
     _q.copy(app.camera.quaternion);
     player.headYaw = new THREE.Euler().setFromQuaternion(_q, 'YXZ').y;
   }

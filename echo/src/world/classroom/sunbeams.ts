@@ -1,13 +1,7 @@
 import * as THREE from 'three';
 import { Rng } from '../../core/math';
 
-/**
- * Sunlight made visible: a soft shaft of light from every window, and dust drifting through the room that
- * catches the light only where it crosses a shaft. Both follow the sun's direction and colour, so the beams
- * swing lower and turn gold with the late-afternoon variant.
- */
 export interface Window {
-  /** x of the window plane (the glass). */
   readonly x: number;
   readonly y0: number;
   readonly y1: number;
@@ -17,9 +11,7 @@ export interface Window {
 
 export interface Sunbeams {
   readonly group: THREE.Group;
-  /** `towardRoom` is the direction sunlight travels (from the sun into the room); `strength` 0..1+. */
   setSun(towardRoom: THREE.Vector3, color: THREE.Color, strength: number): void;
-  /** `pixelHeight` is the drawing buffer's height, so dust keeps its size at any resolution. */
   update(time: number, pixelHeight: number): void;
 }
 
@@ -28,7 +20,7 @@ const SHAFT_LENGTH = 11;
 
 const finish = '\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n';
 
-const SHAFT_VS = /* glsl */ `
+const SHAFT_VS = `
 attribute float aAlong;   // 0 at the window, 1 at the far end of the shaft
 attribute float aAcross;  // 0..1 across the face, for soft edges
 uniform vec3 uDir;
@@ -43,7 +35,7 @@ void main() {
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
-const SHAFT_FS = /* glsl */ `
+const SHAFT_FS = `
 uniform vec3 uColor;
 uniform float uStrength, uTime;
 varying float vAlong, vAcross;
@@ -59,7 +51,7 @@ void main() {
   gl_FragColor = vec4(uColor * edge * fade * n * above * uStrength * 0.09, 1.0);${finish}
 }`;
 
-const DUST_VS = /* glsl */ `
+const DUST_VS = `
 attribute vec4 aSeed;     // phase, speed, size, twinkle
 uniform float uTime, uPixel;
 uniform vec3 uDir, uBox0, uBox1;
@@ -91,7 +83,7 @@ void main() {
   gl_PointSize = aSeed.z * uPixel / max(-mv.z, 0.2);
 }`;
 
-const DUST_FS = /* glsl */ `
+const DUST_FS = `
 uniform vec3 uColor;
 uniform float uStrength;
 varying float vLit, vTwinkle;
@@ -113,7 +105,6 @@ export const buildSunbeams = (rng: Rng, windows: readonly Window[], room: { min:
     uDir: { value: dir }, uLength: { value: SHAFT_LENGTH }, uColor: { value: color }, uStrength: { value: 1 }, uTime: { value: 0 },
   };
 
-  // ---- shafts: per window, the four sides of the light's prism plus a few slices through its middle
   const pos: number[] = [], along: number[] = [], across: number[] = [], index: number[] = [];
   const quad = (a: THREE.Vector3, b: THREE.Vector3): void => {
     const base = pos.length / 3;
@@ -127,12 +118,10 @@ export const buildSunbeams = (rng: Rng, windows: readonly Window[], room: { min:
   for (const w of windows) {
     const x = w.x + 0.02;
     const c = (y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
-    // the sides
     quad(c(w.y0, w.z0), c(w.y0, w.z1));
     quad(c(w.y1, w.z0), c(w.y1, w.z1));
     quad(c(w.y0, w.z0), c(w.y1, w.z0));
     quad(c(w.y0, w.z1), c(w.y1, w.z1));
-    // inner slices give the beam body, so it reads as a volume from any angle
     for (const k of [0.3, 0.5, 0.7]) {
       const z = w.z0 + (w.z1 - w.z0) * k, y = w.y0 + (w.y1 - w.y0) * k;
       quad(c(w.y0, z), c(w.y1, z));
@@ -152,7 +141,6 @@ export const buildSunbeams = (rng: Rng, windows: readonly Window[], room: { min:
   shafts.renderOrder = 5;
   group.add(shafts);
 
-  // ---- dust
   const count = Math.round(1400 * density);
   const dpos = new Float32Array(count * 3), seed = new Float32Array(count * 4);
   const size = room.max.clone().sub(room.min);
@@ -192,7 +180,6 @@ export const buildSunbeams = (rng: Rng, windows: readonly Window[], room: { min:
     },
     update(time, pixelHeight) {
       uniforms.uTime.value = time;
-      // a mote's size in metres to pixels at 1 m, for the game's 62 degree field of view
       dustUniforms.uPixel.value = pixelHeight * 0.83;
     },
   };

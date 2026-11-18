@@ -2,31 +2,24 @@ import * as THREE from 'three';
 import type { Picture } from '../assets/AssetLibrary';
 import type { BuildContext } from './World';
 
-/** Where a copy of a prop stands: metres, then its turn about the vertical in degrees, then its scale. */
 export type Spot = readonly [x: number, y: number, z: number, yaw?: number, scale?: number];
 
 const UP = new THREE.Vector3(0, 1, 0);
 const matrixOf = ([x, y, z, yaw = 0, scale = 1]: Spot): THREE.Matrix4 =>
   new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, THREE.MathUtils.degToRad(yaw)), new THREE.Vector3(scale, scale, scale));
 
-/**
- * Stands copies of a generated prop about a scene, drawn as one batch however many there are. A prop faces +Z
- * and stands on its origin, so a spot is where its base goes and which way it is turned.
- */
 export const dress = async (ctx: BuildContext, parent: THREE.Object3D, id: string, spots: readonly Spot[]): Promise<THREE.Group> => {
   const group = await ctx.assets.instanced(id, spots.map(matrixOf));
   parent.add(group);
   return group;
 };
 
-/** A prop's width, height and depth in metres. */
 export const sizeOf = async (ctx: BuildContext, id: string): Promise<readonly [number, number, number]> => {
   const { size } = (await ctx.assets.model(id)).entry;
   if (!size) throw new Error(`"${id}" is not a prop`);
   return size;
 };
 
-/** The strength of a dressed prop's painted light, to turn it up and down: a lamp, a dock that breathes. */
 export const glowOf = (prop: THREE.Object3D): { value: number } => {
   let glow: { value: number } | undefined;
   prop.traverse((o) => {
@@ -36,7 +29,6 @@ export const glowOf = (prop: THREE.Object3D): { value: number } => {
   return glow;
 };
 
-/** A floor of a repeating picture: each repeat of it covers `metres` of the room. */
 export const floorOf = (picture: Picture, wide: number, deep: number, metres: number, roughness: number): THREE.Mesh => {
   for (const texture of [picture.map, picture.normalMap]) texture?.repeat.set(wide / metres, deep / metres);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(wide, deep), new THREE.MeshStandardMaterial({ map: picture.map, normalMap: picture.normalMap, roughness }));
@@ -45,7 +37,6 @@ export const floorOf = (picture: Picture, wide: number, deep: number, metres: nu
   return floor;
 };
 
-/** A picture to hang on a wall, `wide` metres across, in a slim frame. It faces +Z; its origin is its middle. */
 export const framed = (picture: THREE.Texture, wide: number, tall: number, frame: THREE.ColorRepresentation = 0xd9b98f): THREE.Group => {
   const group = new THREE.Group();
   const face = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.MeshStandardMaterial({ map: picture, roughness: 0.82 }));

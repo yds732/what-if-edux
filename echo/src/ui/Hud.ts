@@ -8,7 +8,6 @@ import { Widget } from './Panel';
 
 export interface SubtitleLine {
   readonly speaker: string;
-  /** Colour of the speaker's name chip. */
   readonly color: string;
   readonly text: string;
 }
@@ -16,6 +15,7 @@ export interface SubtitleLine {
 export interface ChoiceOption {
   readonly title: string;
   readonly detail?: string;
+  readonly emphasis?: 'loud' | 'quiet';
 }
 
 interface Painted {
@@ -23,15 +23,9 @@ interface Painted {
   repaint(): void;
 }
 
-const PAD = 26; // margin kept around every panel for its glow
-/** In a headset the interface is a sheet this far ahead (metres), at this many metres per layout pixel: body text comes out near 21 mm per metre of distance, and the sheet stays inside a 30 degree turn of the eyes. */
+const PAD = 26;
 const SHEET_DISTANCE = 1.35, SHEET_SCALE = 0.00155;
 
-/**
- * Everything the game writes on screen, drawn as panels in one small scene. On a flat display that scene is
- * laid over the finished frame through an orthographic camera in layout pixels; in a headset the same root is
- * scaled to metres and floats in front of the player.
- */
 export class Hud {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
@@ -46,7 +40,6 @@ export class Hud {
   private mode: InputMode = 'mouse';
   private time = 0;
 
-  // ---- widgets ----
   private readonly reticle = this.add(new Widget(56, 56), () => this.paintReticle());
   private readonly prompt = this.add(new Widget(520, 64 + PAD * 2), () => this.paintPrompt());
   private readonly objective = this.add(new Widget(470, 78 + PAD * 2), () => this.paintObjective());
@@ -61,14 +54,12 @@ export class Hud {
   private readonly choiceTitle = this.add(new Widget(900, 90), () => this.paintChoiceTitle());
   private readonly options: Painted[] = [];
 
-  // ---- state behind the paint functions ----
   private focused = false;
   private promptText = '';
   private promptAction: keyof (typeof ACTION_LABELS)['mouse'] = 'interact';
   private objectiveText = '';
   private objectiveDone = false;
   private sideTasks: string[] = [];
-  /** The pointer has moved onto a choice. */
   readonly onHover = new Signal();
   private reticleWanted = true;
   private sub: { line: SubtitleLine; lines: string[]; chars: number; total: number; waiting: boolean } | null = null;
@@ -78,14 +69,11 @@ export class Hud {
   private reflectionLines: string[] = [];
   private counterData = { label: '', value: 0, total: 3, pulse: 0 };
   private hints: Hints | null = null;
-  /** What the story last asked the hint card to show, kept while the player has the full controls open. */
   private storyHints: Hints | null = null;
   private controlsOpen = false;
-  /** The story is running: the K tip at the top of the screen may show. */
   private inPlay = false;
   private choice: { title: string; options: ChoiceOption[]; hover: number; pick: ((i: number) => void) | null } | null = null;
   private lastSubPaint = -1;
-  // ---- headset: the same panels, hung in the world in front of the player ----
   private follow: THREE.Camera | null = null;
   private ray: THREE.Ray | null = null;
   private rayPoint: { x: number; y: number } | null = null;
@@ -123,14 +111,9 @@ export class Hud {
     this.repaintAll();
   }
 
-  /**
-   * Moves the interface out of the flat overlay and into the world, as a sheet a little over a metre ahead that drifts
-   * after the player's gaze. `parent` is the rig the camera rides on.
-   */
   enterWorldSpace(parent: THREE.Object3D, camera: THREE.Camera): void {
     this.follow = camera;
     parent.add(this.root);
-    // a smaller sheet than a monitor's: everything stays inside a comfortable turn of the eyes
     this.vw = 1000;
     this.vh = 580;
     this.uiScale = 1;
@@ -151,7 +134,6 @@ export class Hud {
     this.resize(...this.lastSize);
   }
 
-  /** In a headset: the ray the player points with, for hovering and picking choices. */
   setRay(ray: THREE.Ray | null): void {
     this.ray = ray;
   }
@@ -159,7 +141,6 @@ export class Hud {
   private placeInWorld(k: number): void {
     const cam = this.follow;
     if (!cam) return;
-    // rig-local: the camera's own position and heading are already relative to the rig
     const yaw = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ').y;
     const tx = cam.position.x - Math.sin(yaw) * SHEET_DISTANCE, tz = cam.position.z - Math.cos(yaw) * SHEET_DISTANCE, ty = cam.position.y - 0.2;
     const p = this.root.position;
@@ -169,7 +150,6 @@ export class Hud {
     this.root.rotation.set(0, this.root.rotation.y + dy * k, 0);
   }
 
-  /** Call when the canvas changes size. `dpr` is the drawing buffer's pixel ratio. */
   resize(cssWidth: number, cssHeight: number, dpr: number): void {
     this.lastSize = [cssWidth, cssHeight, dpr];
     if (this.follow) return;
@@ -195,8 +175,6 @@ export class Hud {
     for (const item of [...this.items, ...this.options]) item.repaint();
   }
 
-  // -------------------------------------------------------------------------------------------- public state
-
   setFocus(focused: boolean): void {
     if (focused === this.focused) return;
     this.focused = focused;
@@ -207,8 +185,6 @@ export class Hud {
     this.reticleWanted = v;
   }
 
-  /** The interaction hint under the reticle; null hides it. */
-  /** `action` is what the prompt asks for: the key cap names whatever does that on the device in hand. */
   setPrompt(text: string | null, action: keyof (typeof ACTION_LABELS)['mouse'] = 'interact'): void {
     if (text === null) {
       this.prompt.widget.visible = false;
@@ -222,13 +198,11 @@ export class Hud {
     }
   }
 
-  /** Tasks on the side, listed under the objective while there is one. */
   setSideTasks(tasks: readonly string[]): void {
     this.sideTasks = [...tasks];
     if (this.objective.widget.visible) this.objective.repaint();
   }
 
-  /** `done` shows the objective ticked off, in the accent colour. */
   setObjective(text: string | null, done = false): void {
     if (text === null) {
       this.objective.widget.visible = false;
@@ -238,14 +212,12 @@ export class Hud {
     this.objectiveText = text;
     this.objective.repaint();
     this.objective.widget.visible = true;
-    // re-announce: drop the widget back so it slides in again
     this.objective.widget.snap();
     this.objective.widget.visible = false;
     this.objective.widget.snap();
     this.objective.widget.visible = true;
   }
 
-  /** Starts a subtitle. Drive it with `setSubtitleProgress`; null clears it. */
   setSubtitle(line: SubtitleLine | null): void {
     if (line === null) {
       this.subtitle.widget.visible = false;
@@ -254,7 +226,6 @@ export class Hud {
     }
     const w = Math.min(900, this.vw - 40);
     const panel = this.subtitle.widget.panel;
-    // measure with the real font before sizing the panel
     let lines: string[] = [];
     panel.paint((ctx) => {
       ctx.font = font(400, 23);
@@ -266,7 +237,6 @@ export class Hud {
     this.subtitle.repaint();
   }
 
-  /** `shown` is how many characters are revealed; `waiting` shows the continue mark. */
   setSubtitleProgress(shown: number, waiting: boolean): void {
     const s = this.sub;
     if (!s) return;
@@ -277,7 +247,6 @@ export class Hud {
     this.subtitle.repaint();
   }
 
-  /** A full-screen title: the day and where it finds you. Pair it with a fade of the frame. */
   setCard(title: string | null, subtitle = ''): void {
     if (title === null) {
       this.card.widget.visible = false;
@@ -308,7 +277,6 @@ export class Hud {
     this.toast.widget.visible = true;
   }
 
-  /** Large, unframed lines in the middle of the screen: the story's questions to the player. */
   setReflection(lines: string[] | null): void {
     if (lines === null) {
       this.reflection.widget.visible = false;
@@ -330,7 +298,6 @@ export class Hud {
     this.counter.widget.visible = true;
   }
 
-  /** Takes everything off the screen: nothing of one scene may hang over the start of another. */
   clear(): void {
     this.setControlsTip(false);
     this.setPrompt(null);
@@ -344,7 +311,6 @@ export class Hud {
     this.setHint(null);
   }
 
-  /** A card of control hints; it shows the rows for whatever the player is holding. */
   setHint(hints: Hints | null): void {
     this.storyHints = hints;
     if (this.controlsOpen) return;
@@ -357,13 +323,11 @@ export class Hud {
     this.hint.widget.visible = true;
   }
 
-  /** The plain line at the top centre that says K shows the controls; on while the story runs. */
   setControlsTip(on: boolean): void {
     this.inPlay = on;
     if (!on && this.controlsOpen) this.toggleControls();
   }
 
-  /** Opens or closes the card of every key; closing it gives the card back to whatever the story had there. */
   toggleControls(): void {
     this.controlsOpen = !this.controlsOpen;
     const story = this.storyHints;
@@ -375,7 +339,6 @@ export class Hud {
     this.keysTip.repaint();
   }
 
-  /** Shows a decision and resolves with the index chosen (pointer, tap, or the 1/2/3 keys). */
   choose(title: string, options: ChoiceOption[], signal?: AbortSignal): Promise<number> {
     return new Promise<number>((resolve, reject) => {
       if (signal?.aborted) {
@@ -424,8 +387,6 @@ export class Hud {
     return this.choice !== null;
   }
 
-  // -------------------------------------------------------------------------------------------- frame
-
   update(dt: number): void {
     this.time += dt;
     const { vw, vh } = this;
@@ -444,16 +405,13 @@ export class Hud {
     this.toast.widget.y = vh / 2 - this.toast.widget.panel.height / 2 - edge + PAD;
     this.reflection.widget.x = 0;
     this.reflection.widget.y = 30;
-    // on a touch screen the pause button has the top right corner
     const corner = this.mode === 'touch' ? 62 / this.uiScale : 0;
-    // where the objective and the counter cannot share the top of a narrow screen, the counter drops under it
     const counter = this.counter.widget, objective = this.objective.widget.panel;
     const stacked = this.objective.widget.visible && objective.width + counter.panel.width + corner + (edge - PAD) * 2 > vw;
     counter.x = stacked ? -vw / 2 + counter.panel.width / 2 + edge - PAD : vw / 2 - counter.panel.width / 2 - edge + PAD - corner;
     counter.y = vh / 2 - counter.panel.height / 2 - edge + PAD - (stacked ? objective.height - PAD * 2 + 8 : 0);
     this.hint.widget.x = -vw / 2 + this.hint.widget.panel.width / 2;
     this.hint.widget.y = 30;
-    // the K tip: keyboard only, on a flat screen, while the story runs
     const keys = this.inPlay && this.mode === 'mouse' && !this.follow;
     if (keys && this.input.pressed.has('controls')) this.toggleControls();
     if (!keys && this.controlsOpen) this.toggleControls();
@@ -465,16 +423,13 @@ export class Hud {
       this.counterData.pulse = Math.max(0, this.counterData.pulse - dt * 1.8);
       this.counter.repaint();
     }
-    // the continue mark breathes; repaint it at a few hertz, not every frame
     if (this.sub?.waiting && Math.floor(this.time * 3) !== this.lastSubPaint) {
       this.lastSubPaint = Math.floor(this.time * 3);
       this.subtitle.repaint();
     }
-    // the dot steps aside while someone is speaking, unless it has something to point at; a headset has its ray instead
     this.reticle.widget.visible = this.reticleWanted && !this.follow && (this.focused || !this.sub);
     if (this.follow) {
       this.placeInWorld(1 - Math.exp(-2.4 * dt));
-      // where the pointing ray meets the sheet, in layout coordinates
       this.rayPoint = null;
       if (this.ray) {
         this.root.updateWorldMatrix(true, false);
@@ -494,7 +449,6 @@ export class Hud {
     this.counter.widget.panel.mesh.scale.set(this.counter.widget.panel.width * (1 + 0.12 * pulse), this.counter.widget.panel.height * (1 + 0.12 * pulse), 1);
   }
 
-  /** Converts a pointer position in CSS pixels to layout coordinates (centre origin, y up). */
   private toLayout(px: number, py: number): { x: number; y: number } {
     const w = this.vw * this.uiScale, h = this.vh * this.uiScale;
     return { x: (px - w / 2) / this.uiScale, y: (h / 2 - py) / this.uiScale };
@@ -507,7 +461,6 @@ export class Hud {
     const wide = this.vw >= 940;
     const gap = 18;
     const cardW = wide ? Math.min(400, (this.vw - 60 - gap * (n - 1)) / n) : Math.min(560, this.vw - 36);
-    // height from the longest description
     let tallest = 0;
     const probe = this.options[0]!.widget.panel;
     probe.paint((ctx) => {
@@ -567,8 +520,6 @@ export class Hud {
     if (clicked && hover >= 0 && this.options[hover]!.widget.alpha > 0.6) c.pick(hover);
   }
 
-  // -------------------------------------------------------------------------------------------- painting
-
   private paintReticle(): void {
     this.reticle.widget.panel.paint((ctx, w, h) => {
       const cx = w / 2, cy = h / 2;
@@ -625,7 +576,6 @@ export class Hud {
       fade(ctx, 0, PAD, w, h - PAD * 2, this.theme);
       ctx.fillStyle = this.theme.accent;
       if (this.objectiveDone) {
-        // a tick, drawn thick
         ctx.strokeStyle = this.theme.accent;
         ctx.lineWidth = 3.5;
         ctx.lineCap = ctx.lineJoin = 'round';
@@ -645,7 +595,6 @@ export class Hud {
       ctx.fillStyle = this.objectiveDone ? this.theme.accent : this.theme.text;
       ctx.textBaseline = 'middle';
       lines.forEach((line, i) => ctx.fillText(line, PAD + 50, PAD + 30 + i * 25));
-      // side tasks: a small heading, then each one beside a hollow diamond
       let y = PAD + 30 + lines.length * 25 + 8;
       side.forEach((tl) => {
         ctx.font = font(600, 11);
@@ -675,7 +624,6 @@ export class Hud {
     this.subtitle.widget.panel.paint((ctx, w, h) => {
       const x = PAD, y = PAD + 14, bw = w - PAD * 2, bh = h - PAD * 2 - 14;
       glass(ctx, x, y, bw, bh, this.theme, { radius: 22 });
-      // speaker chip, straddling the top edge
       ctx.font = font(600, 14);
       let nameW = 0;
       for (const ch of s.line.speaker.toUpperCase()) nameW += ctx.measureText(ch).width + 2.2;
@@ -694,7 +642,6 @@ export class Hud {
       ctx.fillStyle = '#ffffff';
       ctx.textBaseline = 'middle';
       spaced(ctx, s.line.speaker.toUpperCase(), chipX + 29, chipY + chipH / 2 + 1, 2.2);
-      // the line itself, revealed character by character across its wrapped lines
       ctx.font = font(400, 23);
       ctx.fillStyle = this.theme.text;
       let left = s.chars;
@@ -786,7 +733,6 @@ export class Hud {
   private paintToast(): void {
     this.toast.widget.panel.paint((ctx, w, h) => {
       glass(ctx, PAD, PAD, w - PAD * 2, h - PAD * 2, this.theme, { radius: 20, border: this.theme.accent });
-      // an envelope
       const ix = PAD + 24, iy = PAD + 26;
       ctx.strokeStyle = this.theme.accent;
       ctx.lineWidth = 2;
@@ -821,7 +767,6 @@ export class Hud {
     });
     widget.panel.resize(maxW, wrapped.length * 50 + 70);
     widget.panel.paint((ctx, w, h) => {
-      // a soft band of shade behind the words, so they read over a lamp as well as over the dark
       const band = ctx.createLinearGradient(0, 0, 0, h);
       band.addColorStop(0, 'rgba(6, 7, 16, 0)');
       band.addColorStop(0.3, 'rgba(6, 7, 16, 0.4)');
@@ -891,7 +836,6 @@ export class Hud {
     });
   }
 
-  /** "K  Controls" in plain text, no panel behind it: a soft shadow keeps it readable over a bright room. */
   private paintKeysTip(): void {
     const label = this.controlsOpen ? 'Hide controls' : 'Controls';
     this.keysTip.widget.panel.paint((ctx, w, h) => {
@@ -916,7 +860,6 @@ export class Hud {
     this.choiceTitle.widget.panel.paint((ctx, w, h) => {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // shrink the question until it fits the screen it is on
       const room = Math.min(w, this.vw) - 76;
       let size = 17, gap = 5, width = 0;
       for (;;) {
@@ -927,7 +870,6 @@ export class Hud {
         size -= 1;
         gap = Math.max(1.5, gap - 0.6);
       }
-      // a strip of glass behind it: the question has to read over anything, a white poster included
       const bw = width + 56, bh = size + 30;
       glass(ctx, w / 2 - bw / 2, h / 2 - bh / 2, bw, bh, this.theme, { radius: bh / 2, glow: 0.5 });
       ctx.fillStyle = this.theme.text;
@@ -942,27 +884,26 @@ export class Hud {
     const o = c.options[index];
     if (!o) return;
     const hover = c.hover === index;
+    const loud = o.emphasis === 'loud', quiet = o.emphasis === 'quiet';
     item.widget.panel.paint((ctx, w, h) => {
       const bw = w - PAD * 2, bh = h - PAD * 2;
-      // a second coat under the glass: whatever is behind a choice must not read through it
+      ctx.globalAlpha = quiet && !hover ? 0.5 : 1;
       ctx.fillStyle = 'rgba(10, 11, 22, 0.62)';
       roundRect(ctx, PAD, PAD, bw, bh, 22);
       ctx.fill();
-      glass(ctx, PAD, PAD, bw, bh, this.theme, { radius: 22, glow: hover ? 1.6 : 0.8, border: hover ? this.theme.accent : undefined, borderWidth: hover ? 2.5 : 1.5, wash: hover ? 'rgba(255,255,255,0.09)' : undefined });
-      // letter badge; the key that picks it on a keyboard
+      glass(ctx, PAD, PAD, bw, bh, this.theme, { radius: 22, glow: hover || loud ? (loud ? 2.4 : 1.6) : 0.8, border: hover || loud ? this.theme.accent : undefined, borderWidth: hover || loud ? 2.5 : 1.5, wash: loud ? 'rgba(255,255,255,0.14)' : hover ? 'rgba(255,255,255,0.09)' : undefined });
       const bx = PAD + 22, by = PAD + 22;
-      ctx.fillStyle = hover ? this.theme.accent : 'rgba(255,255,255,0.12)';
+      ctx.fillStyle = hover || loud ? this.theme.accent : 'rgba(255,255,255,0.12)';
       roundRect(ctx, bx, by, 36, 36, 11);
       ctx.fill();
-      ctx.fillStyle = hover ? '#1b1430' : this.theme.text;
+      ctx.fillStyle = hover || loud ? '#1b1430' : this.theme.text;
       ctx.font = font(700, 18);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // numbers are also the keys that pick; letters on a touch screen, but never in a headset, where A and B are buttons that do something else
       ctx.fillText(this.mode === 'touch' ? 'ABC'[index] ?? '' : String(index + 1), bx + 18, by + 19);
       ctx.textAlign = 'left';
-      ctx.fillStyle = this.theme.text;
-      ctx.font = font(600, 22);
+      ctx.fillStyle = quiet ? this.theme.dim : this.theme.text;
+      ctx.font = font(loud ? 700 : quiet ? 400 : 600, loud ? 25 : quiet ? 17 : 22);
       const titleLines = wrap(ctx, o.title, bw - 110);
       titleLines.forEach((line, i) => ctx.fillText(line, bx + 52, by + 19 + i * 28));
       if (o.detail) {
@@ -971,8 +912,10 @@ export class Hud {
         const y0 = by + 19 + titleLines.length * 28 + 12;
         wrap(ctx, o.detail, bw - 56).forEach((line, i) => ctx.fillText(line, PAD + 28, y0 + i * 23));
       }
+      ctx.globalAlpha = 1;
     });
-    item.widget.panel.mesh.scale.set(item.widget.panel.width * (hover ? 1.025 : 1), item.widget.panel.height * (hover ? 1.025 : 1), 1);
+    const size = (quiet ? 0.78 : loud ? 1.06 : 1) * (hover ? 1.025 : 1);
+    item.widget.panel.mesh.scale.set(item.widget.panel.width * size, item.widget.panel.height * size, 1);
   }
 
 }

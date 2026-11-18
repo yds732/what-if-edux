@@ -1,7 +1,4 @@
-/** Canvas-2D drawing vocabulary for every panel: holographic glass, type, key caps. */
-
 export const FONT = '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-/** The display face: names, titles and headings. */
 export const DISPLAY = '"Cormorant Garamond", "EB Garamond", Georgia, "Times New Roman", serif';
 export const displayFont = (weight: number, size: number, italic = false): string => `${italic ? 'italic ' : ''}${weight} ${size}px ${DISPLAY}`;
 export const font = (weight: number, size: number): string => `${weight} ${size}px ${FONT}`;
@@ -11,7 +8,6 @@ export interface Theme {
   readonly glassBottom: string;
   readonly border: string;
   readonly accent: string;
-  /** Soft outer light around panels. */
   readonly glow: string;
   readonly text: string;
   readonly dim: string;
@@ -19,7 +15,6 @@ export interface Theme {
 
 export type ThemeName = 'real' | 'haven';
 
-/** The real world's interface is cool and quiet; Haven's is warm, gilded and eager to please. */
 export const THEMES: Record<ThemeName, Theme> = {
   real: {
     glassTop: 'rgba(22, 28, 42, 0.80)', glassBottom: 'rgba(12, 16, 28, 0.86)', border: 'rgba(190, 215, 255, 0.34)',
@@ -44,18 +39,13 @@ export const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w
 
 export interface GlassOptions {
   radius?: number;
-  /** 0..1 strength of the outer glow. */
   glow?: number;
-  /** Overrides the border colour, for a selected or highlighted panel. */
   border?: string;
   borderWidth?: number;
-  /** Extra fill laid over the glass, for hover states. */
   wash?: string;
 }
 
-/** A pane of holographic glass. Leave `pad` pixels of margin around it for the glow. */
 export const glass = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, theme: Theme, o: GlassOptions = {}): void => {
-  // panels are square-cornered, to match the menu buttons
   const r = 0 * (o.radius ?? 0);
   ctx.save();
   if ((o.glow ?? 1) > 0) {
@@ -74,7 +64,6 @@ export const glass = (ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
     roundRect(ctx, x, y, w, h, r);
     ctx.fill();
   }
-  // a line of light along the top edge, as if the pane caught the room
   const hl = ctx.createLinearGradient(0, y, 0, y + Math.min(h, 46));
   hl.addColorStop(0, 'rgba(255,255,255,0.13)');
   hl.addColorStop(1, 'rgba(255,255,255,0)');
@@ -89,10 +78,6 @@ export const glass = (ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
 
 const withAlpha = (rgba: string, a: number): string => rgba.replace(/[\d.]+\)$/, `${a})`);
 
-/**
- * A soft shade behind text on the left of the screen: dark at the screen edge, thinning to nothing on the right,
- * with no border or glow, so it reads as shadow rather than as a box.
- */
 export const fade = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, theme: Theme): void => {
   const g = ctx.createLinearGradient(x, 0, x + w, 0);
   g.addColorStop(0, theme.glassBottom);
@@ -102,7 +87,6 @@ export const fade = (ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.fillRect(x, y, w, h);
 };
 
-/** Greedy word wrap. `measure` returns the width of a string in the units of `maxWidth`. */
 export const wrapText = (measure: (s: string) => number, text: string, maxWidth: number): string[] => {
   const lines: string[] = [];
   for (const paragraph of text.split('\n')) {
@@ -121,7 +105,6 @@ export const wrapText = (measure: (s: string) => number, text: string, maxWidth:
 
 export const wrap = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => wrapText((s) => ctx.measureText(s).width, text, maxWidth);
 
-/** Text with letter spacing, for small caps labels. Returns the width drawn. */
 export const spaced = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, align: 'left' | 'center' = 'left'): number => {
   let width = 0;
   for (const ch of text) width += ctx.measureText(ch).width + spacing;
@@ -137,7 +120,6 @@ export const spaced = (ctx: CanvasRenderingContext2D, text: string, x: number, y
   return width;
 };
 
-/** A keyboard key drawn as a small cap. Returns its width. */
 export const keyCap = (ctx: CanvasRenderingContext2D, label: string, x: number, y: number, h: number, theme: Theme): number => {
   ctx.save();
   ctx.font = font(600, Math.round(h * 0.52));
@@ -157,7 +139,6 @@ export const keyCap = (ctx: CanvasRenderingContext2D, label: string, x: number, 
   return w;
 };
 
-/** Four-point sparkle, Haven's mark. */
 export const sparkle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void => {
   ctx.beginPath();
   for (let i = 0; i < 8; i++) {

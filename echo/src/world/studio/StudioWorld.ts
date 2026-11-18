@@ -4,7 +4,6 @@ import { bakeRoomEnvironment } from '../../render/env';
 import { World, type BuildContext, type FrameContext } from '../World';
 import { SUBJECTS } from './subjects';
 
-/** Something to look at in the studio: an object and, optionally, how it moves. */
 export interface Subject {
   readonly object: THREE.Object3D;
   update?(frame: FrameContext): void;
@@ -27,7 +26,6 @@ const primitives: SubjectFactory = () => {
   return { object: g };
 };
 
-/** Asset viewer: a seamless backdrop under three-point light. `?shot=studio&subject=<name>`. */
 export class StudioWorld extends World {
   readonly id = 'studio';
   readonly theme = 'real' as const;

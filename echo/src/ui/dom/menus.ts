@@ -8,17 +8,14 @@ import { XRRig } from '../../input/XRRig';
 import type { Character } from '../../characters/Character';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
 
-/** Two framings of Haven behind the title: words on the left of a wide screen, or above and below the bridge on a tall one. */
 const TITLE_VIEWS = {
   wide: { at: HAVEN.titleWide, pitch: 0.105, lumi: HAVEN.lumiTitle },
   tall: { at: HAVEN.titleTall, pitch: 0.16, lumi: HAVEN.lumi },
 } as const;
 type TitleView = keyof typeof TITLE_VIEWS;
 
-/** The title camera's orbit: around the plaza and the bridge, 30 degrees above them. */
 const TITLE_ORBIT = { centre: { x: 0, y: 0.5, z: -13 }, radius: 30, tilt: Math.PI / 6, speed: 0.015, start: 0.6 } as const;
 
-/** What the title screen keeps while it is open. */
 interface TitleScene {
   haven: HavenWorld;
   lumi: Character;
@@ -48,10 +45,6 @@ const button = (label: string, className: string, onClick: () => void): HTMLButt
   return b;
 };
 
-/**
- * The click: an echo. The button pulses once, two outlines of it ripple outward and fade, and its four corner
- * pixels ride out on the first ripple. Echo is the game's companion; every press answers like one.
- */
 const ECHO = { ms: 560, second: 140, reach: 12, pulse: 1.035, ease: 'cubic-bezier(0.32, 0.72, 0, 1)' } as const;
 const reducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -62,7 +55,6 @@ const echo = (button: HTMLElement): void => {
   document.body.append(layer);
   const sx = (box.width + ECHO.reach * 2) / box.width, sy = (box.height + ECHO.reach * 2) / box.height;
   const done: Promise<unknown>[] = [];
-  // two rings, the second fainter and a beat behind: the echo of the echo
   for (const [delay, strength] of [[0, 0.75], [ECHO.second, 0.4]] as const) {
     const ring = el('div', 'echo-ring');
     Object.assign(ring.style, { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` });
@@ -72,12 +64,10 @@ const echo = (button: HTMLElement): void => {
       { transform: `scale(${sx}, ${sy})`, opacity: 0 },
     ], { duration: ECHO.ms, delay, easing: ECHO.ease, fill: 'both' }).finished);
   }
-  // the corner pixels ride outward on the first ring and fade
   for (const [cx, cy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
     const px = el('div', 'echo-corner');
     Object.assign(px.style, { left: `${box.left + cx * box.width}px`, top: `${box.top + cy * box.height}px` });
     layer.append(px);
-    // it starts where the resting pixel sits, touching the corner from outside, and rides out with the ring
     const size = px.offsetWidth;
     const x0 = cx ? 0 : -size, y0 = cy ? 0 : -size;
     const dx = (cx ? 1 : -1) * ECHO.reach, dy = (cy ? 1 : -1) * ECHO.reach;
@@ -86,12 +76,10 @@ const echo = (button: HTMLElement): void => {
       { transform: `translate(${x0 + dx}px, ${y0 + dy}px)`, opacity: 0 },
     ], { duration: ECHO.ms, easing: ECHO.ease, fill: 'both' }).finished);
   }
-  // and the button itself gives one small pulse
   button.animate([{ transform: 'scale(1)' }, { transform: `scale(${ECHO.pulse})`, offset: 0.35 }, { transform: 'scale(1)' }], { duration: 320, easing: ECHO.ease });
   void Promise.allSettled(done).then(() => layer.remove());
 };
 
-/** Small line icons for the title's utility buttons, drawn in the text colour. */
 const ICONS = {
   chapters: '<path d="M4 5.5h16M4 12h16M4 18.5h10" />',
   settings: '<circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v2.6M12 18.6v2.6M21.2 12h-2.6M5.4 12H2.8M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5" />',
@@ -105,10 +93,8 @@ const icon = (name: keyof typeof ICONS): SVGSVGElement => {
   svg.innerHTML = ICONS[name];
   return svg;
 };
-/** The title's words and buttons arrive once per visit; returning to the title later shows them at once. */
 let titleEntered = false;
 
-/** Title, pause, settings, chapter select and the end-of-week summary: ordinary DOM, laid over the canvas. */
 class Menus {
   private readonly root = document.getElementById('ui') as HTMLElement;
   private current: HTMLElement | null = null;
@@ -117,11 +103,9 @@ class Menus {
   private paused = false;
   private xrSupported = false;
 
-  /** `tierPinned`: the address bar named a graphics tier, which holds for this page whatever the settings say. */
   constructor(private readonly game: Game, private readonly settings: Settings, private readonly tierPinned: boolean) {
     this.loading.style.opacity = '0';
     this.root.append(this.loading);
-    // every menu button answers a click with an echo
     this.root.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement | null)?.closest('button');
       if (b && !b.disabled) echo(b);
@@ -130,11 +114,9 @@ class Menus {
       this.xrSupported = ok;
       if (ok && this.title) void this.showTitle();
     });
-    // taking the headset off mid-story pauses the game on the flat screen
     game.xr.onEnd.push(() => this.pause());
     this.applySettings();
     game.onLoading = (label, bytes) => {
-      // the worlds are tens of megabytes of models: the count going up says the wait is going somewhere
       const arrived = bytes ? ` · ${(bytes / 1e6).toFixed(1)} MB` : '';
       this.loading.innerHTML = label ? `Building ${label === 'haven' ? 'Haven' : `the ${label}`}${arrived}<i></i>` : '';
       this.loading.style.opacity = label ? '1' : '0';
@@ -152,7 +134,6 @@ class Menus {
     addEventListener('visibilitychange', () => {
       if (document.hidden && game.playing) this.pause();
     });
-    // the key that pauses also resumes (nothing in the game runs while paused, so this one is heard here)
     addEventListener('keydown', (e) => {
       if (e.code === 'KeyP' && this.paused && !e.repeat) this.resume();
     });
@@ -183,8 +164,6 @@ class Menus {
     menu.classList.remove('show');
     setTimeout(() => menu.remove(), 500);
   }
-
-  // ------------------------------------------------------------------------------------------------ title
 
   async showTitle(): Promise<void> {
     const game = this.game;
@@ -225,7 +204,6 @@ class Menus {
         void this.game.xr.enter().then(() => this.begin('monday', freshState()), (e: unknown) => console.warn('Could not start VR:', e));
       }));
     }
-    // chapters and settings live apart from the main action, in the corner where games keep them
     const utility = el('nav', 'utility');
     utility.setAttribute('aria-label', 'More');
     const chapters = button('Chapters', 'btn--utility', () => this.showChapters());
@@ -241,21 +219,14 @@ class Menus {
     if (!titleEntered) {
       titleEntered = true;
       menu.classList.add('enter');
-      // the order things arrive in: the name, its subtitle, the line, the action, then the corner
       [...Array.from(head.children), actions, utility].forEach((part, i) => (part as HTMLElement).style.setProperty('--i', String(i)));
     }
     menu.classList.toggle('tall', this.title.view === 'tall');
     this.show(menu);
-    // the picture comes up behind the title
     game.app.tasks.tween(2.2, (k) => (game.app.fx.fade = 1 - k)).catch(() => undefined);
-    // build the first scene's world while the player reads the title
     void game.ensureWorld('classroom');
   }
 
-  /**
-   * The title's camera: high above Haven, looking down at 45 degrees, circling the whole island very slowly.
-   * Lumi stands on the plaza below; the framing for the screen's shape only decides where she stands.
-   */
   private driftCamera(title: TitleScene): void {
     const { player, app } = this.game;
     const name: TitleView = app.camera.aspect >= 1.15 ? 'wide' : 'tall';
@@ -265,7 +236,6 @@ class Menus {
       title.haven.stand(title.lumi, view.lumi);
       document.querySelector('.menu--title')?.classList.toggle('tall', name === 'tall');
     }
-    // one full turn every ~7 minutes, with a gentle breathing in distance so the orbit never feels mechanical
     const t = app.time * TITLE_ORBIT.speed + TITLE_ORBIT.start;
     const radius = TITLE_ORBIT.radius * (1 + 0.04 * Math.sin(app.time * 0.05));
     const cx = TITLE_ORBIT.centre.x, cz = TITLE_ORBIT.centre.z;
@@ -305,8 +275,6 @@ class Menus {
     menu.append(card);
     this.show(menu);
   }
-
-  // ------------------------------------------------------------------------------------------------ settings
 
   private showSettings(back: () => void): void {
     const s = this.settings;
@@ -351,7 +319,6 @@ class Menus {
     };
     row('Graphics', 'Auto picks for this device and adapts as you play. A new level loads with the page.', seg(['auto', ...TIERS] as const, s.quality, (v) => {
       s.quality = v;
-      // worlds are built for a level of detail: start over on it, unless a story is in progress
       if (!this.game.playing) {
         this.applySettings();
         location.reload();
@@ -360,7 +327,6 @@ class Menus {
     row('Volume', '', range(0, 1, s.volume, (v) => (s.volume = v)));
     row('Dialogue', 'Lines move on by themselves after a reading pause.', seg(['auto', 'manual'] as const, s.autoAdvance ? 'auto' : 'manual', (v) => (s.autoAdvance = v === 'auto')));
     row('Look sensitivity', '', range(0.4, 2, s.sensitivity, (v) => (s.sensitivity = v)));
-    // the player's skin tone, as their hands look in the real world
     const swatches = el('div', 'swatches');
     SKIN_TONES.forEach((tone, i) => {
       const b = el('button');
@@ -383,8 +349,6 @@ class Menus {
     menu.append(card);
     this.show(menu);
   }
-
-  // ------------------------------------------------------------------------------------------------ pause
 
   pause(): void {
     const game = this.game;
@@ -430,15 +394,12 @@ class Menus {
     if (capture && !game.hud.choosing) game.input.capturePointer();
   }
 
-  // ------------------------------------------------------------------------------------------------ the end
-
   private showEnd(): void {
     const game = this.game, s = game.state;
     game.playing = false;
     game.input.freePointer();
     game.hud.setReticleVisible(false);
     clearProgress();
-    // the classroom comes back, out of focus, behind the summary
     game.app.tasks.tween(2.6, (k) => (game.app.fx.fade = 1 - k)).catch(() => undefined);
     const menu = el('div', 'menu menu--veil');
     const card = el('div', 'card card--wide');
@@ -460,8 +421,6 @@ class Menus {
     menu.append(card, el('p', 'fine', FRIDAY.endLine));
     this.show(menu);
   }
-
-  // ------------------------------------------------------------------------------------------------ touch
 
   private buildTouchOverlay(): void {
     const game = this.game;
@@ -487,5 +446,4 @@ class Menus {
   }
 }
 
-/** Builds the menus (pause, settings, the end-of-week summary, touch controls). Call once. */
 export const createMenus = (game: Game, settings: Settings, tierPinned: boolean): { showTitle(): Promise<void> } => new Menus(game, settings, tierPinned);

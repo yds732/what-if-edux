@@ -5,21 +5,17 @@ import { GLSL_OUTPUT } from './glsl';
 export interface BurstOptions {
   count: number;
   color: THREE.Color;
-  /** Second colour to vary toward. */
   color2?: THREE.Color;
   speed?: number;
-  /** 0..1: how much of `speed` is random per particle. */
   spread?: number;
   life?: number;
   gravity?: number;
   size?: number;
-  /** Adds this velocity to every particle: a trail inherits its emitter's motion. */
   drift?: THREE.Vector3;
-  /** Emit only into the hemisphere around this direction. */
   toward?: THREE.Vector3;
 }
 
-const VS = /* glsl */ `
+const VS = `
 attribute vec4 aState;   // age01, size, -, -
 attribute vec3 aColor;
 uniform float uPixel;
@@ -32,7 +28,7 @@ void main(){
   gl_Position = projectionMatrix * mv;
   gl_PointSize = min(aState.y * uPixel * 0.85 / max(-mv.z, 0.3), 96.0) * (0.5 + 0.5 * (1.0 - a));
 }`;
-const FS = /* glsl */ `
+const FS = `
 varying vec3 vColor; varying float vFade;
 void main(){
   vec2 q = gl_PointCoord - 0.5; float r = length(q) * 2.0;
@@ -42,10 +38,6 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-/**
- * A fixed pool of spark particles for every celebration and impact in a world. The pool is a ring: when it is
- * full the oldest sparks are reused, so memory and draw cost never grow.
- */
 export class Bursts {
   readonly points: THREE.Points;
   private readonly pos: Float32Array;
@@ -82,7 +74,6 @@ export class Bursts {
     for (let n = 0; n < o.count; n++) {
       const i = this.cursor;
       this.cursor = (this.cursor + 1) % this.capacity;
-      // uniform direction on the sphere
       const y = rng.range(-1, 1), a = rng.range(0, TAU), r = Math.sqrt(1 - y * y);
       let dx = Math.cos(a) * r, dy = y, dz = Math.sin(a) * r;
       if (o.toward && dx * o.toward.x + dy * o.toward.y + dz * o.toward.z < 0) {
