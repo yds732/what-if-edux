@@ -44,8 +44,8 @@ void main(){
   float lit = clamp(dot(nrm, normalize(vec3(-0.55, 0.5, 0.67))) * 0.75 + 0.42, 0.0, 1.0);
   float bands = fbm2(vec2(q.y / PR * 4.5 + fbm2(q / PR * 2.2) * 0.9, q.x / PR * 0.7));
   vec3 planet = mix(vec3(0.22, 0.34, 0.80), vec3(0.55, 0.44, 0.86), smoothstep(0.15, 0.3, bands));
-  planet = mix(planet, vec3(1.1, 0.7, 0.48), smoothstep(0.3, 0.45, bands));
-  planet = mix(planet, vec3(1.35, 0.98, 0.45), smoothstep(0.45, 0.62, bands));
+  planet = mix(planet, vec3(1.15, 0.68, 0.5), smoothstep(0.26, 0.38, bands));
+  planet = mix(planet, vec3(1.45, 1.02, 0.45), smoothstep(0.38, 0.55, bands));
   planet *= 0.2 + 0.9 * lit;
   planet += vec3(0.5, 0.6, 1.0) * pow(r, 6.0) * 0.28;                       // limb haze
   c = mix(c, planet, disc * 0.96);
@@ -55,8 +55,8 @@ void main(){
   float ringMask = smoothstep(1.32, 1.4, rr) * (1.0 - smoothstep(2.05, 2.15, rr)) * facing;
   float gaps = 0.55 + 0.45 * sin(rr * 46.0) * sin(rr * 17.0 + 1.0);
   float behind = step(0.0, rq.y) * disc;                                                         // the far half hides behind the disc
-  c += vec3(1.1, 0.9, 0.62) * ringMask * gaps * (1.0 - behind) * 0.62;
-  c += vec3(1.2, 0.95, 0.7) * smoothstep(1.66, 1.7, rr) * (1.0 - smoothstep(1.72, 1.78, rr)) * facing * (1.0 - behind) * 0.5;
+  c += vec3(1.3, 0.95, 0.5) * ringMask * gaps * (1.0 - behind) * 0.95;
+  c += vec3(1.5, 1.1, 0.6) * smoothstep(1.66, 1.7, rr) * (1.0 - smoothstep(1.72, 1.78, rr)) * facing * (1.0 - behind) * 0.9;
   c += vec3(1.0, 0.75, 0.4) * uFestival * 0.03 * exp(-abs(d.y) * 5.0);
   gl_FragColor = vec4(c, 1.0);
   ${GLSL_OUTPUT}

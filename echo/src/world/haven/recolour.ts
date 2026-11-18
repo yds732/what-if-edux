@@ -17,7 +17,7 @@ const VIOLET: Shift = [0.72, 0.55, 0.85];
 const REGAL: Shift = [0.74, 0.55, 0.55];
 
 const RECOLOURS: Record<string, Recolour> = {
-  'stepping-stone': { pink: COBALT, all: true, gold: {} },
+  'stepping-stone': { pink: DEEP_COBALT, all: true, gold: { mute: 1 } },
   dais: { pink: COBALT, all: true, gold: {} },
   'crystals-a': { pink: VIOLET, green: VIOLET, gold: {} },
   'crystals-b': { pink: DEEP_COBALT, gold: {} },

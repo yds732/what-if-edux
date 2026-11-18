@@ -27,7 +27,7 @@ const BLADE_VS = `
 }
 `;
 
-const GRASS_TONES = [0x2c3f78, 0x4a64a8, 0x879fdf, 0x9a8fc4, 0xb4c6dc].map((c) => new THREE.Color(c));
+const GRASS_TONES = [0xc49c58, 0xd6b06a, 0xe4c488, 0xeed6a2, 0xf4e4bc].map((c) => new THREE.Color(c));
 
 export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null): THREE.Mesh => {
   const blade = new THREE.BufferGeometry();
@@ -45,7 +45,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const b = new THREE.Color(0xa8c9f0), glow = new THREE.Color(0xf5d58c), c = new THREE.Color();
+  const b = new THREE.Color(0xf3e2b8), glow = new THREE.Color(0xa898d8), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -54,7 +54,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     if (!g) continue;
     const patch = fbm3(x * 0.22, z * 0.22, 3.3, 3) * 0.5 + 0.5;
     const tuft = fbm3(x * 1.6, z * 1.6, 7.1, 2) * 0.5 + 0.5;
-    const want = Math.min(1, smoothstep(0.38, 0.46, patch) * (0.45 + 0.8 * smoothstep(0.35, 0.6, tuft)) + 0.025);
+    const want = Math.min(1, smoothstep(0.38, 0.46, patch) * (0.45 + 0.8 * smoothstep(0.35, 0.6, tuft)) + 0.3);
     if (rng.next() > want) continue;
     const lush = smoothstep(0.5, 0.66, patch);
     const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
@@ -122,7 +122,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
-  const barkA = new THREE.Color(0x1e1a2a), barkB = new THREE.Color(0x3e3450);
+  const barkA = new THREE.Color(0x1e2438), barkB = new THREE.Color(0x46506a);
 
   const branch = (from: THREE.Vector3, dir: THREE.Vector3, length: number, radius: number, depth: number): void => {
     const bend = v3(rng.range(-0.8, 0.8), rng.range(-0.1, 0.5), rng.range(-0.8, 0.8));
@@ -159,11 +159,11 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const pinkA = new THREE.Color(0xa8c9f0), pinkB = new THREE.Color(0xc4daf2), lilac = new THREE.Color(0x648bc6);
-  const rose = new THREE.Color(0xf5d58c);
+  const pinkA = new THREE.Color(0xffcf5a), pinkB = new THREE.Color(0xfff0c0), lilac = new THREE.Color(0xd8952e);
+  const rose = new THREE.Color(0xf2b640);
   const masses: THREE.BufferGeometry[] = [];
   const puffs: { p: THREE.Vector3; r: number }[] = [];
-  const dark = new THREE.Color(0x344e80);
+  const dark = new THREE.Color(0xa86f22);
   for (const tip of tips) {
     const n = 3 + Math.round(tip.r * 3);
     for (let i = 0; i < n; i++) {
@@ -179,7 +179,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
       masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.35 + 0.35 * normal.y)));
     }
   }
-  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0x9fc0ff, emissiveIntensity: 0.08 }));
+  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffc060, emissiveIntensity: 0.08 }));
   massMesh.castShadow = true;
   group.add(massMesh);
 
@@ -246,7 +246,7 @@ export const buildGlowFlowers = (spots: readonly { x: number; y: number; z: numb
   for (const s of spots) {
     const lean = v3(Math.sin(s.x * 7.1) * 0.08, 0, Math.cos(s.z * 5.3) * 0.08);
     const top = v3(s.x + lean.x * s.h * 2, s.y + s.h, s.z + lean.z * s.h * 2);
-    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x3f5f9e));
+    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x6a5a9a));
     const b = blob(0.03 * (0.7 + s.h), 0.042 * (0.7 + s.h), 0.03 * (0.7 + s.h), 2, (p) => { if (p.y > 0) p.multiplyScalar(1 - 0.25 * p.y); });
     bulbs.push(tint(place(b, top), s.color));
   }
