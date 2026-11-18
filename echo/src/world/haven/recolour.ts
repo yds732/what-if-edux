@@ -21,8 +21,8 @@ const CRYSTAL_BLUE: Shift = [0.55, 0.6, 0.8];
 const RECOLOURS: Record<string, Recolour> = {
   'stepping-stone': { pink: COBALT, all: true, gold: {} },
   dais: { pink: COBALT, all: true, gold: {} },
-  'island-a': { pink: DEEP_COBALT, keepBlossom: true, green: MEADOW_GOLD, gold: {} },
-  'island-b': { pink: DEEP_COBALT, keepBlossom: true, green: MEADOW_GOLD, gold: {} },
+  'island-a': { pink: DEEP_COBALT, keepBlossom: true, pinkBlossom: true, green: MEADOW_GOLD, gold: {} },
+  'island-b': { pink: DEEP_COBALT, keepBlossom: true, pinkBlossom: true, green: MEADOW_GOLD, gold: {} },
   'crystals-a': { pink: CRYSTAL_BLUE, green: CRYSTAL_BLUE, gold: {} },
   'crystals-b': { pink: DEEP_COBALT, gold: {} },
   'board-frame': { pink: COBALT, gold: {} },

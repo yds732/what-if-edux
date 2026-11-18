@@ -213,13 +213,13 @@ export class HavenWorld extends World {
     }
     await ctx.step('haven: flora');
 
-    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density));
+    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density), 'pink');
     tree.group.position.copy(HAVEN.tree);
     tree.group.scale.setScalar(1.3);
     scene.add(tree.group);
     this.colliders.circle(HAVEN.tree.x, HAVEN.tree.z, 0.75);
     const canopy = tree.canopy.map((p) => p.clone().multiplyScalar(1.3).add(HAVEN.tree));
-    scene.add(buildFallingPetals(Math.round(240 * q.density), canopy, 0.02, rng.fork(), this.time));
+    scene.add(buildFallingPetals(Math.round(240 * q.density), canopy, 0.02, rng.fork(), this.time, new THREE.Color(1.5, 0.9, 1.2)));
     await ctx.step('haven: tree');
 
     const edgeZ = -this.mainIsland.outline(Math.PI) * 0.965;
