@@ -143,20 +143,23 @@ export class AssetLibrary {
     return id in (await this.entries());
   }
 
-  /** Fetches a model (once) and prepares its materials for this device. */
-  model(id: string): Promise<Model> {
-    let pending = this.models.get(id);
+  /** Fetches a model (once) and prepares its materials for this device. `cap` asks for no heavier than that weight. */
+  model(id: string, cap?: AssetTier): Promise<Model> {
+    const order: AssetTier[] = ['low', 'medium', 'high'];
+    const want = cap && order.indexOf(cap) < order.indexOf(this.tier) ? cap : this.tier;
+    const key = want === this.tier ? id : `${id}@${want}`;
+    let pending = this.models.get(key);
     if (!pending) {
-      pending = this.load(id);
-      this.models.set(id, pending);
+      pending = this.load(id, want);
+      this.models.set(key, pending);
     }
     return pending;
   }
 
-  private async load(id: string): Promise<Model> {
+  private async load(id: string, weight: AssetTier = this.tier): Promise<Model> {
     const entry = (await this.entries())[id];
     if (!entry) throw new Error(`there is no generated asset called "${id}"`);
-    const tier = entry.tiers[this.tier];
+    const tier = entry.tiers[weight];
     this.expected += tier.bytes;
     const gltf = await loadGltf(this.base + tier.file, (loaded) => {
       this.fetched.set(id, loaded);

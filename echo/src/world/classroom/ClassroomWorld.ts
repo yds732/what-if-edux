@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { Character } from '../../characters/Character';
 import { CAST, type CastName } from '../../characters/cast';
-import { place, sweep, torus, v3 } from '../../core/geo';
+import { merge, place, sweep, torus, v3 } from '../../core/geo';
 import { Rng, TAU, damp } from '../../core/math';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
@@ -53,22 +52,18 @@ export type ScreenContent =
 const W = 5, D = 6, H = 3.4;
 /** Height of a floor marker: just clear of the floor. */
 export const FLOOR_MARK = 0.02;
-/** The ceiling's pendant lights hang over these columns and rows, where the old panels were. */
-const LIGHT_COLS = [-2.8, 0, 2.8], LIGHT_ROWS = [-3.6, -0.6, 2.4];
-/** Radius of each pendant orb (32 cm across). Its wire is as long as the orb is wide. */
-const ORB_R = 0.16;
-/** The room's light comes from the lamps: a soft warm white, not the blue-white of office panels. */
-const LAMP_COLOR = 0xfff1e0, PENDANT_POWER = 3.0;
+/**
+ * The ceiling's light: a halo ring hung over each group of tables and one over the front, each ring carrying one lamp.
+ * Five lamps light the whole room (it used to be seventeen, and four window panels), which keeps the frame rate up.
+ */
+const RINGS: readonly (readonly [number, number, number])[] = [[-2.1, -1.4, 0.75], [2.1, -1.4, 0.75], [-2.1, 2.2, 0.75], [2.1, 2.2, 0.75], [0.2, -3.9, 1.1]];
+/** The room's light comes from the lamps: a clean white, a touch warm. */
+const LAMP_COLOR = 0xfff6ec, RING_POWER = 4.2;
 /**
  * The border light: a line of cool light round the foot of the walls, just above the skirting and the stage, in a slim
  * white channel that stands a little off the wall, washing the floor's edge and the bottom of the walls.
  */
-const BORDER = { y: 0.24, off: 0.05, color: 0xcfe4ff, power: 0.9 };
-/** Where the border's light is gathered into lamps: [x, z], a little in from each wall, low down. */
-const BORDER_LAMPS: readonly (readonly [number, number])[] = [
-  [-2.5, -D + 0.35], [2.5, -D + 0.35], [-2.5, D - 0.35], [2.5, D - 0.35],
-  [W - 0.35, -3.6], [W - 0.35, 2.4], [-W + 0.35, -3], [-W + 0.35, 3],
-];
+const BORDER = { y: 0.24, off: 0.05, color: 0xcfe4ff };
 /** The door's opening on the right wall, which the border steps round. */
 const DOOR_GAP = { z0: -2.45, z1: -1.35 };
 /** The teacher's desk: a long white slab, plain and square. */
@@ -172,7 +167,6 @@ export class ClassroomWorld extends World {
   private readonly lamps: THREE.PointLight[] = [];
   /** The border light's painted strip, and the light that comes in through each window. */
   private border!: THREE.Mesh;
-  private readonly windows: THREE.RectAreaLight[] = [];
   private screen!: Panel;
   private poster!: Panel;
   private posterGroup = new THREE.Group();
@@ -198,7 +192,7 @@ export class ClassroomWorld extends World {
     this.near = 0.05;
     this.far = 1400;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003, dof: 0.5,
+      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003, dof: 0,
       shadowTint: new THREE.Color(0.0, 0.004, 0.012), highlightTint: new THREE.Color(0.012, 0.006, -0.004),
     }));
     this.clearColor.set(0xbfd0ea);
@@ -217,14 +211,14 @@ export class ClassroomWorld extends World {
     await ctx.step('classroom: city');
 
     // ---- shell ----
-    // grey carpet tiles with a cool blue cast, as most classrooms have
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: carpet(new Rng(2082), W * 2, D * 2), roughness: 0.96 }));
+    // a pale poured-resin floor in large soft tiles, with a faint sheen that catches the ring lights
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: resinFloor(new Rng(2082), W * 2, D * 2), roughness: 0.42 }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
     const b = new Builder();
-    const wall = 0xe9ecf3, trim = 0xc9cedb, accent = 0x7fa0c9;
+    const wall = 0xe4e8ef, trim = 0xd6dbe4;
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, -D - 0.08]);
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, D + 0.08]);
     b.box('matte', wall, [0.16, H, D * 2], [W + 0.08, H / 2, 0]);
@@ -240,34 +234,32 @@ export class ClassroomWorld extends World {
     }
     for (const z of centres) {
       const frame = [v3(0, WY0, z - WW / 2), v3(0, WY0, z + WW / 2), v3(0, WY1, z + WW / 2), v3(0, WY1, z - WW / 2), v3(0, WY0, z - WW / 2)];
-      b.add('metal', 0xf2f3f7, place(sweep(frame, () => 0.045, { radial: 6, polyline: true, steps: 4, startCap: 'flat', endCap: 'flat' }), [-W - 0.02, 0, 0]));
+      b.add('metal', 0x2c313c, place(sweep(frame, () => 0.028, { radial: 6, polyline: true, steps: 4, startCap: 'flat', endCap: 'flat' }), [-W - 0.02, 0, 0]));
     }
-    // one long windowsill of beech under all four windows, deep enough for the plants, on a white apron
-    b.box('satin', 0xd2ad7f, [0.34, 0.04, D * 2 - 0.6], [-W + 0.17, WY0 - 0.02, 0], { r: 0.012 });
-    b.box('satin', 0xb98c5a, [0.02, 0.04, D * 2 - 0.58], [-W + 0.34, WY0 - 0.02, 0], { r: 0.008 });
-    b.box('satin', 0xf2f3f7, [0.02, 0.12, D * 2 - 0.64], [-W + 0.02, WY0 - 0.1, 0]);
+    // one long white windowsill under all four windows, deep enough for the plants, with a hairline of light under its lip
+    b.box('gloss', 0xf4f5f8, [0.34, 0.04, D * 2 - 0.6], [-W + 0.17, WY0 - 0.02, 0], { r: 0.012 });
+    b.box('glow', 0xcfe4ff, [0.006, 0.004, D * 2 - 0.7], [-W + 0.33, WY0 - 0.043, 0]);
     // skirting, and a band of colour at the foot of the front wall
     b.box('satin', trim, [W * 2, 0.1, 0.03], [0, 0.05, -D + 0.015]);
     b.box('satin', trim, [0.03, 0.1, D * 2], [W - 0.015, 0.05, 0]);
     b.box('satin', trim, [W * 2, 0.1, 0.03], [0, 0.05, D - 0.015]);
-    b.box('satin', accent, [W * 2, 0.5, 0.02], [0, 0.35, -D + 0.012]);
+
 
     // ---- the front: a low stage, the display, the plinth ----
-    // the stage is wood, the same honey beech as the cubbies at the back: boards running its length, a darker nosing on the edge
-    const STAGE = { wide: 7.4, deep: 1.9, z: -5.05 }, BOARD = 0.158, grain = new Rng(2083);
-    b.box('satin', 0xa47c4f, [STAGE.wide, STAGE_HEIGHT - 0.02, STAGE.deep], [0, (STAGE_HEIGHT - 0.02) / 2, STAGE.z]);
-    const boards = Math.round(STAGE.deep / BOARD);
-    for (let i = 0; i < boards; i++) {
-      const tone = new THREE.Color(0xd6b081).offsetHSL(grain.range(-0.008, 0.008), grain.range(-0.04, 0.04), grain.range(-0.045, 0.03));
-      b.box('satin', tone, [STAGE.wide - 0.04, 0.02, BOARD - 0.006], [0, STAGE_HEIGHT - 0.01, STAGE.z + STAGE.deep / 2 - BOARD / 2 - i * BOARD], { r: 0.003 });
+    // the stage: a low white platform with a soft grey top and a line of light along its edge
+    const STAGE = { wide: 7.4, deep: 1.9, z: -5.05 };
+    b.box('satin', 0xe9ecf1, [STAGE.wide, STAGE_HEIGHT - 0.012, STAGE.deep], [0, (STAGE_HEIGHT - 0.012) / 2, STAGE.z], { r: 0.01 });
+    b.box('satin', 0xd9dde5, [STAGE.wide - 0.02, 0.012, STAGE.deep - 0.02], [0, STAGE_HEIGHT - 0.006, STAGE.z], { r: 0.004 });
+    b.box('glow', 0xbfe0ff, [STAGE.wide - 0.1, 0.006, 0.006], [0, 0.03, STAGE.z + STAGE.deep / 2 + 0.002]);
+    // the display: one frameless pane of dark glass, edged with a hairline of light
+    b.box('gloss', 0x10131c, [5.0, 2.3, 0.05], [0.2, 2.05, -D + 0.04], { r: 0.02 });
+    for (const [w, h, x, y] of [[5.0, 0.006, 0.2, 2.05 + 1.15], [5.0, 0.006, 0.2, 2.05 - 1.15], [0.006, 2.3, 0.2 - 2.5, 2.05], [0.006, 2.3, 0.2 + 2.5, 2.05]] as const) {
+      b.box('glow', 0x9fd0ff, [w, h, 0.006], [x, y, -D + 0.066]);
     }
-    b.box('satin', 0xb98c5a, [STAGE.wide + 0.02, STAGE_HEIGHT + 0.004, 0.05], [0, (STAGE_HEIGHT + 0.004) / 2, STAGE.z + STAGE.deep / 2 - 0.02], { r: 0.012 });
-    for (const s of [-1, 1]) b.box('satin', 0xb98c5a, [0.05, STAGE_HEIGHT + 0.004, STAGE.deep], [s * (STAGE.wide / 2 - 0.02), (STAGE_HEIGHT + 0.004) / 2, STAGE.z], { r: 0.012 });
-    b.box('gloss', 0x1a1e2c, [5.0, 2.3, 0.07], [0.2, 2.05, -D + 0.05], { r: 0.035 });
-    b.box('metal', 0xd9dde8, [5.16, 2.46, 0.04], [0.2, 2.05, -D + 0.022], { r: 0.05 });
     // ---- tables for two pushed together, their chairs, slates, paper and pencil pots ----
     // the front tables stand in a group of their own: they are cleared away for the after-school club
     const sets = [this.frontRow, scene].map((to) => ({ to, b: new Builder(), chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[], colliders: [] as Obstacle[] }));
+    const chairRng = new Rng(2084);
     for (const t of TABLES) {
       const set = sets[t.front ? 0 : 1]!;
       buildTable(set.b, t, rng);
@@ -296,7 +288,7 @@ export class ClassroomWorld extends World {
     }
     for (const set of sets) {
       set.b.finish(set.to);
-      await dress(ctx, set.to, 'chair', set.chairs);
+      set.to.add(shellChairs(set.chairs, chairRng));
       set.to.add(tablets(set.slates));
       await dress(ctx, set.to, 'backpack', set.bags);
     }
@@ -309,7 +301,17 @@ export class ClassroomWorld extends World {
     // ---- the front: the headset's plinth, and the teacher's desk up on the stage ----
     // the plinth is cut down to the lower eye line: squashed in height only, so its footprint stays the same
     const [, plinthTall] = await sizeOf(ctx, 'plinth');
-    (await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]])).scale.y = CLASSROOM.plinth.y / plinthTall;
+    const plinth = await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]]);
+    plinth.scale.y = CLASSROOM.plinth.y / plinthTall;
+    // in gloss white, like the rest of the room's furniture, keeping the model's shape
+    plinth.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const m = (o.material as THREE.MeshStandardMaterial).clone();
+      m.map = null;
+      m.color.set(0xf3f4f7);
+      m.roughness = 0.3;
+      o.material = m;
+    });
     // a long white slab on two slab ends, a recessed panel between them and a hairline of light under the top's edge
     {
       const c = Math.cos(DESK.yaw), s = Math.sin(DESK.yaw);
@@ -324,21 +326,29 @@ export class ClassroomWorld extends World {
       scene.add(teacherThings(at(0, top, 0), DESK.yaw));
     }
 
-    // ---- the back wall: cubbies with bags and jumpers ----
-    const [cubbyWide, , cubbyDeep] = await sizeOf(ctx, 'lockers');
-    const cubbies = Math.floor((W * 2 - 1.6) / (cubbyWide + 0.06));
-    await dress(ctx, scene, 'lockers', Array.from({ length: cubbies }, (_, i): Spot => [(i - (cubbies - 1) / 2) * (cubbyWide + 0.06), 0, D - cubbyDeep / 2 - 0.02, 180]));
+    // ---- the back wall: everyone's tray unit, with their bags along the top ----
+    {
+      const unitWide = 1.72, units = 4, deep = 0.45;
+      const bagSpots: Spot[] = [];
+      const bagRng = new Rng(2085);
+      for (let i = 0; i < units; i++) {
+        const x = (i - (units - 1) / 2) * (unitWide + 0.06);
+        trayUnit(b, x, D - deep / 2 - 0.02, unitWide, deep, bagRng);
+        for (let k = 0; k < 2; k++) if (bagRng.chance(0.7)) bagSpots.push([x + bagRng.range(-0.6, 0.6), TRAY_UNIT_TALL, D - deep / 2 - 0.02, 180 + bagRng.range(-30, 30), 0.9]);
+      }
+      await dress(ctx, scene, 'backpack', bagSpots);
+    }
 
     // ---- the right wall: books, a pin board and the door ----
-    const [, , shelfDeep] = await sizeOf(ctx, 'bookshelf');
-    await dress(ctx, scene, 'bookshelf', [[W - shelfDeep / 2 - 0.02, 0, BOOKSHELF_Z, -90]]);
+    const shelfDeep = 0.42;
+    bookcase(b, W - shelfDeep / 2 - 0.02, BOOKSHELF_Z, shelfDeep, new Rng(2086));
     this.colliders.box(W - shelfDeep / 2, BOOKSHELF_Z, shelfDeep / 2 + 0.05, 0.55);
     // ---- the back wall: cubbies with bags; the right wall: a pin board and the door ----
-    await dress(ctx, scene, 'door', [[W - 0.07, 0, -1.9, -90]]);
+    slidingDoor(b, W, -1.9);
     // the pin board of everyone's pictures, and posters either side of the display
     const hang = async (id: string, wide: number, x: number, y: number, z: number, turn: number): Promise<void> => {
       const picture = await ctx.assets.picture(id);
-      const hung = framed(picture.map, wide, (wide * picture.entry.size[1]) / picture.entry.size[0]);
+      const hung = framed(picture.map, wide, (wide * picture.entry.size[1]) / picture.entry.size[0], 0xf4f5f8);
       hung.position.set(x, y, z);
       hung.rotation.y = turn;
       scene.add(hung);
@@ -411,12 +421,15 @@ export class ClassroomWorld extends World {
     await dress(ctx, scene, 'plant-tall', corners.map(([x, y, z]): Spot => [x, y, z, rng.range(0, 360)]));
     for (const [x, , z] of corners) this.colliders.circle(x, z, 0.4);
     await dress(ctx, scene, 'plant-small', centres.map((z): Spot => [-W + 0.13, WY0, z + rng.range(-0.6, 0.6), rng.range(0, 360), rng.range(0.9, 1.25)]));
-    // roller blinds, each left at a different height
+    // smart glass: the top of each window tinted down by a different amount, where the blinds used to be
+    const tint = new THREE.MeshStandardMaterial({ color: 0x5a7394, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.38, depthWrite: false });
     centres.forEach((z, i) => {
       const drop = BLIND_DROPS[i]!;
-      b.box('matte', 0xe6e2d6, [0.01, drop, WW + 0.06], [-W + 0.06, WY1 - drop / 2, z]);
-      b.box('satin', 0xc9ccd2, [0.025, 0.025, WW + 0.06], [-W + 0.065, WY1 - drop, z], { r: 0.008 });
-      b.box('satin', 0xf0f1f4, [0.09, 0.09, WW + 0.16], [-W + 0.06, WY1 + 0.06, z], { r: 0.02 });
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(WW, drop), tint);
+      pane.position.set(-W + 0.01, WY1 - drop / 2, z);
+      pane.rotation.y = Math.PI / 2;
+      scene.add(pane);
+      b.box('glow', 0xcfe4ff, [0.004, 0.004, WW - 0.04], [-W + 0.012, WY1 - drop, z]);
     });
     // the room's paper: charts on the piers between the windows, a display board over the cubbies
     const sheet = (texture: THREE.Texture, wide: number, tall: number, x: number, y: number, z: number, turn: number): void => {
@@ -429,24 +442,25 @@ export class ClassroomWorld extends World {
     sheet(chartPaper(new Rng(7)), 0.62, 0.86, -W + 0.004, 1.75, -2.8, Math.PI / 2);
     sheet(feelingsChart(), 0.66, 0.66, -W + 0.004, 1.85, 0, Math.PI / 2);
     sheet(chartPaper(new Rng(11)), 0.62, 0.86, -W + 0.004, 1.7, 2.8, Math.PI / 2);
-    const board = framed(displayBoard(new Rng(9)), 4.2, 1.05, 0xc0392b);
+    const board = framed(displayBoard(new Rng(9)), 4.2, 1.05, 0xf4f5f8);
     board.position.set(-0.3, 2.3, D - 0.005);
     board.rotation.y = Math.PI;
     scene.add(board);
-    // a flip chart on its easel in the front corner by the windows
+    // a free-standing writing screen in the front corner by the windows: a pane of glass on a slim white stand
     const easel = { x: -4.25, z: -3.55, turn: 55 * RAD };
     const ex = (lx: number, lz: number): [number, number] => [easel.x + lx * Math.cos(easel.turn) + lz * Math.sin(easel.turn), easel.z - lx * Math.sin(easel.turn) + lz * Math.cos(easel.turn)];
-    for (const [lx, lz, lean] of [[-0.3, 0.05, 0.1], [0.3, 0.05, -0.1], [0, -0.28, 0]] as const) {
-      const [x, z] = ex(lx, lz);
-      b.box('metal', 0x8e959e, [0.022, 1.75, 0.022], [x, 0.87, z], { rot: [lz < 0 ? -0.2 : 0.06, easel.turn, lean] });
+    {
+      const [fx, fz] = ex(0, 0);
+      b.box('satin', 0xf2f3f6, [0.6, 0.025, 0.36], [fx, 0.0125, fz], { r: 0.01, rot: [0, easel.turn, 0] });
+      b.box('satin', 0xf2f3f6, [0.05, 1.0, 0.04], [fx, 0.52, fz], { r: 0.01, rot: [0, easel.turn, 0] });
+      const [px, pz] = ex(0, 0.03);
+      b.box('gloss', 0x141824, [0.86, 0.62, 0.02], [px, 1.36, pz], { r: 0.012, rot: [-0.06, easel.turn, 0] });
+      const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.56), new THREE.MeshBasicMaterial({ map: glassNotes(), color: new THREE.Color().setScalar(1.1) }));
+      const [qx, qz] = ex(0, 0.042);
+      pad.position.set(qx, 1.36, qz);
+      pad.rotation.set(-0.06, easel.turn, 0, 'YXZ');
+      scene.add(pad);
     }
-    const [px, pz] = ex(0, 0.09);
-    b.box('satin', 0xf4f4f2, [0.66, 0.84, 0.02], [px, 1.32, pz], { rot: [-0.08, easel.turn, 0] });
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.78), new THREE.MeshStandardMaterial({ map: chartPaper(new Rng(21)), roughness: 0.9 }));
-    const [qx, qz] = ex(0, 0.104);
-    pad.position.set(qx, 1.32, qz);
-    pad.rotation.set(-0.08, easel.turn, 0, 'YXZ');
-    scene.add(pad);
     this.colliders.circle(easel.x, easel.z, 0.42);
     b.finish(scene);
     await ctx.step('classroom: furniture');
@@ -469,22 +483,28 @@ export class ClassroomWorld extends World {
     this.beams = buildSunbeams(new Rng(2081), centres.map((z, i) => ({ x: -W, y0: WY0, y1: WY1 - BLIND_DROPS[i]!, z0: z - WW / 2, z1: z + WW / 2 })),
       { min: new THREE.Vector3(-W, 0.05, -D), max: new THREE.Vector3(W, H - 0.05, D) }, ctx.quality.density);
     scene.add(this.beams.group);
-    // pendant lights: a white orb the size of a child's head, hung from the ceiling on a thin wire as long as the orb is wide
+    // halo rings: a slim white ring hung on three wires over each group, its inner face a band of light
     const panels = new Builder();
-    // the room is lit by these lamps: each orb and each wall dome carries a light of its own
-    const lamp = (x: number, y: number, z: number, power: number): void => {
-      const light = new THREE.PointLight(LAMP_COLOR, power, 0, 2);
-      light.position.set(x, y, z);
-      light.userData.power = power;
+    for (const [x, z, r] of RINGS) {
+      const y = H - 0.42;
+      const ring = new THREE.TorusGeometry(r, 0.03, 10, 96);
+      ring.rotateX(Math.PI / 2);
+      ring.deleteAttribute('uv');
+      panels.add('satin', 0xf4f5f8, place(ring, [x, y + 0.012, z]));
+      const band = new THREE.TorusGeometry(r, 0.022, 8, 96);
+      band.rotateX(Math.PI / 2);
+      band.scale(1, 0.5, 1);
+      band.deleteAttribute('uv');
+      panels.add('glow', 0xffffff, place(band, [x, y - 0.014, z]));
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * TAU;
+        panels.cyl('metal', 0x2a2a2a, 0.002, H - y, [x + Math.cos(a) * r, y, z + Math.sin(a) * r], { radial: 5 });
+      }
+      const light = new THREE.PointLight(LAMP_COLOR, RING_POWER * (r > 1 ? 1.2 : 1), 0, 2);
+      light.position.set(x, y - 0.2, z);
+      light.userData.power = light.intensity;
       this.lamps.push(light);
       scene.add(light);
-    };
-    for (const x of LIGHT_COLS) for (const z of LIGHT_ROWS) {
-      const orb = new THREE.SphereGeometry(ORB_R, 32, 20);
-      orb.deleteAttribute('uv');
-      panels.add('glow', 0xffffff, place(orb, [x, H - 2 * ORB_R - ORB_R, z]));
-      panels.cyl('metal', 0x2a2a2a, 0.002, 2 * ORB_R + 0.01, [x, H - 2 * ORB_R - 0.005, z], { radial: 6 });
-      lamp(x, H - 3 * ORB_R, z, PENDANT_POWER);
     }
     this.ceiling = panels.finish(scene, { glow: 2.2, shadows: false }).glow!;
     // the border light: a white channel all the way round, its strip of light along the top and bottom edges
@@ -502,24 +522,6 @@ export class ClassroomWorld extends World {
         for (const edge of [-1, 1]) border.box('glow', BORDER.color, size(len, 0.005, 0.02), [x, y + edge * 0.0275, z]);
       }
       this.border = border.finish(scene, { glow: 2.4, shadows: false }).glow!;
-      if (ctx.quality.tier !== 'low') {
-        for (const [x, z] of BORDER_LAMPS) {
-          const light = new THREE.PointLight(BORDER.color, BORDER.power, 0, 2);
-          light.position.set(x, y + 0.15, z);
-          light.userData.power = BORDER.power;
-          this.lamps.push(light);
-          scene.add(light);
-        }
-      }
-    }
-    // the windows' own light: a soft panel of sky in each opening, so daylight comes from where the glass is
-    RectAreaLightUniformsLib.init();
-    for (const [i, z] of centres.entries()) {
-      const sky = new THREE.RectAreaLight(0xe4ecff, 0, WW, WY1 - BLIND_DROPS[i]! - WY0);
-      sky.position.set(-W + 0.02, (WY0 + WY1 - BLIND_DROPS[i]!) / 2, z);
-      sky.lookAt(0, sky.position.y, z);
-      this.windows.push(sky);
-      scene.add(sky);
     }
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe0ff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false });
     for (const z of centres) {
@@ -564,7 +566,9 @@ export class ClassroomWorld extends World {
     teacher.placeAt(CLASSROOM.teacher);
     this.colliders.circle(CLASSROOM.teacher.position.x, CLASSROOM.teacher.position.z, 0.4);
     for (const s of SEATING) {
-      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who));
+      // only Jamie is seen close up: everyone else wears the lighter model and casts no shadow map
+      const main = s.who === 'jamie';
+      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who, main ? ctx.quality.shadows : false, !main));
       person.placeAt(s.seat).setPose(s.pose, { immediate: true, seat: SEAT });
       if (s.who !== 'jamie') person.setLiveliness(0.7);
     }
@@ -622,16 +626,12 @@ export class ClassroomWorld extends World {
     // all the light has a source: the lamps, the border light, the display and the windows; no light from nowhere
     for (const l of this.lamps) l.intensity = (l.userData.power as number) * m.room;
     const daylight = m.sun / 4.4;
-    for (const w of this.windows) {
-      w.intensity = 2.2 * daylight;
-      w.color.setRGB(0.9 + 0.1 * m.warm, 0.93 - 0.2 * m.warm, 1.0 - 0.45 * m.warm);
-    }
-    // about nine tenths of the light is from the lamps, the border and the windows: only a trace of ambient is left
-    this.fill.intensity = 0.012;
+    // the windows' daylight, which once came from four area lights, is carried by the sky fill instead
+    this.fill.intensity = 0.04 + 0.26 * daylight;
     this.fill.color.setRGB(0.95 + 0.05 * m.warm, 0.93 - 0.18 * m.warm, 0.9 - 0.4 * m.warm);
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);
     (this.border.material as THREE.MeshBasicMaterial).color.setScalar(0.1 + 2.4 * m.room);
-    this.scene.environmentIntensity = 0.03 + 0.03 * m.room + 0.02 * m.warm;
+    this.scene.environmentIntensity = 0.07 + 0.06 * m.room + 0.02 * m.warm;
     this.city.setNight(m.night);
     this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (m.sun / 4.4) * (1.2 + 0.2 * m.warm));
     this.look.exposure = this.variant === 'viewer' ? 1.15 : 1.0;
@@ -1039,29 +1039,24 @@ const tabletUi = (): THREE.CanvasTexture => {
   return map;
 };
 
-const STEEL = 0x8e959e;
-
-/** A table for two: a beech top with a darker edge, a steel rail under each long side, four tube legs; now and then a few things left on it. */
+/** A table for two: a white top with softly rounded corners, a hairline of light under each long edge, slim white legs; now and then a few things left on it. */
 const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
   const turn = t.yaw * RAD;
   const at = (lx: number, y: number, lz: number): [number, number, number] => {
     const [x, z] = onTable(t, lx, lz);
     return [x, y, z];
   };
-  b.box('satin', 0xdcb889, [TABLE.wide, 0.022, TABLE.deep], at(0, TABLE.top - 0.011, 0), { r: 0.006, rot: [0, turn, 0] });
-  b.box('satin', 0xa9875c, [TABLE.wide + 0.004, 0.008, TABLE.deep + 0.004], at(0, TABLE.top - 0.026, 0), { rot: [0, turn, 0] });
-  for (const lz of [-1, 1]) b.box('metal', STEEL, [TABLE.wide - 0.1, 0.034, 0.018], at(0, TABLE.top - 0.05, lz * (TABLE.deep / 2 - 0.035)), { rot: [0, turn, 0] });
-  for (const lx of [-1, 1]) {
-    b.box('metal', STEEL, [0.018, 0.034, TABLE.deep - 0.07], at(lx * (TABLE.wide / 2 - 0.045), TABLE.top - 0.05, 0), { rot: [0, turn, 0] });
-    for (const lz of [-1, 1]) b.cyl('metal', STEEL, 0.014, TABLE.top - 0.03, at(lx * (TABLE.wide / 2 - 0.045), 0, lz * (TABLE.deep / 2 - 0.035)), { radial: 10 });
-  }
+  b.box('satin', 0xf5f6f8, [TABLE.wide - 0.006, 0.026, TABLE.deep - 0.006], at(0, TABLE.top - 0.013, 0), { r: 0.012, rot: [0, turn, 0] });
+  b.box('satin', 0xd7dbe3, [TABLE.wide - 0.06, 0.02, TABLE.deep - 0.06], at(0, TABLE.top - 0.034, 0), { r: 0.006, rot: [0, turn, 0] });
+  for (const lz of [-1, 1]) b.box('glow', 0xbfe0ff, [TABLE.wide - 0.1, 0.004, 0.004], at(0, TABLE.top - 0.046, lz * (TABLE.deep / 2 - 0.035)), { rot: [0, turn, 0] });
+  for (const lx of [-1, 1]) for (const lz of [-1, 1]) b.cyl('satin', 0xeceef2, 0.016, TABLE.top - 0.03, at(lx * (TABLE.wide / 2 - 0.06), 0, lz * (TABLE.deep / 2 - 0.06)), { radial: 12, top: 0.012 });
   // a sheet or two of paper, a pencil pot, a small stack of exercise books
   for (let i = rng.int(0, 2); i > 0; i--) {
     b.box('matte', 0xf7f6f1, [0.21, 0.002, 0.297], at(rng.range(-0.5, 0.5), TABLE.top + 0.001 + i * 0.001, rng.range(-0.12, 0.12)), { rot: [0, turn + rng.range(-0.6, 0.6), 0] });
   }
   if (rng.chance(0.45)) {
     const [x, y, z] = at(rng.pick([-1, 1]) * rng.range(0.05, 0.2), TABLE.top, rng.range(-0.15, 0.15));
-    b.cyl('satin', rng.pick([0x3b6fd0, 0xe25b45, 0x3fa66a, 0xf2b632]), 0.035, 0.085, [x, y, z], { radial: 14 });
+    b.cyl('gloss', rng.pick([0xf4f5f8, 0x9cc4e8, 0x9fd8c4, 0xf2b8a0]), 0.035, 0.085, [x, y, z], { radial: 14 });
     for (let k = 0; k < 4; k++) b.cyl('satin', rng.pick([0xf2c230, 0x3b6fd0, 0xe25b45, 0x2f9e5f]), 0.004, 0.15, [x + rng.range(-0.015, 0.015), y + 0.02, z + rng.range(-0.015, 0.015)], { radial: 6, rot: [rng.range(-0.25, 0.25), 0, rng.range(-0.25, 0.25)] });
   }
   if (rng.chance(0.4)) {
@@ -1069,6 +1064,151 @@ const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
     for (let k = 0; k < rng.int(1, 3); k++) b.box('satin', rng.pick([0x2f6fbf, 0xd9473a, 0x39a35b, 0x8a5cc2, 0xf0a830]), [0.17, 0.008, 0.235], at(lx + rng.range(-0.01, 0.01), TABLE.top + 0.004 + k * 0.009, lz), { rot: [0, spin + rng.range(-0.15, 0.15), 0] });
   }
 };
+
+/**
+ * Moulded shell chairs, all batched: one smooth shell (seat and back in one curve) in soft colours on four slim white
+ * legs. A spot is the chair's middle on the floor; at yaw 0 its seat faces +Z and its back is toward -Z.
+ */
+const shellChairs = (spots: readonly Spot[], rng: Rng): THREE.Group => {
+  const group = new THREE.Group();
+  if (spots.length === 0) return group;
+  // the shell: a seat pan that curls up into the back, built as a swept profile across the chair's width
+  const wide = 0.4, half = wide / 2, N = 24, M = 18;
+  const profile: THREE.Vector2[] = [];
+  // from the front lip (+z) along the seat, round the bend and up the back (-z), as (z, y)
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    if (t < 0.55) {
+      const u = t / 0.55;
+      profile.push(new THREE.Vector2(0.2 - u * 0.33, SEAT - 0.01 * Math.sin(u * Math.PI) + (u < 0.08 ? 0.012 * (1 - u / 0.08) : 0)));
+    } else {
+      const u = (t - 0.55) / 0.45, a = u * (Math.PI / 2 + 0.22);
+      profile.push(new THREE.Vector2(-0.13 - 0.09 * Math.sin(a), SEAT + 0.09 * (1 - Math.cos(a)) + u * u * 0.26));
+    }
+  }
+  const pos: number[] = [], idx: number[] = [];
+  for (let j = 0; j <= M; j++) {
+    const v = j / M, x = (v - 0.5) * wide;
+    // the shell wraps a little round the sitter at the sides
+    const wrapUp = Math.pow(Math.abs(v - 0.5) * 2, 3);
+    for (const p of profile) pos.push(x * (1 - 0.06 * wrapUp), p.y + 0.03 * wrapUp, p.x - 0.02 * wrapUp * (p.y > SEAT + 0.05 ? 1 : 0));
+  }
+  const cols = profile.length;
+  for (let j = 0; j < M; j++) for (let i = 0; i < cols - 1; i++) {
+    const a = j * cols + i, b = a + cols;
+    idx.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  const shell = new THREE.BufferGeometry();
+  shell.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  shell.setIndex(idx);
+  shell.computeVertexNormals();
+  // the legs: four slim tapered rods, splayed a little
+  const legs: THREE.BufferGeometry[] = [];
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const leg = new THREE.CylinderGeometry(0.009, 0.007, SEAT - 0.01, 8);
+    leg.deleteAttribute('uv');
+    leg.rotateZ(sx * 0.08);
+    leg.rotateX(-sz * 0.08);
+    leg.translate(sx * (half - 0.04), (SEAT - 0.01) / 2, sz * 0.14);
+    legs.push(leg);
+  }
+  const frame = merge(legs);
+  const colours = [0xf4f5f8, 0xf4f5f8, 0xa9c7e8, 0x9fd8c4, 0xf3c1a8, 0xc9c2ec];
+  const shellMesh = new THREE.InstancedMesh(shell, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.34, side: THREE.DoubleSide }), spots.length);
+  const legMesh = new THREE.InstancedMesh(frame, new THREE.MeshStandardMaterial({ color: 0xe9ecf1, roughness: 0.3, metalness: 0.2 }), spots.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
+  spots.forEach(([x, y, z, yaw = 0], i) => {
+    m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one);
+    shellMesh.setMatrixAt(i, m);
+    legMesh.setMatrixAt(i, m);
+    shellMesh.setColorAt(i, c.set(rng.pick(colours)));
+  });
+  for (const mesh of [shellMesh, legMesh]) {
+    mesh.castShadow = mesh.receiveShadow = true;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+  return group;
+};
+
+/** Height of the tray units along the back wall, where the bags sit. */
+const TRAY_UNIT_TALL = 1.02;
+
+/**
+ * A pupil's tray unit, as every British classroom has, made for 2080: a white cabinet of pull-out trays in soft
+ * colours, each with a dark finger-pull and a little glowing name strip, on a recessed plinth with light under it.
+ * It stands against the +Z wall, facing -Z; `x`, `z` is its middle on the floor.
+ */
+const trayUnit = (b: Builder, x: number, z: number, wide: number, deep: number, rng: Rng): void => {
+  const tall = TRAY_UNIT_TALL, foot = 0.08, front = z - deep / 2, cols = 3, rows = 6, t = 0.02;
+  b.box('satin', 0xf2f3f6, [wide, tall - foot, deep], [x, foot + (tall - foot) / 2, z], { r: 0.012 });
+  b.box('gloss', 0xf8f9fb, [wide + 0.02, 0.025, deep + 0.02], [x, tall - 0.0125, z], { r: 0.008 });
+  b.box('satin', 0x2b303b, [wide - 0.06, foot, deep - 0.08], [x, foot / 2, z + 0.03]);
+  b.box('glow', 0xcfe4ff, [wide - 0.1, 0.004, 0.004], [x, 0.01, front + 0.05]);
+  const colours = [0x9cc4e8, 0x9fd8c4, 0xf3c1a8, 0xc9c2ec, 0xf6dc8c, 0xf4f5f8];
+  const cw = (wide - t * (cols + 1)) / cols, rh = (tall - foot - t * (rows + 1)) / rows;
+  for (let cIdx = 0; cIdx < cols; cIdx++) for (let r = 0; r < rows; r++) {
+    const cx = x - wide / 2 + t + cw / 2 + cIdx * (cw + t), cy = foot + t + rh / 2 + r * (rh + t);
+    const out = rng.chance(0.12) ? 0.06 : 0;
+    b.box('satin', rng.pick(colours), [cw - 0.006, rh - 0.006, 0.02], [cx, cy, front - 0.01 - out], { r: 0.008 });
+    b.box('satin', 0x3a404c, [cw * 0.36, 0.016, 0.006], [cx, cy + rh * 0.12, front - 0.021 - out], { r: 0.004 });
+    b.box('glow', 0xe6f2ff, [cw * 0.22, 0.008, 0.003], [cx, cy - rh * 0.22, front - 0.021 - out]);
+  }
+};
+
+/** A white bookcase against the right-hand wall, facing -X: open shelves of picture books, standing and leaning. */
+const bookcase = (b: Builder, x: number, z: number, deep: number, rng: Rng): void => {
+  const wide = 1.1, tall = 1.6, t = 0.025, face = x - deep / 2;
+  b.box('satin', 0xf2f3f6, [deep, t, wide], [x, tall - t / 2, z], { r: 0.006 });
+  b.box('satin', 0xf2f3f6, [deep, 0.06, wide], [x, 0.03, z], { r: 0.006 });
+  for (const s of [-1, 1]) b.box('satin', 0xf2f3f6, [deep, tall, t], [x, tall / 2, z + s * (wide / 2 - t / 2)], { r: 0.006 });
+  b.box('matte', 0xdfe3ea, [0.01, tall, wide], [x + deep / 2 - 0.005, tall / 2, z]);
+  const levels = [0.06, 0.45, 0.85, 1.22];
+  for (const y of levels.slice(1)) {
+    b.box('satin', 0xf2f3f6, [deep, t, wide - 2 * t], [x, y, z], { r: 0.004 });
+    b.box('glow', 0xfff3e2, [0.004, 0.004, wide - 0.1], [face + 0.03, y - t / 2 - 0.002, z]);
+  }
+  const colours = [0xe25b45, 0x3b6fd0, 0xf2b632, 0x3fa66a, 0x8a5cc2, 0xf4f5f8, 0x2c3e66, 0xf28fae];
+  for (const y of levels) {
+    let at = z - wide / 2 + t + 0.02;
+    const end = z + wide / 2 - t - 0.04;
+    while (at < end - 0.05) {
+      const thick = rng.range(0.015, 0.04), h = rng.range(0.22, 0.3), d = rng.range(0.16, 0.24);
+      if (at + thick > end) break;
+      b.box('satin', rng.pick(colours), [d, h, thick], [face + 0.03 + d / 2, y + (y === levels[0] ? 0.03 : t / 2) + h / 2, at + thick / 2], { r: 0.003 });
+      at += thick + 0.002 + (rng.chance(0.12) ? 0.08 : 0);
+    }
+  }
+};
+
+/** A sliding door in the right-hand wall: a slim white frame, a frosted glass leaf with a vertical bar of light, a long pull. */
+const slidingDoor = (b: Builder, wallX: number, z: number): void => {
+  const x = wallX - 0.03, wide = 1.0, tall = 2.1;
+  for (const s of [-1, 1]) b.box('satin', 0xf4f5f8, [0.06, tall + 0.05, 0.05], [x, (tall + 0.05) / 2, z + s * (wide / 2 + 0.025)], { r: 0.01 });
+  b.box('satin', 0xf4f5f8, [0.06, 0.05, wide + 0.1], [x, tall + 0.025, z], { r: 0.01 });
+  b.box('satin', 0xe9ecf1, [0.04, tall - 0.01, wide - 0.01], [x - 0.005, tall / 2, z], { r: 0.008 });
+  b.box('gloss', 0xc6d6e6, [0.006, tall - 0.5, wide * 0.3], [x - 0.028, tall / 2 + 0.05, z - wide * 0.18]);
+  b.box('glow', 0xcfe4ff, [0.004, tall - 0.6, 0.006], [x - 0.031, tall / 2 + 0.05, z + wide * 0.02]);
+  b.box('metal', 0xb9bec8, [0.03, 0.55, 0.022], [x - 0.04, 1.05, z + wide * 0.36], { r: 0.008 });
+};
+
+/** What is written on the writing screen in the corner: a few lines in a child's hand, in light. */
+const glassNotes = (): THREE.CanvasTexture => canvasTexture(800, 560, (ctx) => {
+  ctx.fillStyle = '#121725';
+  ctx.fillRect(0, 0, 800, 560);
+  ctx.strokeStyle = 'rgba(160, 210, 255, 0.85)';
+  ctx.fillStyle = 'rgba(220, 238, 255, 0.92)';
+  ctx.font = `600 54px ${HAND}`;
+  ctx.fillText('Our class rules', 60, 100);
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(60, 120); ctx.lineTo(470, 120); ctx.stroke();
+  ctx.font = `400 40px ${HAND}`;
+  ['1. Be kind', '2. Listen to each other', '3. Try your best', '4. Ask for help'].forEach((l, i) => ctx.fillText(l, 70, 200 + i * 78));
+  ctx.fillStyle = 'rgba(255, 210, 120, 0.9)';
+  ctx.beginPath();
+  for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 18 : 40; ctx.lineTo(680 + Math.cos(a) * r, 120 + Math.sin(a) * r); }
+  ctx.fill();
+});
 
 const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas');
@@ -1081,31 +1221,19 @@ const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext
   return texture;
 };
 
-/** Grey carpet tiles with a blue cast: a fine speckle of fibres, half-metre tiles laid with their pile turned, a few worn patches. */
-const carpet = (rng: Rng, wide: number, deep: number): THREE.CanvasTexture => {
-  const N = 512, tile = 128; // one texture covers 2 m: four tiles a side
+/** A pale poured-resin floor: a soft warm grey in metre tiles with fine seams and a faint, even mottle. */
+const resinFloor = (rng: Rng, wide: number, deep: number): THREE.CanvasTexture => {
+  const N = 512, tile = 256; // one texture covers 2 m: two tiles a side
   const texture = canvasTexture(N, N, (ctx) => {
-    const image = ctx.createImageData(N, N);
-    const shade = Array.from({ length: 16 }, () => rng.range(-5, 5));
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const t = Math.floor(x / tile) + Math.floor(y / tile) * 4;
-      const grain = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 ? Math.sin(x * 0.9) : Math.sin(y * 0.9);
-      const n = (rng.next() - 0.5) * 26 + grain * 2.5 + shade[t]!;
-      const fleck = rng.chance(0.012) ? rng.range(-30, 24) : 0;
-      const i = (y * N + x) * 4;
-      image.data[i] = 118 + n + fleck;
-      image.data[i + 1] = 126 + n + fleck;
-      image.data[i + 2] = 142 + n * 1.05 + fleck;
-      image.data[i + 3] = 255;
+    ctx.fillStyle = '#c7cad0';
+    ctx.fillRect(0, 0, N, N);
+    for (let i = 0; i < 14000; i++) {
+      ctx.fillStyle = rng.chance(0.5) ? 'rgba(255, 255, 255, 0.035)' : 'rgba(90, 96, 110, 0.035)';
+      const r = rng.range(0.6, 3);
+      ctx.beginPath(); ctx.arc(rng.next() * N, rng.next() * N, r, 0, TAU); ctx.fill();
     }
-    ctx.putImageData(image, 0, 0);
-    // the seams between tiles
-    ctx.strokeStyle = 'rgba(60, 66, 80, 0.22)';
-    ctx.lineWidth = 1;
-    for (let k = 0; k <= N; k += tile) {
-      ctx.beginPath(); ctx.moveTo(k + 0.5, 0); ctx.lineTo(k + 0.5, N); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, k + 0.5); ctx.lineTo(N, k + 0.5); ctx.stroke();
-    }
+    ctx.fillStyle = 'rgba(120, 126, 140, 0.35)';
+    for (let k = 0; k <= N; k += tile) { ctx.fillRect(k - 1, 0, 2, N); ctx.fillRect(0, k - 1, N, 2); }
   });
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(wide / 2, deep / 2);

@@ -127,8 +127,9 @@ export class Character {
   }
 
   /** Makes a member of the cast for a world, fetching their figure. */
-  static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows): Promise<Character> {
-    return new Character(spec, await ctx.assets.model(id), shadowMaps);
+  /** `lighter` uses the model's medium weight even on the top tiers: for someone only ever seen across a room. */
+  static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows, lighter = false): Promise<Character> {
+    return new Character(spec, await ctx.assets.model(id, lighter ? 'medium' : undefined), shadowMaps);
   }
 
   /** Places the character at a point with `rotation.y` = `yawRad` (0 faces +Z). */
