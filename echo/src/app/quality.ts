@@ -5,19 +5,15 @@ export const TIERS: readonly Tier[] = ['low', 'medium', 'high', 'ultra'];
 
 export interface QualitySettings {
   readonly tier: Tier;
-  /** Upper bound on scene pixels before `scale` is applied. */
   readonly maxPixels: number;
   readonly msaa: 0 | 2 | 4;
   readonly ao: boolean;
-  /** Light shafts and depth of field: the cinematic lens. */
   readonly shafts: boolean;
   readonly dof: boolean;
   readonly bloomLevels: number;
   readonly shadowMapSize: number;
-  /** 0..1 multiplier on instance counts: grass, petals, fireflies, far islands. */
   readonly density: number;
   readonly anisotropy: number;
-  /** Real-time shadow maps. Without them, people stand on soft painted shadows instead. */
   readonly shadows: boolean;
 }
 
@@ -30,30 +26,22 @@ const PRESETS: Record<Tier, QualitySettings> = {
 
 export const isTier = (v: string | null): v is Tier => v !== null && (TIERS as readonly string[]).includes(v);
 
-/** Graphics that share a laptop's memory and power budget, and software renderers: by the name the GPU reports. */
 const MODEST_GPU = /Intel|Radeon\(TM\) Graphics|Radeon Graphics|Vega \d|Mali|Adreno|PowerVR|Microsoft Basic|SwiftShader|llvmpipe/i;
 
-/** Where a desktop-class machine starts, from its GPU's name ('' when the browser will not say). */
 export const tierForGpu = (renderer: string): Tier => (MODEST_GPU.test(renderer) ? 'medium' : 'high');
 
 const gpuName = (): string => {
   const gl = document.createElement('canvas').getContext('webgl2');
   const info = gl?.getExtension('WEBGL_debug_renderer_info');
-  // Firefox gives the name under RENDERER itself; elsewhere that is a generic string, which simply reads as unknown
   const name = gl ? String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER)) : '';
   gl?.getExtension('WEBGL_lose_context')?.loseContext();
   return name;
 };
 
-/**
- * First guess before any frame has been timed: headsets and phones start low; tablets and laptops on integrated
- * graphics medium; everything else high. The resolution governor takes it from there.
- */
 export const detectTier = (): Tier => (detected ??= probeTier());
 let detected: Tier | null = null;
 
 const probeTier = (): Tier => {
-  // a standalone headset draws everything twice on a phone's GPU
   if (/OculusBrowser|Quest|Pico|VisionOS/i.test(navigator.userAgent)) return 'low';
   const coarse = matchMedia('(pointer: coarse)').matches;
   const small = Math.min(screen.width, screen.height) < 820;
@@ -64,12 +52,7 @@ const probeTier = (): Tier => {
 
 export const settingsFor = (tier: Tier): QualitySettings => PRESETS[tier];
 
-/**
- * Keeps the frame time near the display's refresh by scaling the internal resolution. Scene targets shrink; the
- * canvas, the final composite and the HUD stay at native resolution, so text never softens.
- */
 export class ResolutionGovernor {
-  /** Fraction of `maxPixels` actually rendered, as a linear scale on each axis. */
   scale = 1;
   private acc = 0;
   private frames = 0;
@@ -88,13 +71,8 @@ export class ResolutionGovernor {
     if (fixed !== null) this.scale = clamp(fixed, 0.3, 1);
   }
 
-  /** Milliseconds of frames still to ignore: a world's first seconds are slow while it uploads and compiles. */
   private settle = 0;
 
-  /**
-   * Starts afresh at full resolution for a new world, and ignores its first seconds. Without this, the stalls of
-   * arriving drop the resolution to its lowest step, and it then climbs back one step at a time over many seconds.
-   */
   reset(settleMs = 3000): void {
     if (this.fixed !== null) return;
     this.acc = this.frames = this.slowWindows = this.goodMs = this.probing = 0;
@@ -103,7 +81,6 @@ export class ResolutionGovernor {
     if (this.level !== 0) this.setLevel(0);
   }
 
-  /** Feed every rendered frame's wall time in ms. */
   sample(frameMs: number, targetMs = 1000 / 60): void {
     if (this.fixed !== null) return;
     if (this.settle > 0) {
@@ -113,7 +90,7 @@ export class ResolutionGovernor {
     if (frameMs > 250) {
       this.acc = 0;
       this.frames = 0;
-      return; // a stall or a tab switch, not a slow GPU
+      return;
     }
     this.acc += frameMs;
     this.frames++;

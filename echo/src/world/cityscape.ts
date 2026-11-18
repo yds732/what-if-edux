@@ -2,22 +2,15 @@ import * as THREE from 'three';
 import { Rng, TAU } from '../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../render/glsl';
 
-/**
- * The city of 2080 as seen through a window: a sky that runs from late afternoon to night, ranks of towers
- * whose windows come on as it darkens, and traffic threading the air between them. Built to sit behind glass:
- * one group, a handful of draw calls.
- */
 export interface Cityscape {
   readonly group: THREE.Group;
-  /** 0 is a warm afternoon, 1 is night. */
   setNight(k: number): void;
-  /** 0 leaves the sky as setNight paints it; 1 is a flat grey overcast in which neither the day nor the night shows. */
   setOvercast(k: number): void;
   update(time: number): void;
 }
 
-const SKY_VS = /* glsl */ `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const SKY_FS = /* glsl */ `
+const SKY_VS = `varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const SKY_FS = `
 ${GLSL_NOISE}
 uniform float uNight, uTime, uOvercast; uniform vec3 uSunDir;
 varying vec3 vDir;
@@ -40,11 +33,11 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const TOWER_VS_PARS = /* glsl */ `
+const TOWER_VS_PARS = `
 attribute vec4 aTower;   // seed, lit fraction at night, facade style, 1 for a bare mast
 varying vec3 vTowerPos, vTowerUnit, vTowerN, vTowerWN, vTowerAt; varying vec4 vTower;
 `;
-const TOWER_VS = /* glsl */ `
+const TOWER_VS = `
 vTowerUnit = position;
 vTowerPos = position * vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz));
 vTowerN = normal;
@@ -52,17 +45,12 @@ vTowerWN = normalize(mat3(instanceMatrix) * normal);
 vTowerAt = (instanceMatrix * vec4(position, 1.0)).xyz;
 vTower = aTower;
 `;
-const TOWER_FS_PARS = /* glsl */ `
+const TOWER_FS_PARS = `
 ${GLSL_NOISE}
 uniform float uNight, uTime, uOvercast; uniform vec3 uSunDir;
 varying vec3 vTowerPos, vTowerUnit, vTowerN, vTowerWN, vTowerAt; varying vec4 vTower;
 `;
-/**
- * The towers are a painted backdrop with a light of their own: nothing in the room reaches them. A low sun
- * behind the skyline warms the faces that see it, the sky cools the rest, and distance takes everything
- * toward the colour of the horizon.
- */
-const TOWER_FS = /* glsl */ `
+const TOWER_FS = `
 {
   vec3 albedo = diffuseColor.rgb;
   vec3 n = normalize(vTowerWN);
@@ -116,7 +104,6 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
   sky.renderOrder = -10;
   group.add(sky);
 
-  // towers: three ranks receding from the window, taller toward the back; some step in to a crown, some carry a mast
   const count = Math.round(170 * density);
   const box = new THREE.BoxGeometry(1, 1, 1);
   box.translate(0, 0.5, 0);
@@ -152,7 +139,6 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
     const x = Math.sin(angle) * dist, z = -Math.cos(angle) * dist;
     const seed = [rng.next(), rng.range(0.18, 0.5), rng.next(), 0] as const;
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.range(0, TAU));
-    // mostly cool glass and steel, with the odd tower of warm stone
     tint.setHSL(rng.chance(0.26) ? rng.range(0.05, 0.1) : rng.range(0.55, 0.68), rng.range(0.07, 0.24), rng.range(0.42, 0.72));
     p.set(x, -120, z);
     s.set(w, h, d);
@@ -178,7 +164,6 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
   towers.frustumCulled = false;
   group.add(towers);
 
-  // air traffic: strings of lights moving along lanes between the towers; and a red beacon on every mast
   const lanes = Math.round(90 * density), N = lanes + beacons.length / 3;
   const lanePos = new Float32Array(N * 3), laneSeed = new Float32Array(N * 4);
   for (let i = 0; i < lanes; i++) {
@@ -186,14 +171,13 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
     laneSeed.set([rng.next(), rng.range(8, 22) * rng.sign(), rng.range(0.6, 1.4), rng.next()], i * 4);
   }
   lanePos.set(beacons, lanes * 3);
-  // speed 0 marks a beacon: it stays put, glows red and blinks
   for (let i = lanes; i < N; i++) laneSeed.set([rng.next(), 0, 1.5, 1], i * 4);
   const lg = new THREE.BufferGeometry();
   lg.setAttribute('position', new THREE.BufferAttribute(lanePos, 3));
   lg.setAttribute('aSeed', new THREE.BufferAttribute(laneSeed, 4));
   const lights = new THREE.Points(lg, new THREE.ShaderMaterial({
     uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-    vertexShader: /* glsl */ `
+    vertexShader: `
       attribute vec4 aSeed; uniform float uTime; varying float vHue, vGlow;
       void main(){
         vec3 p = position;
@@ -205,7 +189,7 @@ export const buildCityscape = (rng: Rng, density = 1): Cityscape => {
         gl_Position = projectionMatrix * mv;
         gl_PointSize = clamp(520.0 * aSeed.z / max(-mv.z, 1.0), 1.5, 7.0);
       }`,
-    fragmentShader: /* glsl */ `
+    fragmentShader: `
       uniform float uNight, uOvercast; varying float vHue, vGlow;
       void main(){
         float r = length(gl_PointCoord - 0.5) * 2.0;

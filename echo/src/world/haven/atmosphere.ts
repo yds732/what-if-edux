@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import type { Rng } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
 
-// ---------------------------------------------------------------------------------------------------- cloud sea
-
-const CLOUD_VS = /* glsl */ `varying vec3 vWorld; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
-const CLOUD_FS = /* glsl */ `
+const CLOUD_VS = `varying vec3 vWorld; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const CLOUD_FS = `
 ${GLSL_NOISE}
 uniform float uTime; uniform vec3 uLit, uShade, uHaze, uGlow; uniform vec2 uLightDir;
 varying vec3 vWorld;
@@ -39,10 +37,8 @@ export const buildCloudSea = (y: number, timeUniform: { value: number }): THREE.
   return mesh;
 };
 
-// ---------------------------------------------------------------------------------------------------- waterfalls
-
-const FALL_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const FALL_FS = /* glsl */ `
+const FALL_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const FALL_FS = `
 ${GLSL_NOISE}
 uniform float uTime; uniform vec3 uColor;
 varying vec2 vUv;
@@ -55,10 +51,8 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-/** A ribbon of falling water from `top`, `height` metres long, facing `facing` radians about Y. */
 export const buildWaterfall = (top: THREE.Vector3, width: number, height: number, facing: number, timeUniform: { value: number }): THREE.Mesh => {
   const g = new THREE.PlaneGeometry(width, height, 1, 8);
-  // uv.y = 0 at the lip, 1 at the bottom; the sheet bellies outward as it falls
   const pos = g.getAttribute('position') as THREE.BufferAttribute, uv = g.getAttribute('uv') as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
     const v = 1 - uv.getY(i);
@@ -76,9 +70,7 @@ export const buildWaterfall = (top: THREE.Vector3, width: number, height: number
   return mesh;
 };
 
-// ---------------------------------------------------------------------------------------------------- particles
-
-const MOTE_VS = /* glsl */ `
+const MOTE_VS = `
 attribute vec4 aSeed;   // phase, speed, size, hue
 uniform float uTime, uPixel; uniform vec3 uBox, uCenter;
 varying float vHue; varying float vTwinkle;
@@ -92,7 +84,7 @@ void main(){
   gl_Position = projectionMatrix * mv;
   gl_PointSize = min(aSeed.z * uPixel * 0.85 / max(-mv.z, 0.4), 64.0);
 }`;
-const MOTE_FS = /* glsl */ `
+const MOTE_FS = `
 uniform vec3 uColorA, uColorB; uniform float uGain;
 varying float vHue; varying float vTwinkle;
 void main(){
@@ -107,7 +99,6 @@ export interface Motes {
   setPixelHeight(h: number): void;
 }
 
-/** Fireflies and pollen: additive points wandering inside a box. */
 export const buildMotes = (count: number, center: THREE.Vector3, box: THREE.Vector3, rng: Rng, timeUniform: { value: number }, opts: { a: THREE.ColorRepresentation; b: THREE.ColorRepresentation; size: number; gain: number }): Motes => {
   const pos = new Float32Array(count * 3), seed = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) {
@@ -123,7 +114,7 @@ export const buildMotes = (count: number, center: THREE.Vector3, box: THREE.Vect
   return { points, setPixelHeight: (h) => void (u.uPixel.value = h) };
 };
 
-const PETAL_VS = /* glsl */ `
+const PETAL_VS = `
 attribute vec4 aStart;   // xyz at the top of its fall, phase
 attribute vec3 aSpin;    // spin speed, drift, size
 uniform float uTime, uFloor;
@@ -143,7 +134,7 @@ void main(){
   vFade = smoothstep(0.0, 0.06, t) * smoothstep(1.0, 0.9, t);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(c + p, 1.0);
 }`;
-const PETAL_FS = /* glsl */ `
+const PETAL_FS = `
 uniform vec3 uColor;
 varying vec2 vUv; varying float vFade;
 void main(){
@@ -153,7 +144,6 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-/** Petals coming off the blossom tree: an endless, looping fall, all in the vertex shader. */
 export const buildFallingPetals = (count: number, sources: readonly THREE.Vector3[], floor: number, rng: Rng, timeUniform: { value: number }): THREE.Mesh => {
   const card = new THREE.PlaneGeometry(1, 0.8);
   const start = new Float32Array(count * 4), spin = new Float32Array(count * 3);
@@ -177,7 +167,6 @@ export const buildFallingPetals = (count: number, sources: readonly THREE.Vector
   return mesh;
 };
 
-/** Soft round sprite texture for halos, drawn once. */
 let haloTexture: THREE.Texture | null = null;
 export const getHaloTexture = (): THREE.Texture => {
   if (haloTexture) return haloTexture;
@@ -197,7 +186,6 @@ export const getHaloTexture = (): THREE.Texture => {
   return haloTexture;
 };
 
-/** An additive glow billboard: gives lights a halo on screen and stands in for bloom in a headset. */
 export const makeHalo = (color: THREE.ColorRepresentation, size: number, strength = 1): THREE.Sprite => {
   const mat = new THREE.SpriteMaterial({ map: getHaloTexture(), color: new THREE.Color(color).multiplyScalar(strength), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false });
   const sprite = new THREE.Sprite(mat);

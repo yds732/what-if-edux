@@ -1,8 +1,3 @@
-/**
- * Player collision on the ground plane. Every world is a walkable region minus a handful of obstacles, so the
- * player is a circle resolved against boxes, circles and an outer boundary: no physics engine, no tunnelling.
- */
-
 export type Obstacle =
   | { readonly kind: 'box'; cx: number; cz: number; hx: number; hz: number; rot?: number }
   | { readonly kind: 'circle'; cx: number; cz: number; r: number };
@@ -16,12 +11,7 @@ export interface GroundPoint {
   z: number;
 }
 
-/**
- * A raised path the player may leave the bounds along, such as a bridge: a centre line of points with heights,
- * a half width, and how much of it (0..1 of its points) is there to walk on.
- */
 export class Walkway {
-  /** Fraction of the line that can be walked, from its first point. */
   reach = 1;
   private readonly cum: number[] = [0];
 
@@ -36,7 +26,6 @@ export class Walkway {
     return this.cum[this.cum.length - 1]!;
   }
 
-  /** The nearest point on the walkable part of the centre line to (x, z): its distance, ground height and position. */
   nearest(x: number, z: number): { d: number; y: number; x: number; z: number; past: number; tx: number; tz: number } | null {
     const limit = this.reach * this.length;
     if (limit <= 0) return null;
@@ -51,7 +40,6 @@ export class Walkway {
       const t = Math.max(0, Math.min(tMax, raw));
       const px = a.x + ex * t, pz = a.z + ez * t;
       const d = Math.hypot(x - px, z - pz);
-      // how far beyond the built end the point lies, along the path: the end is cut square, not rounded
       const past = tMax < 1 || i === this.points.length - 1 ? Math.max(0, (raw - tMax) * seg) : 0;
       if (!best || d < best.d) best = { d, y: a.y + (b.y - a.y) * t, x: px, z: pz, past, tx: ex / (seg || 1), tz: ez / (seg || 1) };
     }
@@ -62,10 +50,8 @@ export class Walkway {
 export class Colliders {
   bounds: Bounds | null = null;
   readonly obstacles: Obstacle[] = [];
-  /** Paths out past the bounds that may also be walked on. */
   readonly walkways: Walkway[] = [];
 
-  /** Ground height at (x, z) when it is on a walkway, else null (the world's own floor). */
   groundAt(x: number, z: number, radius: number): number | null {
     if (this.insideBounds(x, z, radius)) return null;
     for (const w of this.walkways) {
@@ -111,7 +97,6 @@ export class Colliders {
     if (i >= 0) this.obstacles.splice(i, 1);
   }
 
-  /** Moves `p` (a circle of `radius`) out of every obstacle and back inside the bounds. Mutates and returns `p`. */
   resolve(p: GroundPoint, radius: number): GroundPoint {
     for (let pass = 0; pass < 3; pass++) {
       let moved = false;
@@ -132,7 +117,6 @@ export class Colliders {
         } else {
           const rot = o.rot ?? 0;
           const c = Math.cos(rot), s = Math.sin(rot);
-          // into the box's frame
           const wx = p.x - o.cx, wz = p.z - o.cz;
           const lx = wx * c + wz * s, lz = -wx * s + wz * c;
           const qx = Math.max(-o.hx, Math.min(o.hx, lx)), qz = Math.max(-o.hz, Math.min(o.hz, lz));
@@ -147,7 +131,6 @@ export class Colliders {
             nx = qx + dx * radius;
             nz = qz + dz * radius;
           } else {
-            // centre is inside the box: leave through the nearest face
             const ex = o.hx - Math.abs(lx), ez = o.hz - Math.abs(lz);
             if (ex < ez) {
               nx = Math.sign(lx || 1) * (o.hx + radius);
@@ -163,7 +146,6 @@ export class Colliders {
         }
       }
       if (this.bounds && !this.insideBounds(p.x, p.z, radius)) {
-        // off the bounds is allowed on a walkway; otherwise the player is held to the bounds or a walkway's edge, whichever is nearer
         const inBounds = this.clampToBounds({ x: p.x, z: p.z }, radius);
         let best = inBounds, bestD = Math.hypot(inBounds.x - p.x, inBounds.z - p.z);
         for (const w of this.walkways) {
@@ -171,7 +153,6 @@ export class Colliders {
           if (!n) continue;
           const room = Math.max(0.05, w.halfWidth - radius);
           if (n.past > 0) {
-            // beyond the built end: back to the end line, then within the deck's width
             const bx = p.x - n.tx * n.past, bz = p.z - n.tz * n.past;
             const sx = bx - n.x, sz = bz - n.z, side = Math.hypot(sx, sz), k = side > room ? room / side : 1;
             const cx = n.x + sx * k, cz = n.z + sz * k, d = Math.hypot(cx - p.x, cz - p.z);

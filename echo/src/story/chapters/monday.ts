@@ -8,7 +8,6 @@ import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
 import { giveGem, havenCalls, holdGem, labelLumi, lumiPleads, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
 
-/** Scene 1. The pilot is announced; the player volunteers, goes home, and puts the headset on for the first time. */
 export const monday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, headset } = game;
   app.fx.fade = 1;
@@ -27,13 +26,11 @@ export const monday = async (game: Game): Promise<void> => {
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 0.01);
   await d.fadeIn(1.4);
   hud.setHint(CONTROLS);
-  // from the back row the teacher is a long way off: lean in to listen
   void d.tween(2.6, (k) => (app.zoom = 12 * k)).catch(() => undefined);
   await d.play(MONDAY.intro);
   hud.setHint(null);
   void d.tween(1.0, (k) => (app.zoom = 12 * (1 - k))).catch(() => undefined);
 
-  // up from the desk and to the front
   player.stand();
   player.canMove = true;
   d.objective(MONDAY.objectiveWalk);
@@ -57,7 +54,6 @@ export const monday = async (game: Game): Promise<void> => {
   stowHeadset(game);
   game.hands.pose('rest');
 
-  // ---- after school: home ----
   const bedroom = (await d.enter('bedroom', BEDROOM.enter)) as BedroomWorld;
   bedroom.setNight(0.9, true);
   bedroom.setMessages(null);
@@ -81,13 +77,11 @@ export const monday = async (game: Game): Promise<void> => {
   const haven = await enterHaven(game, 'arrival');
   game.reach('monday.haven');
 
-  // ---- first sight of Haven ----
   const lumi = haven.cast.lumi!;
   lumi.lookAtPoint(game.playerEye);
   await d.wait(2.6);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.4);
 
-  // ---- Lumi waits to be talked to, a "!" over its head ----
   const guide = haven.companion;
   haven.showCompanion(true);
   guide.setAlert(true);
@@ -107,16 +101,13 @@ export const monday = async (game: Game): Promise<void> => {
   await tickStreak(game, haven);
   player.canMove = true;
 
-  // ---- the tour ----
   game.reach('monday.tour');
   await lumiTour(game, haven);
 
-  // ---- free time: Lumi asks for a gift, find it a gem, or take the headset off ----
   await havenFreeTime(game, haven);
   await d.fadeOut(1.4);
 };
 
-/** Free time in Haven after the tour, until the player takes the headset off. */
 const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, input, state } = game;
   const guide = haven.companion;
@@ -135,7 +126,6 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
         held += dt;
         if (action) return true;
         if (game.autopilot.enabled && held > 0.6) {
-          // a scripted run does everything there is to do, then leaves
           action = ({ none: 'talk', asked: 'gem', carrying: 'give', given: 'off' } as const)[state.lumiGift];
           return true;
         }
@@ -161,7 +151,6 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       guide.mode = 'roam';
       player.canMove = true;
     } else if (did === 'gem') {
-      // the gem comes from the cluster's light; the cluster stays as it was
       takeGem(game);
     } else {
       await giveGem(game, haven);

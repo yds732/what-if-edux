@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-/** A cut gemstone, small enough to hold: a long octahedron with a cool inner light, like Haven's crystals. */
 export const makeGem = (size = 0.055): THREE.Mesh => {
   const geo = new THREE.OctahedronGeometry(size, 0);
   geo.scale(0.8, 1.45, 0.8);

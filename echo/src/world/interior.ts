@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { merge, place, roundBox, tint, type V3 } from '../core/geo';
 
-/** Surface finishes shared by every piece of furniture; one draw call each per room. */
 export type Finish = 'matte' | 'satin' | 'gloss' | 'metal' | 'glow';
 
 const MATERIALS: Record<Finish, () => THREE.Material> = {
@@ -12,27 +11,20 @@ const MATERIALS: Record<Finish, () => THREE.Material> = {
   glow: () => new THREE.MeshBasicMaterial({ vertexColors: true }),
 };
 
-/**
- * Collects the pieces of a room by finish and bakes each finish into one mesh. Furniture is written as a list
- * of boxes and blobs; the room pays a handful of draw calls however much is in it.
- */
 export class Builder {
   private readonly parts: Record<Finish, THREE.BufferGeometry[]> = { matte: [], satin: [], gloss: [], metal: [], glow: [] };
 
-  /** Adds a geometry that is already in place; it is tinted here. */
   add(finish: Finish, color: THREE.ColorRepresentation, geometry: THREE.BufferGeometry): this {
     this.parts[finish].push(tint(geometry, color));
     return this;
   }
 
-  /** A box by its size and centre; `r` rounds the edges. */
   box(finish: Finish, color: THREE.ColorRepresentation, size: V3, at: V3, opts: { r?: number; rot?: V3 } = {}): this {
     const g = opts.r ? roundBox(size[0], size[1], size[2], opts.r, 2) : new THREE.BoxGeometry(size[0], size[1], size[2]);
     g.deleteAttribute('uv');
     return this.add(finish, color, place(g, at, opts.rot));
   }
 
-  /** An upright cylinder by radius, height and the centre of its base. */
   cyl(finish: Finish, color: THREE.ColorRepresentation, radius: number, height: number, at: V3, opts: { top?: number; radial?: number; rot?: V3 } = {}): this {
     const g = new THREE.CylinderGeometry(opts.top ?? radius, radius, height, opts.radial ?? 20);
     g.deleteAttribute('uv');
@@ -40,7 +32,6 @@ export class Builder {
     return this.add(finish, color, place(g, at, opts.rot));
   }
 
-  /** Bakes everything added so far into meshes under `parent`. `glow` scales the emissive finish into HDR. */
   finish(parent: THREE.Object3D, opts: { glow?: number; shadows?: boolean } = {}): Partial<Record<Finish, THREE.Mesh>> {
     const out: Partial<Record<Finish, THREE.Mesh>> = {};
     for (const key of Object.keys(this.parts) as Finish[]) {
@@ -61,7 +52,6 @@ export class Builder {
   }
 }
 
-/** A simple wall poster, drawn; returns a quad of the given size in metres. */
 export const makePoster = (width: number, height: number, paint: (ctx: CanvasRenderingContext2D, w: number, h: number) => void): THREE.Mesh => {
   const px = 512, py = Math.round((512 * height) / width);
   const canvas = document.createElement('canvas');

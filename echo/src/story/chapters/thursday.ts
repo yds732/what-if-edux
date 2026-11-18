@@ -6,7 +6,6 @@ import { HOOKS, MONDAY, THURSDAY } from '../script';
 import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, stowHeadset, waitUse } from './shared';
 import { breakStreak, havenCalls, labelLumi, leaveWhenLumiLets, tickStreak } from './companion';
 
-/** Scene 4. The Starlight Festival and Jamie's rehearsal fall on the same evening. */
 export const thursday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, state } = game;
   app.fx.fade = 1;
@@ -25,7 +24,6 @@ export const thursday = async (game: Game): Promise<void> => {
   await d.fadeIn(1.4);
   await d.play(THURSDAY.intro);
 
-  // ---- across the bridge toward the gateway; partway over, the real world interrupts ----
   haven.setBoard({ title: THURSDAY.festivalTitle, body: THURSDAY.festivalBody, value: 0, total: 1 });
   d.objective(THURSDAY.objective);
   const path = haven.bridge.path;
@@ -52,10 +50,8 @@ export const thursday = async (game: Game): Promise<void> => {
   const clash = { left: THURSDAY.clash.rehearsal, right: THURSDAY.clash.festival };
   await chat(game, bedroom, thread, THURSDAY.message.map((m) => ({ from: 'jamie' as const, text: m.text })), clash);
   game.reach('thursday.message');
-  // the phone on one side, the headset on the other
   player.faceToward(BEDROOM.dock.clone(), 1.3);
   await d.wait(1.5);
-  // the thought belongs to the headset; the message waits behind it
   hud.setReflection([`“${THURSDAY.thought}”`]);
   await holdToRead(game, 3.2, 7);
   hud.setReflection(null);
@@ -63,7 +59,6 @@ export const thursday = async (game: Game): Promise<void> => {
   player.faceToward(BEDROOM.hologram.clone(), 1.2);
   await d.wait(1.3);
 
-  // ---- decision 2 ----
   game.reach('thursday.decision');
   const pick = await d.choose(THURSDAY.decision.title, THURSDAY.decision.options);
   state.thursdayChoice = pick === 0 ? 'help' : 'haven';
@@ -79,7 +74,6 @@ const helpJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
   const { director: d, audio, player } = game;
   const [you, thanks] = THURSDAY.help.reply;
   await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: thanks.text }]);
-  // a call opens above the phone
   bedroom.setMessages(null);
   await d.wait(0.5);
   audio.sfx('holoOpen');
@@ -118,7 +112,6 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   await liftHeadset(game);
   const haven = await enterHaven(game, 'festival');
   labelLumi(game, haven, null);
-  // back where the player left off, partway across
   const partway = haven.bridge.path.getPointAt(0.3);
   player.position.set(partway.x, partway.y, partway.z);
   player.canMove = true;
@@ -130,7 +123,6 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   const end = haven.bridge.path.getPointAt(1);
   await d.walkTo(end.x, end.z - 1.5, 2.6);
   await d.complete(THURSDAY.haven.objective);
-  // the gateway opens
   haven.openGateway();
   audio.sfx('gateOpen');
   game.app.fx.flash = 0.5;

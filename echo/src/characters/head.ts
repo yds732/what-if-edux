@@ -1,30 +1,16 @@
 import * as THREE from 'three';
 
-/**
- * A figure's head is modelled blank; its face is drawn by the fragment shader straight onto the skin from a handful
- * of numbers (how open each eye is, how the mouth curves...). Expressions are therefore continuous, crisp at any
- * distance, lit like the rest of the head, and cost nothing beyond the head's own draw call.
- */
 export interface FaceState {
-  /** 0 closed .. 1 open (1.2 is wide-eyed), per eye. */
   eyeL: number;
   eyeR: number;
-  /** -1 downturned .. 1 arched: bends the eyes into the "^ ^" of a real smile. */
   eyeSmile: number;
-  /** Where the eyes point, -1..1 on each axis. */
   gazeX: number;
   gazeY: number;
-  /** 0 closed .. 1 fully open. */
   mouthOpen: number;
-  /** -1 frown .. 1 smile. */
   mouthSmile: number;
-  /** 0.5 pursed .. 1.4 broad. */
   mouthWidth: number;
-  /** -1 low .. 1 raised. */
   browRaise: number;
-  /** -1 angry .. 1 worried (inner ends up). */
   browTilt: number;
-  /** 0..1 */
   blush: number;
 }
 
@@ -33,21 +19,13 @@ export const neutralFace = (): FaceState => ({
 });
 
 export interface FaceLook {
-  /** Iris colour. */
   eyeColor?: THREE.ColorRepresentation;
   browColor?: THREE.ColorRepresentation;
-  /** Companions carry a glint of their own light in the eye. */
   glintColor?: THREE.ColorRepresentation;
-  /** Eye size multiplier. */
   eyeScale?: number;
 }
 
-/*
- * The style is a calm, natural one: almond eyes with white, a coloured iris and a single modest catch-light under a
- * soft lash line; straight, fairly thick brows a little above them; a small closed mouth that only just turns up.
- * Every character shares it; they differ by colouring and by how their resting mouth sits.
- */
-const FACE_PARS = /* glsl */ `
+const FACE_PARS = `
 varying vec3 vHeadPos;
 uniform float uEyeScale, uBlush;
 uniform vec4 uEyes;    // openL, openR, smile, -
@@ -89,7 +67,7 @@ float fEye(vec2 f, vec2 c, vec2 r, float open, float smile, vec2 gaze, out vec3 
 float fSeg(vec2 p, vec2 a, vec2 b, out float h){ vec2 pa = p - a, ba = b - a; h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
 `;
 
-const FACE_COLOR = /* glsl */ `
+const FACE_COLOR = `
 {
   vec2 f = vHeadPos.xy;
   // the face is on the front of the head, and nowhere else on the body
@@ -148,11 +126,6 @@ const FACE_COLOR = /* glsl */ `
 }
 `;
 
-/**
- * A face drawn onto whatever material covers a head. The material's vertices are taken into "face space" by
- * `toFace`: origin at the middle of the head, +Z out of the face, +X toward the character's left, one unit per
- * head radius. A generated head keeps its own textures; the features go on top of them.
- */
 export class FaceLayer {
   private readonly u = {
     uFaceMatrix: { value: new THREE.Matrix4() }, uEyeScale: { value: 1 }, uBlush: { value: 0 },
@@ -169,12 +142,10 @@ export class FaceLayer {
     if (look.glintColor !== undefined) this.u.uGlintColor.value.set(look.glintColor);
   }
 
-  /** Changes where the face sits on the head (for fitting it to a generated head). */
   setPlacement(toFace: THREE.Matrix4): void {
     this.u.uFaceMatrix.value.copy(toFace);
   }
 
-  /** Adds the face to a material. Call before the material is first used. */
   install(material: THREE.MeshStandardMaterial): void {
     const before = material.onBeforeCompile.bind(material);
     material.onBeforeCompile = (shader, renderer) => {

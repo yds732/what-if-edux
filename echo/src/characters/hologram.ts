@@ -1,17 +1,11 @@
 import * as THREE from 'three';
 
-/** A figure shown as a projection: what there is to turn up, colour and animate. */
 export interface Hologram {
-  /** 0 is flesh and cloth, 1 is light. */
   readonly amount: { value: number };
   readonly color: THREE.Color;
   readonly time: { value: number };
 }
 
-/**
- * Lets a material be shown as a hologram: the figure turns to bands of coloured light that climb it, brightest
- * at its edges, with gaps between the bands that the room shows through. Call before the material is first used.
- */
 export const addHologram = (material: THREE.MeshStandardMaterial): Hologram => {
   const uniforms = { uHolo: { value: 0 }, uHoloColor: { value: new THREE.Color() }, uHoloTime: { value: 0 } };
   const before = material.onBeforeCompile.bind(material);

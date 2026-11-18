@@ -2,11 +2,10 @@ import * as THREE from 'three';
 import { Rng, TAU } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
 
-/** Direction of the ringed planet that hangs behind the gateway, and of the key light that models faces. */
 export const PLANET_DIR = new THREE.Vector3(0.1, 0.2, -1).normalize();
 export const KEY_DIR = new THREE.Vector3(-0.45, 0.62, 0.62).normalize();
 
-const SKY_FS = /* glsl */ `
+const SKY_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uFestival; uniform vec3 uPlanetDir;
 varying vec3 vDir;
@@ -58,7 +57,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const SKY_VS = /* glsl */ `
+const SKY_VS = `
 varying vec3 vDir;
 void main(){
   vDir = position;
@@ -66,7 +65,7 @@ void main(){
   gl_Position = vec4(p.xy, p.w * 0.99999, p.w);   // pinned just inside the far plane
 }`;
 
-const STAR_VS = /* glsl */ `
+const STAR_VS = `
 attribute float aSize, aPhase; attribute vec3 aColor;
 uniform float uTime, uPixel;
 varying vec3 vColor;
@@ -77,7 +76,7 @@ void main(){
   gl_Position = vec4(p.xy, p.w * 0.99998, p.w);
   gl_PointSize = aSize * uPixel;
 }`;
-const STAR_FS = /* glsl */ `
+const STAR_FS = `
 varying vec3 vColor;
 void main(){
   vec2 q = gl_PointCoord - 0.5; float r = length(q) * 2.0;
@@ -86,7 +85,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const AURORA_VS = /* glsl */ `
+const AURORA_VS = `
 uniform float uTime;
 varying vec2 vUv;
 void main(){
@@ -96,7 +95,7 @@ void main(){
   p.xz += normalize(vec2(p.x, p.z) + 1e-3) * sway * uv.y;       // the curtain's top edge wanders more than its foot
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
-const AURORA_FS = /* glsl */ `
+const AURORA_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uStrength; uniform vec3 uLow, uHigh;
 varying vec2 vUv;
@@ -113,7 +112,6 @@ void main(){
 
 export interface HavenSky {
   readonly group: THREE.Group;
-  /** A plain copy of the dome for baking the environment map. */
   readonly envScene: THREE.Scene;
   update(time: number, camera: THREE.Camera, pixelHeight: number): void;
   setFestival(k: number): void;
@@ -129,15 +127,13 @@ export const buildSky = (starCount: number): HavenSky => {
   dome.renderOrder = -1000;
   group.add(dome);
 
-  // the environment bake sees the dome from the origin through an ordinary camera
   const envScene = new THREE.Scene();
   const envDome = new THREE.Mesh(new THREE.IcosahedronGeometry(50, 4), new THREE.ShaderMaterial({
-    vertexShader: /* glsl */ `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: SKY_FS, uniforms, side: THREE.BackSide, fog: false,
   }));
   envScene.add(envDome);
 
-  // stars: crisp points, denser and brighter toward the zenith, each with its own slow twinkle
   const rng = new Rng(2080);
   const pos = new Float32Array(starCount * 3), size = new Float32Array(starCount), phase = new Float32Array(starCount), color = new Float32Array(starCount * 3);
   const tints = [new THREE.Color(1, 0.96, 0.9), new THREE.Color(0.8, 0.88, 1), new THREE.Color(1, 0.82, 0.72), new THREE.Color(0.86, 0.8, 1)];
@@ -161,7 +157,6 @@ export const buildSky = (starCount: number): HavenSky => {
   stars.renderOrder = -999;
   group.add(stars);
 
-  // aurora: three curtains hung on arcs high over the islands
   const auroraMats: THREE.ShaderMaterial[] = [];
   const curtain = (radius: number, from: number, to: number, base: number, height: number, low: THREE.ColorRepresentation, high: THREE.ColorRepresentation, strength: number): void => {
     const SEG = 96;
@@ -196,12 +191,11 @@ export const buildSky = (starCount: number): HavenSky => {
     update(time, camera, pixelHeight) {
       uniforms.uTime.value = time;
       starU.uPixel.value = pixelHeight / 1080;
-      // stars and dome are pinned to the camera in their shaders; the curtains are real geometry far away
       void camera;
     },
     setFestival(k) {
       uniforms.uFestival.value = k;
-      for (const m of auroraMats) m.uniforms.uStrength!.value *= 1; // strength is set per curtain; the festival only warms the horizon
+      for (const m of auroraMats) m.uniforms.uStrength!.value *= 1;
     },
   };
 };

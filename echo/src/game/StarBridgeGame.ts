@@ -17,10 +17,9 @@ type OrbState = 'none' | 'waiting' | 'coming' | 'held' | 'flying';
 const GOLD = new THREE.Color(1.0, 0.8, 0.42);
 const WHITE_GOLD = new THREE.Color(1.0, 0.95, 0.8);
 const PREVIEW_DOTS = 30;
-/** In the hand the orb is a fraction of its flying size, so it never hides what the player is aiming at. */
 const HELD_SCALE = 0.4;
 
-const PREVIEW_VS = /* glsl */ `
+const PREVIEW_VS = `
 attribute float aT;
 uniform float uPixel, uShow;
 varying float vT;
@@ -30,7 +29,7 @@ void main(){
   gl_Position = projectionMatrix * mv;
   gl_PointSize = clamp(0.2 * uPixel * 0.85 / max(-mv.z, 0.3), 5.0, 44.0) * (1.0 - 0.45 * aT) * uShow;
 }`;
-const PREVIEW_FS = /* glsl */ `
+const PREVIEW_FS = `
 uniform vec3 uColor; uniform float uShow, uTime;
 varying float vT;
 void main(){
@@ -41,32 +40,21 @@ void main(){
 }`;
 
 export interface ChallengeOptions {
-  /** Rings that count, in any order. */
   readonly rings: readonly Ring[];
-  /** Where a fresh orb appears. */
   readonly source: THREE.Vector3;
-  /** Orbs before the attempt fails; null never runs out. */
   readonly orbs: number | null;
 }
 
-/**
- * The orb-throwing game: take an orb, hold to draw back, release to throw it through a ring. It owns the
- * orb, the aiming arc and the feel of a throw; what a hit means is up to whoever listens.
- */
 export class StarBridgeGame {
   readonly onHit = new Signal<{ ring: Ring; index: number; offset: number }>();
-  /** `closest` is how far, in metres, the nearest miss passed from a ring's edge. */
   readonly onMiss = new Signal<{ rim: boolean; closest: number }>();
   readonly onThrow = new Signal<number>();
   readonly onTake = new Signal();
-  /** A fresh orb has condensed above the star. */
   readonly onAppear = new Signal();
-  /** The last orb is spent and rings remain. */
   readonly onFail = new Signal();
   active = false;
   throws = 0;
   misses = 0;
-  /** Set false to keep the player from throwing during dialogue. */
   canThrow = true;
 
   private options: ChallengeOptions | null = null;
@@ -141,25 +129,18 @@ export class StarBridgeGame {
     return this.state === 'held';
   }
 
-  /** 0..1 while a throw is being drawn back, otherwise 0. */
   get chargeLevel(): number {
     return this.charging ? this.charge : 0;
   }
 
-  /** The orb waiting above the star, as something to look at and take. */
   get pedestalItem(): Interactable {
     return this.pedestal;
   }
 
-  /** An orb is waiting to be taken. */
   get offering(): boolean {
     return this.state === 'waiting' && this.wait <= 0 && this.scale > 0.6;
   }
 
-  /**
-   * Autopilot: takes the waiting orb, or throws the held one at full power. `aimAt` is the ring to hit; pass
-   * null to throw wide on purpose.
-   */
   autoPlay(aimAt: Ring | null): void {
     if (this.offering) this.take();
     if (this.state !== 'held' || !this.options) return;
@@ -168,13 +149,11 @@ export class StarBridgeGame {
     const speed = speedForCharge(1);
     const ideal = aimAt ? solveLaunch(origin, aimAt.center, speed) : null;
     const v = ideal ?? { x: speed * 0.7, y: speed * 0.5, z: speed * 0.5 };
-    // turn the player to face the throw, then launch along it exactly as a released throw does
     this.player.yaw = Math.atan2(-v.x, -v.z);
     this.player.pitch = Math.atan2(v.y, Math.hypot(v.x, v.z));
     this.launch(_b.set(v.x, v.y, v.z).normalize());
   }
 
-  /** How many orbs are left, or null when the supply is endless. */
   get remaining(): number | null {
     return this.orbsLeft;
   }
@@ -199,14 +178,12 @@ export class StarBridgeGame {
     return out;
   }
 
-  /** Releases the held orb along the player's aim, or along `direction` when a scripted run supplies one. */
   private launch(direction?: THREE.Vector3): void {
     const o = this.options;
     if (!o) return;
     const origin = this.orb.position;
     const speed = speedForCharge(this.charge);
     const aim = (direction ? _a.copy(direction) : this.player.aim(_a)).multiplyScalar(speed);
-    // gentle help toward the unlit ring the throw is already closest to
     let best: Vec3 | null = null, bestCos = -1;
     for (const r of o.rings) {
       if (r.state === 'lit') continue;
@@ -285,7 +262,6 @@ export class StarBridgeGame {
       case 'waiting': {
         this.wait -= dt;
         if (this.wait > 0) break;
-        // the orb condenses out of sparks above the star, then waits to be taken
         if (!orb.visible) {
           orb.visible = true;
           orb.position.copy(o.source);
@@ -296,7 +272,6 @@ export class StarBridgeGame {
         orb.position.set(o.source.x, o.source.y + Math.sin(time * 1.7) * 0.06, o.source.z);
         this.pedestal.position.copy(orb.position);
         this.pedestal.enabled = this.canThrow;
-        // after the first one, orbs come to a player who is standing ready
         if (this.throws > 0 && this.canThrow && this.scale > 0.9 && this.player.distanceTo(o.source.x, o.source.z) < 3.4) this.take();
         break;
       }
@@ -330,7 +305,6 @@ export class StarBridgeGame {
       case 'flying': {
         this.scale = damp(this.scale, 1, 10, dt);
         this.age += dt;
-        // fixed sub-steps: the arc and the ring test are the same at any frame rate
         const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
         const h = dt / steps;
         let done = false;
@@ -350,7 +324,6 @@ export class StarBridgeGame {
               break;
             }
             if (c?.kind === 'rim') {
-              // a clip off the hoop: sparks, and the orb is knocked off its line
               this.rimmed = true;
               this.velocity.multiplyScalar(0.45).addScaledVector(ring.normal, 2.5);
               this.bursts.emit(orb.position, { count: 16, color: WHITE_GOLD, speed: 3, life: 0.4, size: 0.08 });
@@ -380,7 +353,6 @@ export class StarBridgeGame {
     this.afterThrow();
   }
 
-  /** Lays the dots of the aiming arc along the flight the current charge would give. */
   private updatePreview(o: ChallengeOptions): void {
     const speed = speedForCharge(this.charge);
     const origin = this.orb.position;
@@ -395,7 +367,6 @@ export class StarBridgeGame {
     this.preview.geometry.attributes.position!.needsUpdate = true;
   }
 
-  /** True while the drawn arc passes through a ring: the throw, released now, would score. */
   get aimedTrue(): boolean {
     return this.onTarget;
   }

@@ -2,12 +2,9 @@ import * as THREE from 'three';
 import { blob, curve1, merge, place, sweep, tint, tintBy, v3 } from '../../core/geo';
 import { Rng, TAU, fbm3, lerp, smoothstep } from '../../core/math';
 
-/** Shared clock for everything that sways. */
 export const windUniforms = { uTime: { value: 0 }, uWind: { value: 1 } };
 
-// ---------------------------------------------------------------------------------------------------- grass
-
-const BLADE_VS_PARS = /* glsl */ `
+const BLADE_VS_PARS = `
 attribute vec4 aBlade;   // x, z, yaw, height
 attribute vec3 aTint;
 attribute float aGround;
@@ -15,7 +12,7 @@ uniform float uTime, uWind;
 varying float vBladeV;
 varying vec3 vTint;
 `;
-const BLADE_VS = /* glsl */ `
+const BLADE_VS = `
 {
   float h = aBlade.w, c = cos(aBlade.z), s = sin(aBlade.z);
   vec3 p = position; float v = p.y; vBladeV = v;
@@ -30,12 +27,7 @@ const BLADE_VS = /* glsl */ `
 }
 `;
 
-/**
- * A field of blades in one draw call. `ground` decides where grass may grow and how tall; it returns the
- * ground height, or null to leave the spot bare.
- */
 export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null): THREE.Mesh => {
-  // one blade: a tapering strip, three segments
   const blade = new THREE.BufferGeometry();
   const w = 0.028;
   const verts: number[] = [], idx: number[] = [], nor: number[] = [];
@@ -94,21 +86,18 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   return mesh;
 };
 
-// ---------------------------------------------------------------------------------------------------- blossom tree
-
 export interface Tree {
   readonly group: THREE.Group;
-  /** World-space points among the blossom, for spawning falling petals. */
   readonly canopy: THREE.Vector3[];
 }
 
-const PETAL_VS_PARS = /* glsl */ `
+const PETAL_VS_PARS = `
 attribute vec4 aLeaf;   // local offset xyz, size
 attribute vec4 aLeafRot; // axis-angle packed: yaw, tilt, phase, tint
 uniform float uTime, uWind;
 varying float vLeafTint, vLeafPhase; varying vec2 vLeafUv;
 `;
-const PETAL_VS = /* glsl */ `
+const PETAL_VS = `
 {
   float yaw = aLeafRot.x, tilt = aLeafRot.y + 0.25 * sin(uTime * 1.7 + aLeafRot.z * 6.28) * uWind;
   vec3 p = position * aLeaf.w;
@@ -141,13 +130,11 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
     const kids = depth === 0 ? 4 : rng.int(2, 3);
     for (let i = 0; i < kids; i++) {
       const spread = depth === 0 ? 0.85 : 0.7;
-      // higher limbs reach out sideways and droop a little, the way an old cherry spreads
       const d = dir.clone().add(v3(rng.range(-1, 1) * spread, depth >= 2 ? rng.range(-0.25, 0.3) : rng.range(0.05, 0.45), rng.range(-1, 1) * spread)).normalize();
       branch(from.clone().lerp(end, rng.range(0.72, 1)), d, length * rng.range(0.6, 0.78), radius * 0.58, depth + 1);
     }
     if (depth >= 2) tips.push({ p: end, r: 0.5 + rng.range(0, 0.3) });
   };
-  // a leaning trunk with a root flare
   const trunkTop = v3(0.5, 2.5, 0.25);
   bark.push(tintBy(sweep([v3(-0.15, -0.3, 0), v3(0.05, 0.9, 0.05), trunkTop], curve1([[0, 0.58], [0.16, 0.36], [1, 0.25]]), { radial: 14, steps: 14, startCap: 'flat', endCap: 'round' }),
     (p, out) => void out.copy(barkA).lerp(barkB, 0.5 + 0.5 * fbm3(p.x * 3, p.y * 1.2, p.z * 3, 2))));
@@ -159,19 +146,15 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
     const a = (i / 5) * TAU + rng.range(-0.4, 0.4);
     branch(trunkTop.clone().add(v3(0, -0.25 * i * 0.3, 0)), v3(Math.cos(a) * 0.95, rng.range(0.3, 0.65), Math.sin(a) * 0.95).normalize(), rng.range(2.1, 2.8), 0.21, 1);
   }
-  // a central leader straight up through the middle, so the crown is full rather than a ring
   branch(trunkTop.clone(), v3(0.06, 1, 0.04).normalize(), 2.5, 0.2, 1);
   const trunk = new THREE.Mesh(merge(bark), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
   trunk.castShadow = true;
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  // canopy: soft masses at the branch tips...
   const pinkA = new THREE.Color(0xeeb0c6), pinkB = new THREE.Color(0xfff0e6), lilac = new THREE.Color(0x7c6fa8);
-  // deep magenta-rose streaks through the pastel crown, so it has some punch
   const rose = new THREE.Color(0xd6337f);
   const masses: THREE.BufferGeometry[] = [];
-  // each branch tip carries a cluster of small puffs: light on top, deep violet underneath
   const puffs: { p: THREE.Vector3; r: number }[] = [];
   const dark = new THREE.Color(0x6f5a8e);
   for (const tip of tips) {
@@ -193,7 +176,6 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   massMesh.castShadow = true;
   group.add(massMesh);
 
-  // ...and thousands of petals sitting on them, each a small curved card
   const card = new THREE.PlaneGeometry(1, 0.86, 2, 1);
   const cp = card.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < cp.count; i++) cp.setZ(i, -0.35 * cp.getX(i) * cp.getX(i));
@@ -202,10 +184,8 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   for (let i = 0; i < petalCount; i++) {
     const puff = rng.pick(puffs);
     const d = v3(rng.gauss(), rng.gauss() * 0.8 + 0.25, rng.gauss()).normalize();
-    // mostly on the outside of each puff, some deeper in, so the blossom builds up in layers
     const p = puff.p.clone().addScaledVector(d, puff.r * (rng.next() < 0.75 ? rng.range(0.85, 1.12) : rng.range(0.45, 0.85)));
     leaf.push(p.x, p.y, p.z, rng.range(0.18, 0.36));
-    // how much light this cluster catches: the top of each puff and the top of the tree are brightest
     const light = Math.min(1, Math.max(0, 0.3 + 0.42 * d.y + 0.28 * smoothstep(2.2, 6.0, p.y) + rng.range(-0.12, 0.12)));
     rot.push(rng.range(0, TAU), rng.range(-1.1, 1.1), rng.next(), light);
     if (i % 24 === 0 && d.y < 0.2) canopy.push(p);
@@ -253,9 +233,6 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   return { group, canopy };
 };
 
-// ---------------------------------------------------------------------------------------------------- glow flowers
-
-/** Lantern flowers: a thin stem and a bulb of light. One draw call for stems, one for bulbs. */
 export const buildGlowFlowers = (spots: readonly { x: number; y: number; z: number; h: number; color: THREE.Color }[]): THREE.Group => {
   const group = new THREE.Group();
   const stems: THREE.BufferGeometry[] = [], bulbs: THREE.BufferGeometry[] = [];
@@ -269,7 +246,7 @@ export const buildGlowFlowers = (spots: readonly { x: number; y: number; z: numb
   if (stems.length === 0) return group;
   group.add(new THREE.Mesh(merge(stems), new THREE.MeshLambertMaterial({ vertexColors: true })));
   const bulbMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-  bulbMat.color.setScalar(2.6);   // HDR: the bulbs are light sources for the bloom
+  bulbMat.color.setScalar(2.6);
   group.add(new THREE.Mesh(merge(bulbs), bulbMat));
   return group;
 };

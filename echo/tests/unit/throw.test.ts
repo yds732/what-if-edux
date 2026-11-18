@@ -5,7 +5,6 @@ import {
 
 const ring: RingTarget = { center: { x: 0, y: 3, z: -12 }, normal: { x: 0, y: 0, z: 1 }, radius: 1.25 };
 
-/** Flies an orb in small steps and reports the first thing it does to the ring. */
 const fly = (from: Vec3, v: Vec3, target: RingTarget, dt = 1 / 120): 'through' | 'rim' | 'miss' => {
   let p = { ...from };
   const vel = { ...v };

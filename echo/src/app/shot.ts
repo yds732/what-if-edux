@@ -11,7 +11,6 @@ import { isTier } from './quality';
 
 type WorldFactory = (params: URLSearchParams) => World;
 
-/** Worlds a capture can ask for by name: `?shot=<name>`. */
 export const SHOT_WORLDS: Record<string, WorldFactory> = {
   studio: (p) => new StudioWorld(p),
   haven: () => new HavenWorld(),
@@ -24,10 +23,6 @@ const vec = (text: string | null, fallback: [number, number, number]): THREE.Vec
   return n.length === 3 && n.every(Number.isFinite) ? new THREE.Vector3(n[0], n[1], n[2]) : new THREE.Vector3(...fallback);
 };
 
-/**
- * Capture mode: one world, one camera, an exact time. `?shot=studio&eye=0,1.5,3&at=0,1,0&t=2&q=high`
- * Add `live=1` to keep animating instead of holding the frame at `t`.
- */
 export const runShot = async (canvas: HTMLCanvasElement, params: URLSearchParams): Promise<App> => {
   const name = params.get('shot') ?? 'studio';
   const factory = SHOT_WORLDS[name];
@@ -53,10 +48,9 @@ export const runShot = async (canvas: HTMLCanvasElement, params: URLSearchParams
 
   const t = numberParam(params, 't', 0, 0, 3600);
   app.renderAt(t);
-  app.renderAt(t); // second draw: shadow maps and any one-frame-late targets have settled
+  app.renderAt(t);
   window.__INFO = { ...app.info, buildMs: Math.round(performance.now() - t0), world: name };
   if (params.has('live')) app.start();
-  // `__app.renderAt(t)` lets a capture's @eval change the world and then step the clock on to see it
   (window as any).__world = world; (window as any).__app = app; window.__READY = true;
   return app;
 };

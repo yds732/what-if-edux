@@ -5,42 +5,30 @@ import { Signal } from '../core/tasks';
 import type { Input } from '../input/Input';
 import { cameraYaw, type Anchor } from '../world/World';
 
-/** A twelve-year-old's eye level. */
 export const EYE_STANDING = 1.15;
 export const PLAYER_RADIUS = 0.28;
 const WALK_SPEED = 2.5;
 const PITCH_LIMIT = 1.35;
 
-/**
- * The first-person body: where the player stands, where they look, how they walk. It owns the camera rig;
- * the story freezes it for cutscenes, seats it at desks and turns it gently toward what matters.
- */
 export class Player {
   readonly position = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
   eyeHeight = EYE_STANDING;
-  /** Walking is allowed. */
   canMove = true;
-  /** Looking around is allowed. */
   canLook = true;
   seated = false;
-  /** Metres walked, for footsteps and for "you moved" checks. */
   travelled = 0;
   readonly onStep = new Signal<number>();
-  /** In a headset: how far the real head is turned from the rig, so walking follows the gaze. */
   headYaw = 0;
-  /** In a headset: lift applied to the floor so the eyes sit at `eyeHeight`. */
   xrFloor = 0;
 
   private readonly velocity = new THREE.Vector2();
   private bobPhase = 0;
-  /** Seconds lived: drives the camera's breathing. */
   private life = 0;
   private readonly breathing = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
   private bob = 0;
   private eye = EYE_STANDING;
-  /** The height of the world's own floor, where the player was put: walkways lift them above it. */
   private floorY = 0;
   private turn: { yaw: number; pitch: number; left: number; total: number; fromYaw: number; fromPitch: number } | null = null;
   private lastStepAt = 0;
@@ -64,7 +52,6 @@ export class Player {
     this.apply();
   }
 
-  /** Sits at an anchor: no walking, and the head only turns so far from the seat's facing. */
   sit(a: Anchor, eyeHeight: number): void {
     this.position.copy(a.position);
     this.floorY = a.position.y;
@@ -80,7 +67,6 @@ export class Player {
     this.eyeHeight = eyeHeight;
   }
 
-  /** Eases the view toward a world point over `seconds`; any look input from the player cancels it. */
   faceToward(target: THREE.Vector3, seconds = 0.9): void {
     const eye = this.eyePosition(_v);
     const dx = target.x - eye.x, dy = target.y - eye.y, dz = target.z - eye.z;
@@ -93,13 +79,11 @@ export class Player {
     return out.set(this.position.x, this.position.y + this.eye + this.bob, this.position.z);
   }
 
-  /** Unit vector the player is looking along. */
   forward(out: THREE.Vector3): THREE.Vector3 {
     const cp = Math.cos(this.pitch);
     return out.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
   }
 
-  /** In a headset the player aims with a controller: pass its ray each frame, or nulls to aim with the eyes again. */
   aimFrom(origin: THREE.Vector3 | null, direction: THREE.Vector3 | null): void {
     this.aimSet = !!origin && !!direction;
     if (origin && direction) {
@@ -108,7 +92,6 @@ export class Player {
     }
   }
 
-  /** Unit vector things are thrown and pointed along: the controller's ray in a headset, the view otherwise. */
   aim(out: THREE.Vector3): THREE.Vector3 {
     return this.aimSet ? out.copy(this.aimDir) : this.forward(out);
   }
@@ -121,7 +104,6 @@ export class Player {
     const input = this.input;
     const xr = this.app.renderer.xr.isPresenting;
 
-    // ---- look ----
     if (this.canLook && (input.look.x !== 0 || input.look.y !== 0)) {
       this.yaw += input.look.x;
       this.pitch = clamp(this.pitch + input.look.y, -PITCH_LIMIT, PITCH_LIMIT);
@@ -137,12 +119,10 @@ export class Player {
       if (t.left <= 0) this.turn = null;
     }
     if (this.seatYaw !== null) {
-      // a seated head turns about 130 degrees either way
       const off = clamp(angleDelta(this.seatYaw, this.yaw), -2.3, 2.3);
       this.yaw = this.seatYaw + off;
     }
 
-    // ---- walk ----
     let mx = 0, my = 0;
     if (this.canMove && !this.seated) {
       mx = input.move.x;
@@ -164,7 +144,6 @@ export class Player {
       this.position.z = next.z;
       const moved = Math.hypot(next.x - before.x, next.z - before.y);
       this.travelled += moved;
-      // sliding along a wall should not leave stored speed pushing into it
       if (dt > 0) this.velocity.set((next.x - before.x) / dt, (next.z - before.y) / dt);
       this.bobPhase += moved * 3.4;
       if (this.travelled - this.lastStepAt > 0.72) {
@@ -172,7 +151,6 @@ export class Player {
         this.onStep.emit(speed / WALK_SPEED);
       }
     }
-    // up onto a bridge or other walkway, and back down to the floor off it
     if (!this.seated) {
       const ground = this.app.world?.colliders.groundAt(this.position.x, this.position.z, PLAYER_RADIUS) ?? null;
       this.position.y = damp(this.position.y, ground ?? this.floorY, 14, dt);
@@ -188,13 +166,10 @@ export class Player {
     const { rig, camera, renderer } = this.app;
     rig.rotation.set(0, this.yaw, 0);
     if (renderer.xr.isPresenting) {
-      // the headset drives the camera; the rig is the floor under it
       rig.position.set(this.position.x, this.position.y + this.xrFloor, this.position.z);
       return;
     }
     rig.position.copy(this.position);
-    // a person standing still is never still: slow breathing, a faint sway, and the eyes drifting a little.
-    // Several slow waves out of step with one another, so the motion never visibly repeats.
     const t = this.life, k = this.breathing;
     const breath = Math.sin((t * TAU) / BREATH_SECONDS);
     const lift = (0.006 * breath + 0.0015 * Math.sin(t * 0.83 + 1.3)) * k;
@@ -209,7 +184,6 @@ export class Player {
   }
 }
 
-/** One breath, in and out. */
 const BREATH_SECONDS = 4.6;
 const TAU = Math.PI * 2;
 const _v = new THREE.Vector3();

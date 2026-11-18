@@ -9,7 +9,6 @@ import type { Ring } from '../../world/haven/bridge';
 import type { Anchor } from '../../world/World';
 import { ORB_CONTROLS, TUESDAY } from '../script';
 
-/** Offers something to use and resolves when the player uses it. */
 export const waitUse = (game: Game, spec: Pick<Interactable, 'position' | 'radius' | 'reach' | 'prompt' | 'onFocus'>): Promise<void> => {
   const d = game.director;
   return new Promise<void>((resolve, reject) => {
@@ -39,7 +38,6 @@ export const waitUse = (game: Game, spec: Pick<Interactable, 'position' | 'radiu
   });
 };
 
-/** Waits for the headset button (or, on a touch screen, a tap) with a prompt under the reticle. */
 export const waitHeadsetOff = async (game: Game, prompt: string): Promise<void> => {
   const { hud, input, interaction } = game;
   interaction.enabled = false;
@@ -58,7 +56,6 @@ export const waitHeadsetOff = async (game: Game, prompt: string): Promise<void> 
   }
 };
 
-/** Lets the player take in something on screen: at least `min` seconds, then until they press on, or `max`. */
 export const holdToRead = async (game: Game, min: number, max: number): Promise<void> => {
   const { input } = game;
   let held = 0;
@@ -71,12 +68,9 @@ export const holdToRead = async (game: Game, min: number, max: number): Promise<
   });
 };
 
-// ---------------------------------------------------------------------------------------------------- headset
-
 const CRADLE = { position: new THREE.Vector3(0, -0.22, -0.43), rotation: new THREE.Euler(0.5, Math.PI, 0) };
 const FACE = { position: new THREE.Vector3(0, -0.02, -0.1), rotation: new THREE.Euler(0, Math.PI, 0) };
 
-/** Rests the headset on something in the current world, facing the room. */
 export const restHeadset = (game: Game, at: THREE.Vector3): void => {
   const g = game.headset.group;
   game.app.world?.scene.add(g);
@@ -87,7 +81,6 @@ export const restHeadset = (game: Game, at: THREE.Vector3): void => {
   game.headset.setPower(0.25);
 };
 
-/** Puts the headset out of sight: it is being worn, or carried home in a bag. */
 export const stowHeadset = (game: Game): void => {
   game.app.camera.add(game.headset.group);
   game.headset.group.visible = false;
@@ -102,7 +95,6 @@ const moveHeadset = (game: Game, to: { position: THREE.Vector3; rotation: THREE.
   }, ease.inOutCubic);
 };
 
-/** Lifts the headset from where it rests into both hands. */
 export const liftHeadset = async (game: Game): Promise<void> => {
   const { hands, audio, headset } = game;
   hands.pose('reach');
@@ -114,10 +106,6 @@ export const liftHeadset = async (game: Game): Promise<void> => {
   await moveHeadset(game, CRADLE, 0.55);
 };
 
-/**
- * Raises the held headset to the face, then dissolves the room into Haven around the player.
- * The headset must already be in the hands (see `liftHeadset`).
- */
 export const enterHaven = async (game: Game, variant: HavenVariant, at: Anchor = HAVEN.spawn): Promise<HavenWorld> => {
   const { hands, audio, app, director: d } = game;
   const haven = (await game.ensureWorld('haven')) as HavenWorld;
@@ -133,7 +121,6 @@ export const enterHaven = async (game: Game, variant: HavenVariant, at: Anchor =
   return haven;
 };
 
-/** Takes the headset off: Haven dissolves back into the bedroom and the headset goes back on its dock. */
 export const leaveHaven = async (game: Game, night: number): Promise<BedroomWorld> => {
   const { hands, audio, app, director: d, headset } = game;
   const bedroom = (await game.ensureWorld('bedroom')) as BedroomWorld;
@@ -144,7 +131,6 @@ export const leaveHaven = async (game: Game, night: number): Promise<BedroomWorl
   app.fx.flash = 0.7;
   audio.setSoundscape('bedroom', 2);
   await d.wipeTo('bedroom', BEDROOM.desk);
-  // the headset comes away from the face, down into the hands, and back to its dock
   const g = headset.group;
   app.camera.add(g);
   g.visible = true;
@@ -167,9 +153,6 @@ export const leaveHaven = async (game: Game, night: number): Promise<BedroomWorl
   return bedroom;
 };
 
-// ---------------------------------------------------------------------------------------------------- phone
-
-/** The phone lights up; resolves when the player opens it. */
 export const openPhone = async (game: Game, bedroom: BedroomWorld, prompt: string): Promise<void> => {
   bedroom.setAlert(true);
   await waitUse(game, { position: BEDROOM.phone.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.17, reach: 2.4, prompt });
@@ -178,11 +161,9 @@ export const openPhone = async (game: Game, bedroom: BedroomWorld, prompt: strin
   game.audio.sfx('phoneTap');
   game.app.tasks.wait(0.5).then(() => game.hands.pose('rest'), () => undefined);
   game.audio.sfx('holoOpen');
-  // frame the hologram in the upper half of the view: choices and subtitles use the lower half
   game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.24, 0)), 0.9);
 };
 
-/** Adds messages to the hologram one at a time, as if they were arriving. */
 export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[], add: readonly ChatMessage[], footer: { left: string; right: string } | null = null): Promise<void> => {
   for (const m of add) {
     thread.push(m);
@@ -192,25 +173,16 @@ export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   }
 };
 
-// ---------------------------------------------------------------------------------------------------- orbs
-
 export interface RingRound {
   readonly rings: readonly Ring[];
-  /** Orbs before the round fails and restarts; null never runs out. */
   readonly orbs: number | null;
   readonly label: string;
-  /** Rings already lit before this round, shown in the counter. */
   readonly done?: number;
   readonly total: number;
   onHit(hits: number, ring: Ring): void;
-  /** Puts the round back to its start after a failed attempt. */
   onReset?(): void;
 }
 
-/**
- * One round of the orb game: throw until every ring is lit. Lumi cheers every throw, hit or miss. If the orbs
- * run out, she shrugs it off and the round restarts at once.
- */
 export const playRings = async (game: Game, haven: HavenWorld, round: RingRound): Promise<void> => {
   const d = game.director, star = game.star;
   if (!star) throw new Error('the orb game needs Haven to be built');
@@ -227,7 +199,6 @@ export const playRings = async (game: Game, haven: HavenWorld, round: RingRound)
     }),
     star.onMiss.on(({ rim }) => {
       game.audio.sfx(rim ? 'ringRim' : 'orbFizzle');
-      // she is just as pleased with a miss
       lumi.setMood('delighted').play(hits % 2 ? 'clap' : 'thumbsUp');
     }),
     star.onThrow.on((charge) => game.audio.sfx('orbThrow', { pitch: 0.85 + 0.4 * charge })),
@@ -262,7 +233,6 @@ export const playRings = async (game: Game, haven: HavenWorld, round: RingRound)
       });
       game.audio.setCharge(0);
       if (!failed) break;
-      // out of orbs: the lights go out, Lumi is delighted anyway, and it starts again
       star.end();
       game.audio.sfx('fail');
       for (const r of round.rings) r.setState('dormant', true);

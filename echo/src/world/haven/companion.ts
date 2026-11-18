@@ -3,13 +3,6 @@ import type { Character } from '../../characters/Character';
 import { angleDelta, damp } from '../../core/math';
 import type { Colliders } from '../colliders';
 
-/**
- * Lumi on the move: the Echo companion being a little too keen to be your friend. In free time it keeps near the player without quite walking
- * with them: it drifts off to look at blossom and at things in the grass, and the moment the player comes close it
- * stops whatever it was doing and watches them.
- */
-
-/** A floating "!" over the head, like a notification: talk to me. */
 const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial } => {
   const group = new THREE.Group();
   group.name = 'companion alert';
@@ -19,7 +12,6 @@ const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial }
   bar.scale.set(1, 1, 0.6);
   const dot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 10), material);
   dot.scale.set(1, 1, 0.6);
-  // a soft disc behind, so it reads against the bright sky
   const disc = new THREE.Mesh(new THREE.CircleGeometry(0.19, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }));
   disc.position.set(0, 0.09, -0.03);
   group.add(disc, bar, dot);
@@ -27,9 +19,7 @@ const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial }
   return { group, material };
 };
 
-/** A small caption over the head, such as the day streak. */
 const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: string | null) => void } => {
-  // up to two pills, one per line of text, stacked upward from the sprite's foot
   const ROW = 112, canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = ROW * 2;
@@ -51,7 +41,6 @@ const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: s
     g.font = '600 46px system-ui, "Segoe UI", "Segoe UI Emoji", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    // the last line sits lowest, nearest the head
     lines.forEach((line, i) => {
       const top = canvas.height - ROW * (lines.length - i);
       const w = Math.min(500, g.measureText(line).width + 64), x = (canvas.width - w) / 2;
@@ -70,9 +59,7 @@ const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: s
   return { sprite, rows: () => rows, set };
 };
 
-/** Close enough that Lumi stops and watches you. */
 const NEAR = 2.3;
-/** Further than this and Lumi comes after you. */
 const FAR = 4.6;
 const SPEED = 1.5;
 const RADIUS = 0.3;
@@ -81,9 +68,7 @@ export type CompanionMode = 'still' | 'roam';
 
 export class Companion {
   readonly person: Character;
-  /** Where to aim to talk: the middle of the chest, kept up to date. */
   readonly chest = new THREE.Vector3();
-  /** still: where the story put it. roam: keeps near the player and wanders. */
   mode: CompanionMode = 'still';
   private readonly alert: ReturnType<typeof buildAlert>;
   private readonly label = buildLabel();
@@ -99,7 +84,6 @@ export class Companion {
 
   constructor(
     person: Character,
-    /** Things worth a look: blossom, flowers, crystals in the grass. */
     private readonly curiosities: readonly THREE.Vector3[],
     private readonly groundAt: (x: number, z: number) => number,
     private readonly colliders: Colliders,
@@ -111,17 +95,14 @@ export class Companion {
     person.root.add(this.label.sprite);
   }
 
-  /** The "!" over Lumi's head. */
   setAlert(on: boolean): void {
     this.alertOn = on;
   }
 
-  /** The caption over Lumi's head, one or two lines split by a newline, or null for none. */
   setLabel(text: string | null): void {
     this.label.set(text);
   }
 
-  /** Puts Lumi at a point, facing `yaw` (0 faces +Z). */
   placeAt(x: number, z: number, yaw: number): void {
     this.pos.set(x, this.groundAt(x, z), z);
     this.yaw = yaw;
@@ -137,7 +118,6 @@ export class Companion {
       this.pos.copy(p.root.position);
       this.yaw = p.root.rotation.y;
     }
-    // the alert bobs and always faces the camera; the label sits under it
     this.alertShown = damp(this.alertShown, this.alertOn ? 1 : 0, 7, dt);
     const a = this.alert.group;
     a.visible = this.alertShown > 0.01;
@@ -156,25 +136,21 @@ export class Companion {
     let look: THREE.Vector3 | null = null;
     const goal: THREE.Vector3 = this.goal;
     if (toPlayer < NEAR) {
-      // close: stop, turn and watch
       this.goal.copy(this.pos);
       this.curiosity = null;
       this.linger = 0;
       look = eye;
     } else if (toPlayer > FAR) {
-      // left behind: catch up, to a spot a little to one side of the player
       const ang = Math.atan2(this.pos.x - player.x, this.pos.z - player.z);
       this.goal.set(player.x + Math.sin(ang) * 2.8, 0, player.z + Math.cos(ang) * 2.8);
       this.curiosity = null;
       look = eye;
     } else {
-      // in between: distracted by whatever is nearby
       this.linger -= dt;
       if (!this.curiosity || this.linger <= 0) this.pickCuriosity(player);
       look = this.curiosity;
     }
 
-    // glide toward the goal
     let moving = false, d = 0;
     {
       const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
@@ -183,7 +159,6 @@ export class Companion {
         const step = Math.min(d, SPEED * dt * Math.min(1, d / 0.6 + 0.25));
         const next = { x: this.pos.x + (dx / d) * step, z: this.pos.z + (dz / d) * step };
         this.colliders.resolve(next, RADIUS);
-        // never into the player
         const px = next.x - player.x, pz = next.z - player.z, pd = Math.hypot(px, pz);
         if (pd < 1.1 && pd > 1e-4) {
           next.x = player.x + (px / pd) * 1.1;
@@ -196,7 +171,6 @@ export class Companion {
     }
     this.pos.y = damp(this.pos.y, this.groundAt(this.pos.x, this.pos.z), 10, dt);
 
-    // face where it is going, or what it is looking at
     const faceTo = moving && d > 0.5 ? goal : look;
     if (faceTo) {
       const want = Math.atan2(faceTo.x - this.pos.x, faceTo.z - this.pos.z);
@@ -208,7 +182,6 @@ export class Companion {
     else p.lookAtPoint(null);
   }
 
-  /** Something near the player to wander over to and stare at for a while. */
   private pickCuriosity(player: THREE.Vector3): void {
     const near = this.curiosities.filter((c) => c !== this.curiosity && Math.hypot(c.x - player.x, c.z - player.z) < FAR + 0.6);
     const pool = near.length ? near : this.curiosities;
@@ -216,7 +189,6 @@ export class Companion {
     this.curiosity = c;
     this.linger = 3 + Math.random() * 3.5;
     if (!c) return;
-    // stand a step short of it, on the side facing Lumi
     const ang = Math.atan2(this.pos.x - c.x, this.pos.z - c.z);
     const back = c.y > 1.2 ? 1.9 : 0.8;
     this.goal.set(c.x + Math.sin(ang) * back, 0, c.z + Math.cos(ang) * back);

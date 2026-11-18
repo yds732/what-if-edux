@@ -3,12 +3,6 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp01 } from './math';
 
-/**
- * Procedural modelling kit. Everything in the game is built from four moves: sweep a section along a path,
- * spin a profile, deform a seamless sphere, and round a box. Geometries come back indexed with smooth normals;
- * colour is carried per vertex so many parts can share one material and one draw call.
- */
-
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -16,7 +10,6 @@ const _q = new THREE.Quaternion();
 export type V3 = readonly [number, number, number];
 export const v3 = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, y, z);
 
-/** A unit sphere with no seam and no poles, so it can be pushed around freely and still shade smoothly. */
 export const smoothSphere = (detail = 4): THREE.BufferGeometry => {
   const g = new THREE.IcosahedronGeometry(1, detail);
   g.deleteAttribute('uv');
@@ -27,7 +20,6 @@ export const smoothSphere = (detail = 4): THREE.BufferGeometry => {
   return merged;
 };
 
-/** Moves every vertex through `fn` (mutating the passed vector) and rebuilds the normals. */
 export const deform = (g: THREE.BufferGeometry, fn: (p: THREE.Vector3, index: number) => void): THREE.BufferGeometry => {
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
@@ -42,14 +34,12 @@ export const deform = (g: THREE.BufferGeometry, fn: (p: THREE.Vector3, index: nu
   return g;
 };
 
-/** Ellipsoid, or any blob a deformation makes of one. */
 export const blob = (rx: number, ry: number, rz: number, detail = 3, shape?: (p: THREE.Vector3) => void): THREE.BufferGeometry =>
   deform(smoothSphere(detail), (p) => {
     shape?.(p);
     p.set(p.x * rx, p.y * ry, p.z * rz);
   });
 
-/** Gives every vertex one colour (linear working space). */
 export const tint = (g: THREE.BufferGeometry, color: THREE.ColorRepresentation): THREE.BufferGeometry => {
   const c = new THREE.Color(color);
   const n = g.getAttribute('position').count;
@@ -63,7 +53,6 @@ export const tint = (g: THREE.BufferGeometry, color: THREE.ColorRepresentation):
   return g;
 };
 
-/** Colours each vertex from its position (and normal, when the geometry has them). */
 export const tintBy = (g: THREE.BufferGeometry, fn: (p: THREE.Vector3, out: THREE.Color, n: THREE.Vector3) => void): THREE.BufferGeometry => {
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   const nor = g.getAttribute('normal') as THREE.BufferAttribute | undefined;
@@ -94,13 +83,11 @@ export const place = (
   return g;
 };
 
-/** Fills a one-component attribute with a constant; `merge` needs every part to carry the same attributes. */
 export const fill = (g: THREE.BufferGeometry, name: string, value: number): THREE.BufferGeometry => {
   g.setAttribute(name, new THREE.BufferAttribute(new Float32Array(g.getAttribute('position').count).fill(value), 1));
   return g;
 };
 
-/** Merges parts into one geometry. Attributes missing on some parts are dropped so the merge always succeeds. */
 export const merge = (parts: THREE.BufferGeometry[], dispose = true): THREE.BufferGeometry => {
   if (parts.length === 0) throw new Error('merge: no parts');
   const common = new Set(Object.keys(parts[0]!.attributes));
@@ -119,35 +106,24 @@ export const merge = (parts: THREE.BufferGeometry[], dispose = true): THREE.Buff
 };
 
 export interface Section {
-  /** Half-width along the section's side axis. */
   rx: number;
-  /** Half-width along its up axis. */
   ry: number;
 }
 export type SectionFn = (t: number) => Section | number;
 export type CapStyle = 'round' | 'flat' | 'point' | 'open';
 
 export interface SweepOptions {
-  /** Vertices around the section. */
   radial?: number;
-  /** Samples along the path; defaults to 6 per control point. */
   steps?: number;
-  /** Hint for the section's up axis at the start; transported along the path so the tube never twists. */
   up?: THREE.Vector3;
   startCap?: CapStyle;
   endCap?: CapStyle;
-  /** Twist in radians, as a function of t. */
   twist?: (t: number) => number;
-  /** Treats the control points as the exact polyline instead of fitting a curve through them. */
   polyline?: boolean;
 }
 
 const sectionOf = (s: Section | number): Section => (typeof s === 'number' ? { rx: s, ry: s } : s);
 
-/**
- * Sweeps an elliptical section along a path. Limbs, hair locks, branches, cables, arches and rails are all this.
- * `uv.x` runs 0..1 along the path and `uv.y` around the section.
- */
 export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: SweepOptions = {}): THREE.BufferGeometry => {
   if (path.length < 2) throw new Error('sweep: a path needs at least two points');
   const radial = opts.radial ?? 12;
@@ -161,14 +137,12 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
     return out.lerpVectors(path[i]!, path[i + 1]!, f - i);
   };
 
-  // centres and tangents
   const centers: THREE.Vector3[] = [], tangents: THREE.Vector3[] = [];
   for (let i = 0; i <= steps; i++) centers.push(pointAt(i / steps, new THREE.Vector3()));
   for (let i = 0; i <= steps; i++) {
     const a = centers[Math.max(0, i - 1)]!, b = centers[Math.min(steps, i + 1)]!;
     tangents.push(new THREE.Vector3().subVectors(b, a).normalize());
   }
-  // parallel-transported frames
   const ups: THREE.Vector3[] = [], sides: THREE.Vector3[] = [];
   const hint = opts.up ?? (Math.abs(tangents[0]!.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1));
   let up = hint.clone().addScaledVector(tangents[0]!, -hint.dot(tangents[0]!)).normalize();
@@ -184,7 +158,6 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
 
   const positions: number[] = [], uvs: number[] = [], indices: number[] = [];
   const twistAt = (t: number): number => opts.twist?.(t) ?? 0;
-  /** Appends one ring of vertices and returns its first index. */
   const ring = (center: THREE.Vector3, i: number, rx: number, ry: number, t: number): number => {
     const first = positions.length / 3;
     const twist = twistAt(t);
@@ -202,7 +175,6 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
       indices.push(a0 + k, b0 + k, a0 + k1, a0 + k1, b0 + k, b0 + k1);
     }
   };
-  /** Closes a ring onto a single vertex; `outward` is -1 at the start of the path and +1 at its end. */
   const fan = (r0: number, p: THREE.Vector3, t: number, outward: -1 | 1): void => {
     const index = positions.length / 3;
     positions.push(p.x, p.y, p.z);
@@ -224,7 +196,6 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
   let firstRing = -1;
 
   if (startCap === 'round') {
-    // quarter-ellipse closure: the section shrinks as its centre slides back along the tangent
     const depth = Math.min(s0.rx, s0.ry);
     for (let j = CAP; j >= 1; j--) {
       const a = (j / (CAP + 1)) * (Math.PI / 2);
@@ -253,7 +224,7 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
 
   if (startCap === 'round') fan(firstRing, centers[0]!.clone().addScaledVector(tangents[0]!, -Math.min(s0.rx, s0.ry)), 0, -1);
   else if (startCap === 'point') fan(firstRing, centers[0]!, 0, -1);
-  else if (startCap === 'flat') fan(ring(centers[0]!, 0, s0.rx, s0.ry, 0), centers[0]!, 0, -1); // its own rim, so the edge stays crisp
+  else if (startCap === 'flat') fan(ring(centers[0]!, 0, s0.rx, s0.ry, 0), centers[0]!, 0, -1);
   if (endCap === 'round') fan(lastRing, centers[steps]!.clone().addScaledVector(tangents[steps]!, Math.min(s1.rx, s1.ry)), 1, 1);
   else if (endCap === 'point') fan(lastRing, centers[steps]!, 1, 1);
   else if (endCap === 'flat') fan(ring(centers[steps]!, steps, s1.rx, s1.ry, 1), centers[steps]!, 1, 1);
@@ -268,7 +239,6 @@ export const sweep = (path: readonly THREE.Vector3[], section: SectionFn, opts: 
   return g;
 };
 
-/** Smooth interpolation through [t, value] keys; the workhorse for limb and lock profiles. */
 export const curve1 = (keys: readonly (readonly [number, number])[]) => (t: number): number => {
   if (t <= keys[0]![0]) return keys[0]![1];
   for (let i = 1; i < keys.length; i++) {
@@ -283,7 +253,6 @@ export const curve1 = (keys: readonly (readonly [number, number])[]) => (t: numb
   return keys[keys.length - 1]![1];
 };
 
-/** Smooth, seamless torus about +Y. */
 export const torus = (radius: number, tube: number, radial = 10, tubular = 28): THREE.BufferGeometry => {
   const g = new THREE.TorusGeometry(radius, tube, radial, tubular);
   g.deleteAttribute('uv');
@@ -295,7 +264,6 @@ export const torus = (radius: number, tube: number, radial = 10, tubular = 28): 
   return merged;
 };
 
-/** Box with rounded edges and smooth shading across them. */
 export const roundBox = (w: number, h: number, d: number, radius: number, segments = 3): THREE.BufferGeometry => {
   const r = Math.min(radius, w / 2, h / 2, d / 2);
   const g = new RoundedBoxGeometry(w, h, d, segments, r);
@@ -303,7 +271,6 @@ export const roundBox = (w: number, h: number, d: number, radius: number, segmen
   return g;
 };
 
-/** Flat rounded rectangle in the XY plane facing +Z, with uv 0..1 across it: panels, screens, posters. */
 export const roundRect = (w: number, h: number, radius: number, segments = 6): THREE.BufferGeometry => {
   const r = Math.min(radius, w / 2, h / 2);
   const shape = new THREE.Shape();

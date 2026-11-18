@@ -20,10 +20,6 @@ export interface Rig {
   readonly joints: Record<BoneName, THREE.Vector3>;
 }
 
-/**
- * A rig whose joints stand at the given points in character space: the character faces +Z and its left is +X.
- * Bones carry no rotation in this pose.
- */
 export const rigFromJoints = (joints: Record<BoneName, THREE.Vector3>): Rig => {
   const bones = {} as Record<BoneName, THREE.Bone>;
   for (const name of BONES) {

@@ -2,32 +2,24 @@ import * as THREE from 'three';
 import { Rng, TAU } from '../../core/math';
 import { GLSL_OUTPUT } from '../../render/glsl';
 
-/**
- * Now and then a shooting star crosses Haven's sky: a bright head with a tail that thins and fades behind it.
- * One at a time, every few seconds, far enough away that it never meets the islands.
- */
 export interface ShootingStars {
   readonly mesh: THREE.Mesh;
   update(dt: number, camera: THREE.Camera): void;
 }
 
 const STAR = {
-  /** Seconds between one star ending and the next starting. */
   gap: [3.5, 9] as const,
-  /** Seconds a star is in the sky. */
   life: [0.55, 1.0] as const,
   distance: 900,
-  /** World units its head travels over its life. */
   travel: [180, 300] as const,
-  /** Tail length as a share of its travel. */
   tail: 0.45,
   width: 2.2,
 } as const;
 
-const VS = /* glsl */ `
+const VS = `
 varying vec2 vUv;
 void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const FS = /* glsl */ `
+const FS = `
 uniform float uFade; uniform vec3 uColor;
 varying vec2 vUv;
 void main() {
@@ -59,7 +51,6 @@ export const buildShootingStars = (rng: Rng): ShootingStars => {
   const head = new THREE.Vector3(), tail = new THREE.Vector3(), side = new THREE.Vector3(), view = new THREE.Vector3(), eye = new THREE.Vector3();
 
   const spawn = (): void => {
-    // somewhere in the upper sky, in any direction, falling at a slant
     const bearing = rng.range(0, TAU), up = rng.range(0.32, 0.9);
     const from = new THREE.Vector3(Math.sin(bearing) * Math.cos(up), Math.sin(up), Math.cos(bearing) * Math.cos(up)).multiplyScalar(STAR.distance);
     const across = new THREE.Vector3(Math.cos(bearing), 0, -Math.sin(bearing)).multiplyScalar(rng.chance(0.5) ? 1 : -1);
@@ -84,7 +75,6 @@ export const buildShootingStars = (rng: Rng): ShootingStars => {
         mesh.visible = false;
         return;
       }
-      // it streaks in fast and slows a little as it burns out; fades in at once, out at the end
       const eased = 1 - (1 - k) ** 1.6;
       camera.getWorldPosition(eye);
       uniforms.uFade.value = Math.min(1, k * 8) * (1 - k ** 3);

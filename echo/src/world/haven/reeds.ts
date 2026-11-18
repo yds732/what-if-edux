@@ -2,17 +2,13 @@ import * as THREE from 'three';
 import { Rng, TAU } from '../../core/math';
 import { windUniforms } from './flora';
 
-/**
- * Clumps of tall reeds: thin stalks that fan out from a shared root, each tipped with a soft plume, swaying
- * together in the wind. One instanced draw call for every stalk on the island.
- */
-const REED_VS_PARS = /* glsl */ `
+const REED_VS_PARS = `
 attribute vec4 aReed;   // x, z, yaw (direction it leans), height
 attribute vec4 aLean;   // lean, sway phase, ground height, tint
 uniform float uTime, uWind;
 varying float vV, vTint;
 `;
-const REED_VS = /* glsl */ `
+const REED_VS = `
 {
   float v = position.y, h = aReed.w;
   vV = v; vTint = aLean.w;
@@ -27,7 +23,7 @@ const REED_VS = /* glsl */ `
   transformed.xz += aReed.xy;
 }
 `;
-const REED_FS = /* glsl */ `
+const REED_FS = `
 {
   // dark and green at the water-soaked root, straw toward the top, a pale warm plume at the tip
   vec3 root = vec3(0.13, 0.25, 0.2), straw = vec3(0.62, 0.55, 0.32), plume = vec3(0.95, 0.82, 0.6);
@@ -41,12 +37,10 @@ export interface ReedClump {
   readonly x: number;
   readonly z: number;
   readonly ground: number;
-  /** 1 is an ordinary clump. */
   readonly size: number;
 }
 
 export const buildReeds = (rng: Rng, clumps: readonly ReedClump[]): THREE.Mesh => {
-  // one stalk: a long thin strip that widens into a plume near the top and closes to a point
   const profile: [number, number][] = [[0, 1], [0.3, 0.8], [0.6, 0.6], [0.8, 0.5], [0.84, 1.9], [0.92, 1.6], [1, 0]];
   const w = 0.016;
   const verts: number[] = [], idx: number[] = [], nor: number[] = [];
@@ -64,7 +58,6 @@ export const buildReeds = (rng: Rng, clumps: readonly ReedClump[]): THREE.Mesh =
   for (const c of clumps) {
     const count = Math.round(rng.range(24, 42) * c.size);
     for (let i = 0; i < count; i++) {
-      // stalks crowd the middle of a clump and thin out at its edge
       const r = 0.22 * c.size * Math.sqrt(rng.next()), a = rng.range(0, TAU);
       const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
       const outward = Math.atan2(Math.cos(a), Math.sin(a)) + rng.range(-0.5, 0.5);

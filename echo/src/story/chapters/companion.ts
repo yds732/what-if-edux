@@ -9,14 +9,8 @@ import type { StoryState } from '../state';
 import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { waitHeadsetOff } from './shared';
 
-/**
- * Lumi's part of the story: the tour of Haven and the gem gift for your new friend. Shared by Monday (where it
- * all starts) and Tuesday (if the player chooses to spend the afternoon in Haven).
- */
-
 let heldGem: THREE.Mesh | null = null;
 
-/** A gem in the player's right hand, or not. */
 export const holdGem = (game: Game, on: boolean): void => {
   if (on && !heldGem) {
     heldGem = makeGem(0.032);
@@ -30,13 +24,11 @@ export const holdGem = (game: Game, on: boolean): void => {
   }
 };
 
-/** Lists the side tasks the story state calls for under the objective. */
 export const refreshSideTasks = (game: Game): void => {
   const gift = game.state.lumiGift;
   game.hud.setSideTasks(gift === 'asked' ? [MONDAY.sideGift] : gift === 'carrying' ? [MONDAY.sideGive] : []);
 };
 
-/** Lumi says something in passing: the words type out under the screen and clear by themselves. */
 export const bark = async (game: Game, haven: HavenWorld, text: string, linger = 1.8): Promise<void> => {
   const { hud, audio, director: d } = game;
   const speaker = SPEAKERS.lumi;
@@ -66,7 +58,6 @@ const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
   new THREE.Vector3(0, 7, -50),
 ];
 
-/** Lumi points out each sight from where it stands; the player's view turns with it. No following, so nothing can stall. */
 export const lumiTour = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
   const guide = haven.companion;
@@ -92,7 +83,6 @@ export const lumiTour = async (game: Game, haven: HavenWorld): Promise<void> => 
   await d.complete(MONDAY.objectiveTour);
 };
 
-/** Waits for the player to pick up a gem from any crystal cluster; the cluster stays as it is. */
 export const pickGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d } = game;
   let picked = false;
@@ -112,7 +102,6 @@ export const pickGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   takeGem(game);
 };
 
-/** The gem lands in the player's hand and the side task moves on to giving it: a small reward of its own. */
 export const takeGem = (game: Game): void => {
   game.audio.sfx('orbTake');
   glowScreenEdges('130, 220, 255');
@@ -121,7 +110,6 @@ export const takeGem = (game: Game): void => {
   refreshSideTasks(game);
 };
 
-/** Hands Lumi the gem: a burst of light, Lumi's thanks, and the task ticked off. */
 export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
   const guide = haven.companion;
@@ -141,21 +129,14 @@ export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   player.canMove = true;
 };
 
-// ---------------------------------------------------------------------------------------- Haven's hooks
-
 let labelExtra: string | null = null;
 
-/** The caption over Lumi: the streak, if there is one, above `extra` . */
 export const labelLumi = (game: Game, haven: HavenWorld, extra: string | null = labelExtra): void => {
   labelExtra = extra;
   const n = game.state.streak;
   haven.companion.setLabel([n > 0 ? HOOKS.streakLabel(n) : null, extra].filter(Boolean).join('\n') || null);
 };
 
-/**
- * Another day with Lumi. A streak broken since the last visit is mentioned first, and starts again from one.
- * Anything past the first day is celebrated, out loud.
- */
 export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { state, director: d, audio } = game;
   if (state.streakLost) {
@@ -173,7 +154,6 @@ export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> =
   await bark(game, haven, HOOKS.streakUp(state.streak));
 };
 
-/** The real world won: the streak goes, and Lumi will bring it up next time. */
 export const breakStreak = (state: StoryState): void => {
   if (state.streak === 0) return;
   state.streak = 0;
@@ -181,10 +161,6 @@ export const breakStreak = (state: StoryState): void => {
   state.streakBroke = true;
 };
 
-/**
- * Waits for the player to take the headset off, with Lumi asking them not to each time: staying is the big bright
- * button, leaving the small grey one. Once its pleas run out, Lumi lets them go.
- */
 export const leaveWhenLumiLets = async (game: Game, haven: HavenWorld, prompt: string): Promise<void> => {
   for (let ask = 0; ; ask++) {
     await waitHeadsetOff(game, prompt);
@@ -192,7 +168,6 @@ export const leaveWhenLumiLets = async (game: Game, haven: HavenWorld, prompt: s
   }
 };
 
-/** Lumi's plea when the player tries to leave; true if they stay. */
 export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Promise<boolean> => {
   const { director: d, player, state } = game;
   haven.cast.lumi!.lookAtPoint(game.playerEye);
@@ -214,10 +189,6 @@ export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Pr
   }
 };
 
-/**
- * Haven calls the player back while they are in their room: a message on the wall screen and the headset pulsing
- * on its dock, with a chime now and then. Returns the call's end; it also ends by itself when the bedroom is left.
- */
 export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
   const { audio, headset, app } = game;
   game.state.pings++;
@@ -242,7 +213,6 @@ export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: s
   return stop;
 };
 
-/** The end of the week: each thing Haven did to keep the player, as it happened to them. Pages of [heading, detail]. */
 export const hookPayoff = (state: StoryState): [string, string][] => {
   const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
   const pages: [string, string][] = [];

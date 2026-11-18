@@ -4,23 +4,17 @@ export const CHAPTERS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
 export type ChapterId = (typeof CHAPTERS)[number];
 export const isChapter = (v: string | null): v is ChapterId => v !== null && (CHAPTERS as readonly string[]).includes(v);
 
-/** The three decisions the script tracks. There is deliberately no score. */
 export interface StoryState {
   tuesdayChoice: 'meet' | 'haven' | null;
   thursdayChoice: 'help' | 'haven' | null;
   policyChoice: Policy | null;
-  /** Lumi's gift: not asked for yet, asked for, a gem in hand, or given. */
   lumiGift: 'none' | 'asked' | 'carrying' | 'given';
-  // ---- what Haven does to keep the player, counted so the end can show it back to them. Not a score. ----
-  /** Days in a row spent with Lumi, the best run, whether a break is still to be mentioned, and whether one ever happened. */
   streak: number;
   streakBest: number;
   streakLost: boolean;
   streakBroke: boolean;
-  /** Times Lumi asked the player not to leave, and times the player stayed. */
   leaveAsks: number;
   stayedOn: number;
-  /** Messages Haven sent into the bedroom. */
   pings: number;
 }
 
@@ -37,13 +31,11 @@ interface Save {
 
 const KEY = 'echo-between-two-worlds/save';
 
-/** Progress is saved at the start of each day, so "Continue" resumes a week in progress. */
 export const saveProgress = (chapter: ChapterId, state: StoryState): void => {
   try {
     const save: Save = { version: 1, chapter, state: { ...state } };
     localStorage.setItem(KEY, JSON.stringify(save));
   } catch {
-    // storage can be unavailable (private mode, embedded frames): the game simply does not offer Continue
   }
 };
 
@@ -63,6 +55,5 @@ export const clearProgress = (): void => {
   try {
     localStorage.removeItem(KEY);
   } catch {
-    // nothing to clear
   }
 };

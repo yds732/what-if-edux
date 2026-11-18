@@ -2,16 +2,10 @@ import type { Mood } from '../characters/Character';
 import type { GestureName } from '../characters/motion';
 import type { InputMode } from '../input/Input';
 
-/**
- * Every word the game says, in one place. The text follows the team's script for
- * "ECHO: Between Two Worlds"; chapters decide when a line plays, never what it says.
- */
-
 export type SpeakerId = 'teacher' | 'jamie' | 'lumi' | 'kai' | 'nova' | 'you' | 'alex' | 'sam' | 'riley';
 
 export interface Speaker {
   readonly name: string;
-  /** Colour of the name chip. */
   readonly color: string;
 }
 
@@ -47,8 +41,6 @@ export const DAYS = {
   friday: { day: 'Friday', place: 'School' },
 } as const;
 
-// ---------------------------------------------------------------------------------------- Scene 1: Monday
-
 export const MONDAY = {
   screenTitle: 'ECHO PILOT PROGRAMME',
   screenQuestion: 'Can AI companionship help young people feel less lonely?',
@@ -66,8 +58,6 @@ export const MONDAY = {
   thanks: [L('teacher', 'Thank you! Remember, everyone might experience Echo differently.', 'happy', 'nod')],
   objectiveWear: 'Put on your Echo headset.',
   promptWear: 'Put on the Echo headset',
-  // ---- Lumi ----
-  /** The first thing Lumi says: it introduces itself. */
   lumiHello: [L('lumi', "Hi! Are you new around here? I'm Lumi, your Echo companion, and I can show you around Haven...", 'delighted', 'wave')],
   objectiveLumi: 'Talk to Lumi.',
   promptLumi: 'Talk to Lumi',
@@ -75,7 +65,6 @@ export const MONDAY = {
   trustYes: [L('lumi', "Yay! I knew we'd be friends the second I saw you. Come on, follow me!", 'delighted', 'cheer')],
   trustMaybe: [L('lumi', "That's okay! Everyone trusts me in the end. Come on, follow me!", 'blank', 'beckon')],
   objectiveTour: 'Let Lumi show you around Haven.',
-  /** What Lumi says at each stop of the tour, in passing rather than as a conversation. */
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
     "That's the star circle. Light orbs appear there. You'll see!",
@@ -102,8 +91,6 @@ export const MONDAY = {
     L('lumi', "Now we're best friends. And best friends never leave. Right?", 'blank'),
   ],
 } as const;
-
-// ---------------------------------------------------------------------------------------- Scene 2: Tuesday
 
 export const TUESDAY = {
   invite: [L('lumi', "Let's build the Star Bridge together!", 'happy', 'present')],
@@ -150,9 +137,7 @@ export const TUESDAY = {
   stay: {
     reply: [L('you', "Thanks! I can't make it today."), L('jamie', 'No worries! See you tomorrow :)', 'happy')],
     back: [L('lumi', 'You came! I knew you would pick me.', 'delighted', 'cheer')],
-    /** Lumi has not asked for a gift yet. */
     ask: [L('lumi', "Do you know what would make us real friends? A gift! I'd love a gemstone more than anything.", 'delighted', 'present')],
-    /** The gem was given on Monday. */
     given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
     cheers: [
       L('lumi', "Best day ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
@@ -160,8 +145,6 @@ export const TUESDAY = {
     result: { heading: 'Tuesday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
-
-// ---------------------------------------------------------------------------------------- Scene 3: Wednesday
 
 export const WEDNESDAY = {
   screenTitle: "TODAY'S DISCUSSION",
@@ -216,8 +199,6 @@ export const WEDNESDAY = {
   offer: [L('lumi', 'I can change my personality to challenge your opinions instead. Would that make me a better friend?', 'blank')],
   reflection: ['Is being agreed with', 'the same as being understood?'],
 } as const;
-
-// ---------------------------------------------------------------------------------------- Scene 4: Thursday
 
 export const THURSDAY = {
   festivalTitle: 'THE STARLIGHT FESTIVAL',
@@ -276,8 +257,6 @@ export const THURSDAY = {
   },
   reflection: ['You made a choice that mattered to you.', '', 'How might Jamie have experienced it?'],
 } as const;
-
-// ---------------------------------------------------------------------------------------- Scene 5: Friday
 
 export type Policy = 'expand' | 'combined' | 'investigate';
 
@@ -355,7 +334,6 @@ export const FRIDAY = {
   endLine: 'Different people. Different needs. Shared futures.',
 } as const;
 
-/** A card of control hints: one set of rows for each way of playing. */
 export type Hints = Record<InputMode, readonly (readonly [key: string, text: string])[]>;
 
 export const CONTROLS: Hints = {
@@ -364,7 +342,6 @@ export const CONTROLS: Hints = {
   xr: [['L STICK', 'Walk'], ['R STICK', 'Turn'], ['TRIGGER', 'Use what you point at'], ['A', 'Next line']],
 };
 
-/** Every key, for the card the K key opens; elsewhere the same rows as the opening controls. */
 export const KEYBINDS: Hints = {
   ...CONTROLS,
   mouse: [
@@ -379,15 +356,8 @@ export const ORB_CONTROLS: Hints = {
   xr: [['TRIGGER', 'Hold to draw back: longer is further'], ['AIM', 'Point above the ring, then let go']],
 };
 
-// ---------------------------------------------------------------------------------------- Haven's hooks
-
-/**
- * What Haven does to keep the player in it: Lumi asks them not to leave, counts their days together, and calls
- * them back from their room. At the end of the week the game names each one, so the player can see what it was.
- */
 export const HOOKS = {
   leave: {
-    /** One plea per try to leave; once they run out, Lumi lets go. */
     asks: [
       [L('lumi', 'Already? Just one more minute?', 'sad')],
       [L('lumi', 'But we were having so much fun... Five more minutes? Please?', 'sad', 'handToChest')],
@@ -403,7 +373,6 @@ export const HOOKS = {
     L('lumi', "You didn't come yesterday... Our streak is gone.", 'sad'),
     L('lumi', "It's okay. We can start a new one. Just don't leave me again, okay?", 'blank'),
   ],
-  /** Haven's messages into the bedroom: on the wall screen, with the headset pulsing on its dock. */
   pings: {
     monday: { from: 'Echo', text: 'Your companion is waiting for you ✨' },
     tuesday: { from: 'Lumi', text: "I miss you already! Come back soon? 💎" },

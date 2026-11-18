@@ -9,17 +9,10 @@ import { glowScreenEdges } from '../ui/dom/taskGlow';
 
 const _head = new THREE.Vector3();
 
-/** Characters per second of the typewriter. */
 const TYPE_SPEED = 46;
 const UP = new THREE.Vector3(0, 1, 0);
 
-/**
- * The stage manager. Chapters are plain async functions that call these verbs one after another: say a line,
- * wait for the player to walk somewhere, offer a choice, dissolve one world into another. Every verb waits on
- * the game clock and honours the chapter's abort signal, so a restart unwinds cleanly from any point.
- */
 export class Director {
-  /** Finish lines by themselves after a reading pause. */
   autoAdvance = true;
   private controller = new AbortController();
   private readonly blend = makeLook();
@@ -30,18 +23,14 @@ export class Director {
     return this.controller.signal;
   }
 
-  /** A scripted playthrough is driving: nothing waits for a person. */
   private get auto(): boolean {
     return this.game.autopilot.enabled;
   }
 
-  /** Stops whatever chapter is running; its awaits reject with Cancelled. */
   abort(): void {
     this.controller.abort();
     this.controller = new AbortController();
   }
-
-  // ------------------------------------------------------------------------------------------------ time
 
   wait(seconds: number): Promise<void> {
     return this.game.app.tasks.wait(seconds, this.signal);
@@ -55,7 +44,6 @@ export class Director {
     return this.game.app.tasks.tween(seconds, onUpdate, easing, this.signal);
   }
 
-  /** True once when the player asks to move on (click, tap, Space, Enter). The press is consumed. */
   private advancePressed(): boolean {
     const input = this.game.input;
     if (this.game.hud.choosing) return false;
@@ -67,14 +55,10 @@ export class Director {
     return true;
   }
 
-  // ------------------------------------------------------------------------------------------------ words
-
-  /** One line of dialogue: the speaker animates, the words type out, and the line waits to be read. */
   async say(line: Line): Promise<void> {
     const { hud, audio, app } = this.game;
     const speaker = SPEAKERS[line.who];
     const person = app.world?.cast[line.who];
-    // the lens goes to whoever is speaking, and back to rest for a line with no face to it
     app.focus = person ? person.headWorld(_head).distanceTo(this.game.playerEye) : null;
     if (person) {
       if (line.mood) person.setMood(line.mood);
@@ -89,7 +73,6 @@ export class Director {
       await this.until((dt) => {
         shown = Math.min(total, shown + dt * TYPE_SPEED);
         if (this.advancePressed()) shown = total;
-        // a syllable every third letter is enough to read as speech
         while (voiced < Math.floor(shown)) {
           const ch = line.text[voiced] ?? ' ';
           if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice(line.who, ch);
@@ -118,12 +101,10 @@ export class Director {
     this.game.hud.setSubtitle(null);
   }
 
-  /** Clears the subtitle panel between beats. */
   hush(): void {
     this.game.hud.setSubtitle(null);
   }
 
-  /** A task done: a chime, the screen's edges light up gold, and the task stays up ticked for a moment. */
   async complete(text: string): Promise<void> {
     const { hud, audio, app } = this.game;
     audio.sfx('taskDone');
@@ -139,7 +120,6 @@ export class Director {
     if (text) this.game.audio.sfx('objective');
   }
 
-  /** Offers a decision and returns the index picked. The world holds still while the player decides. */
   async choose(title: string, options: readonly ChoiceOption[]): Promise<number> {
     const { hud, input, interaction, player, audio } = this.game;
     this.hush();
@@ -153,7 +133,6 @@ export class Director {
     this.tween(0.5, (k) => (fx.dim = k)).catch(() => undefined);
     try {
       const shown = hud.choose(title, [...options], this.signal);
-      // a scripted run still shows the choice for a moment, then answers it through the same door a key press uses
       if (this.auto) {
         const want = await this.game.autopilot.choose(title, options.length);
         this.wait(1.1).then(() => input.inject((['choice1', 'choice2', 'choice3'] as const)[want] ?? 'choice1'), () => undefined);
@@ -162,7 +141,6 @@ export class Director {
       audio.sfx('uiSelect');
       return index;
     } finally {
-      // not a tween on the story's clock: the picture must come back even if the story was cancelled mid-choice
       this.game.app.tasks.tween(0.45, (k) => (fx.dim = Math.min(fx.dim, 1 - k))).catch(() => undefined);
       player.canMove = couldMove;
       player.canLook = couldLook;
@@ -172,7 +150,6 @@ export class Director {
     }
   }
 
-  /** The two-line outcome card after a decision: what it gave, what it cost. */
   async result(data: { heading: string; gained: string; missed: string }): Promise<void> {
     const { hud, audio } = this.game;
     this.hush();
@@ -188,7 +165,6 @@ export class Director {
     await this.wait(0.5);
   }
 
-  /** Unframed lines in the middle of the screen, held for `seconds`. */
   async reflect(lines: readonly string[], seconds: number): Promise<void> {
     const { hud } = this.game;
     this.hush();
@@ -203,8 +179,6 @@ export class Director {
     await this.wait(1.4);
   }
 
-  // ------------------------------------------------------------------------------------------------ picture
-
   fadeOut(seconds = 0.7, color: THREE.ColorRepresentation = 0x05040a): Promise<void> {
     const fx = this.game.app.fx;
     fx.fadeColor.set(color);
@@ -218,7 +192,6 @@ export class Director {
     return this.tween(seconds, (k) => (fx.fade = from * (1 - k)), ease.inOutQuad);
   }
 
-  /** The title card that opens a day. Call with the picture already faded out. */
   async card(key: keyof typeof DAYS): Promise<void> {
     const { hud, audio } = this.game;
     const d = DAYS[key];
@@ -229,7 +202,6 @@ export class Director {
     await this.wait(0.6);
   }
 
-  /** Cuts to a world, under a fade or a card. */
   async enter(id: WorldId, anchor: Anchor, eyeHeight?: number): Promise<World> {
     const world = await this.game.ensureWorld(id);
     this.game.setWorld(world);
@@ -237,23 +209,17 @@ export class Director {
     return world;
   }
 
-  /**
-   * Dissolves the current world into another around the player: near things change first, the horizon last.
-   * This is what putting the headset on, and taking it off, looks like.
-   */
   async wipeTo(id: WorldId, anchor: Anchor, eyeHeight?: number): Promise<World> {
     const { app, player, audio } = this.game;
     const from = app.world;
     const to = await this.game.ensureWorld(id);
     if (!from || app.renderer.xr.isPresenting) {
-      // a headset has no second pass to dissolve with: go through light instead
       await this.fadeOut(0.5, 0xe8f0ff);
       this.game.setWorld(to);
       player.teleport(anchor, eyeHeight);
       await this.fadeIn(0.9);
       return to;
     }
-    // slide the outgoing scene under the player so their pose is continuous across the cut
     const delta = cameraYaw(anchor) - player.yaw;
     const moved = player.position.clone().applyAxisAngle(UP, delta);
     from.scene.rotation.y = delta;
@@ -272,7 +238,6 @@ export class Director {
     audio.sfx('wipe');
     try {
       await this.tween(3.1, (k) => {
-        // slow at arm's length, then racing for the horizon
         wipe.radius = reach * (0.06 * k + 0.94 * k * k * k);
         lerpLook(this.blend, from.look, to.look, Math.min(1, k * 1.6));
       }, ease.linear);
@@ -287,7 +252,6 @@ export class Director {
     return to;
   }
 
-  /** Waits until the player is within `radius` metres of a ground point. A scripted run is simply put there. */
   async walkTo(x: number, z: number, radius: number): Promise<void> {
     const player = this.game.player;
     if (this.auto) {
@@ -298,7 +262,6 @@ export class Director {
     await this.until(() => player.distanceTo(x, z) < radius);
   }
 
-  /** Carries the player the last step onto a mark, so a scene is seen from where it was composed. A cut in a headset, where being moved is unpleasant. */
   async stepTo(x: number, z: number, seconds = 0.6): Promise<void> {
     const p = this.game.player.position, fromX = p.x, fromZ = p.z;
     if (this.auto || this.game.app.renderer.xr.isPresenting) {
