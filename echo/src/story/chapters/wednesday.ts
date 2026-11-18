@@ -48,7 +48,7 @@ export const wednesday = async (game: Game): Promise<void> => {
   await d.play(WEDNESDAY.discussion);
   jamie.setMood('happy');
   audio.sfx('bell');
-  hud.setToast({ title: WEDNESDAY.bell, body: 'End of the school day', icon: 'speaker' });
+  hud.setToast({ title: WEDNESDAY.bell, body: 'End of the school day' });
   await d.wait(2.4);
   hud.setToast(null);
   await d.fadeOut(1.2);

@@ -98,9 +98,6 @@ export class RallyWorld extends Minigame {
   readonly id = 'rally' as const;
   readonly soundscape = 'arcadeRally' as const;
   readonly score: Score = { you: 0, kai: 0 };
-  interruptAt: number | null = null;
-  resume = false;
-  interrupted = false;
   phase: Phase = 'idle';
   readonly hits = { you: 0, kai: 0 };
 
@@ -317,7 +314,7 @@ export class RallyWorld extends Minigame {
   }
 
   override reset(): void {
-    if (!this.resume) this.score.you = this.score.kai = 0;
+    this.score.you = this.score.kai = 0;
     this.hits.you = this.hits.kai = 0;
     this.phase = 'idle';
     this.result = null;
@@ -338,18 +335,15 @@ export class RallyWorld extends Minigame {
     const level = LEVELS[this.level]!;
     this.bot.skill = arcade.autoSkill;
     this.sweep = 0;
-    this.interrupted = false;
-    const resuming = this.resume;
-    this.resume = false;
     arcade.game.reach('rally.intro');
     this.kai.play('wave');
-    hud.setCard(MINIGAMES.rally.title, resuming ? `${this.score.you} : ${this.score.kai} · first to ${TO_WIN}` : `Kai · ${level.name} · first to ${TO_WIN}`);
+    hud.setCard(MINIGAMES.rally.title, `Kai · ${level.name} · first to ${TO_WIN}`);
     audio.sfx('card');
     arcade.tween(2.6, (k) => (this.sweep = k), ease.inOutCubic).catch(() => undefined);
     await arcade.wait(2.0);
     hud.setCard(null);
     await arcade.wait(0.5);
-    await arcade.talk(resuming ? RALLY.resume : this.played === 0 ? RALLY.intro : this.level > 0 && this.lastWon ? RALLY.harder : RALLY.again);
+    await arcade.talk(this.played === 0 ? RALLY.intro : this.level > 0 && this.lastWon ? RALLY.harder : RALLY.again);
     hud.setHint(RALLY.controls);
     this.played++;
     arcade.game.reach('rally.ready');
@@ -370,14 +364,6 @@ export class RallyWorld extends Minigame {
       await arcade.wait(done ? 0.8 : 1.35);
       if (!done && gamePoint(this.score) === 'you' && this.rng.chance(0.7)) arcade.bark(RALLY.gamePoint, 1.4);
       hud.setHint(null);
-      if (!done && this.interruptAt !== null && this.score.you + this.score.kai >= this.interruptAt) {
-        this.interruptAt = null;
-        this.interrupted = true;
-        this.resume = true;
-        arcade.hint(null);
-        this.phase = 'idle';
-        return { won: false, stars: 0, summary: '' };
-      }
     }
     hud.setHint(null);
     arcade.hint(null);
