@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Plays stretches of the week inside an emulated Quest 3 with its controllers, no autopilot once it hands over:
-//   2. B takes the headset off; A moves dialogue on;
+//   2. B takes the headset off once Lumi's plea to stay is answered with the trigger; A moves dialogue on;
 //   3. pointing at a choice card and pulling the trigger chooses it;
 //   4. ending the session (taking the headset off) pauses, and the game carries on on the flat screen.
 // The emulator (IWER) stands in for the headset: this checks the button and axis mapping and the pointing
@@ -63,11 +63,23 @@ const open = async (beat) => {
 // ------------------------------------------------------------------------------------------- 2. headset off
 {
   const t = await open('thursday.oneMore');
-  await t.page.waitForTimeout(600);
+  const { page } = t;
+  await page.evaluate(() => window.__xrDevice.controllers.right.position.set(0.22, 1.15, -0.3));
+  // the day's last lines play out first: B counts once the story asks for the headset to come off
+  const asked = await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 }).then(() => true, () => false);
   await t.shot('4_notify');
   await t.press('right', 'b-button');
-  await t.page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 60000 })
-    .then(() => check('B takes the Echo headset off', true), () => check('B takes the Echo headset off', false));
+  // Lumi asks for one more minute: pointing at Leave and pulling the trigger goes
+  await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
+  await page.waitForTimeout(1500);
+  const leave = await page.evaluate(() => {
+    const p = window.__game.hud.options[1].widget.panel.mesh.getWorldPosition(window.__game.playerEye.clone());
+    return [p.x, p.y, p.z];
+  });
+  await t.point(leave);
+  await t.press('right', 'trigger');
+  await page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 60000 })
+    .then(() => check('B takes the Echo headset off', asked, asked ? '' : 'the story never asked for the headset'), () => check('B takes the Echo headset off', false));
   await t.close();
 }
 
