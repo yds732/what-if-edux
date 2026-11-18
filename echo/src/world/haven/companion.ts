@@ -175,7 +175,8 @@ export class Companion {
       const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
       d = Math.hypot(dx, dz);
       if (d > 0.12) {
-        const step = Math.min(d, SPEED * dt * Math.min(1, d / 0.6 + 0.25));
+        const pace = this.mode === 'lead' ? (toPlayer < 3 ? 2.7 : 1.7) : SPEED;
+        const step = Math.min(d, pace * dt * Math.min(1, d / 0.6 + 0.25));
         const next = { x: this.pos.x + (dx / d) * step, z: this.pos.z + (dz / d) * step };
         this.colliders.resolve(next, RADIUS);
         const px = next.x - player.x, pz = next.z - player.z, pd = Math.hypot(px, pz);
