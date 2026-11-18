@@ -11,7 +11,7 @@ export const RING_RADIUS = 1.25;
 
 const TILES = 40;
 const STUB = 4;
-const GOLD = new THREE.Color(0.45, 0.84, 1.0);
+const GOLD = new THREE.Color(1.0, 0.88, 0.64);
 
 const TILE_VS = `
 attribute float aTile; attribute vec3 aCenter;
@@ -145,7 +145,7 @@ export class Ring {
       const a = (i / 16) * TAU;
       dashGeo.push(place(new THREE.BoxGeometry(0.22, 0.035, 0.02), [Math.cos(a) * (radius + 0.42), Math.sin(a) * (radius + 0.42), 0], [0, 0, a + Math.PI / 2]));
     }
-    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.92, 1.0).multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false });
+    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.92, 0.72).multiplyScalar(1.8), transparent: true, opacity: 0, depthWrite: false });
     this.dashes = new THREE.Mesh(merge(dashGeo.map((g) => { g.deleteAttribute('uv'); return g; })), dashMat);
     this.group.add(this.dashes);
   }

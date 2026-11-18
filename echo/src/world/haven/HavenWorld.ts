@@ -17,7 +17,7 @@ import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
-import { buildCastle } from './castle';
+import { buildCastle, buildMountain } from './castle';
 import { buildBoardFrame, buildHoop } from './minimal';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
@@ -89,8 +89,8 @@ export class HavenWorld extends World {
     this.near = 0.08;
     this.far = 3200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.2, ao: 0.8, saturation: 1.26, contrast: 0.24, vignette: 0.36, grain: 0.014, chroma: 0.005,
-      shafts: 0.22, shaftColor: new THREE.Color(0.7, 0.88, 1.0), dof: 0, streak: 0.1,
+      exposure: 0.94, bloom: 0.14, ao: 0.8, saturation: 1.22, contrast: 0.3, vignette: 0.32, grain: 0.01, chroma: 0,
+      shafts: 0.1, shaftColor: new THREE.Color(0.7, 0.88, 1.0), dof: 0, streak: 0.1,
       shadowTint: new THREE.Color(0.0, 0.008, 0.028), highlightTint: new THREE.Color(0.035, 0.03, -0.01),
     }));
     this.clearColor.set(0x0c1438);
@@ -108,7 +108,7 @@ export class HavenWorld extends World {
     scene.add(this.sky.group);
     scene.environment = bakeEnvironment(ctx.renderer, this.sky.envScene, 0.02);
     scene.environmentIntensity = 1.1;
-    scene.fog = new THREE.FogExp2(0x2e4a6a, 0.0046);
+    scene.fog = new THREE.FogExp2(0x4f6498, 0.0036);
     scene.add(buildCloudSea(-44, this.time));
     await ctx.step('haven: sky');
 
@@ -124,7 +124,7 @@ export class HavenWorld extends World {
     key.shadow.radius = 5;
     const rim = new THREE.DirectionalLight(0x78a6ff, 1.7);
     rim.position.copy(PLANET_DIR).multiplyScalar(60);
-    scene.add(key, key.target, rim, new THREE.HemisphereLight(0xb4c0f0, 0x4a3f86, 1.1));
+    scene.add(key, key.target, rim, new THREE.HemisphereLight(0xc4daf2, 0x344e80, 1.1));
 
     const rock = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
     this.mainIsland = buildIsland({ radius: 13.5, depth: 20, seed: 1, lump: 0.1, hills: 0.9, flat: 0.72 });
@@ -149,9 +149,20 @@ export class HavenWorld extends World {
       if (i === 0) {
         const top = shape.heightAt(0, HAVEN.bridgeEnd.z - 2 - z) ?? 0;
         island.position.y += gatewayDrop = HAVEN.bridgeEnd.y - 0.04 - (y + top);
+        const mountain = buildMountain();
+        mountain.position.set(0, (shape.heightAt(0, -7) ?? 0) - 1.5, -15);
+        island.add(mountain);
         const castle = buildCastle();
-        castle.position.set(0, (shape.heightAt(0, -4) ?? 0) - 0.3, -4);
+        castle.scale.setScalar(0.72);
+        castle.position.set(0, (shape.heightAt(0, -2.5) ?? 0) - 0.3, -2.5);
         island.add(castle);
+        const fall = buildWaterfall(v3(-6.5, 11, -8.6), 3, 60, 0.3, this.time);
+        island.add(fall);
+        for (const [hx, hy, hz, color, size] of [[-2.2, 2.2, 4.6, 0xb7a5d8, 7], [2.2, 2.2, 4.6, 0xf5d58c, 6], [0, 4, 3.2, 0xc4daf2, 10]] as const) {
+          const halo = makeHalo(color, size, 0.35);
+          halo.position.set(hx, (shape.heightAt(hx, hz) ?? 0) + hy, hz);
+          island.add(halo);
+        }
       } else if (i < 6) {
         const tree = buildBlossomTree(rng.fork(), Math.round(2600 * q.density));
         const tx = radius * 0.25, tz = -radius * 0.2;
@@ -183,7 +194,7 @@ export class HavenWorld extends World {
       return { y, scale: path };
     };
     scene.add(buildGrass(Math.round(36000 * q.density), 13.5, rng.fork(), ground));
-    const flowerColors = [new THREE.Color(0xffd36b), new THREE.Color(0xffe9a8), new THREE.Color(0xffc04d), new THREE.Color(0xffb347)];
+    const flowerColors = [0xf5d58c, 0xf5d58c, 0xb7a5d8, 0xb7a5d8, 0xc4daf2, 0xf0c6ad].map((c) => new THREE.Color(c));
     const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
     for (let i = 0; i < 400 && flowers.length < Math.round(110 * q.density); i++) {
       const a = rng.range(0, TAU), r = rng.range(3.4, 12);
@@ -293,7 +304,9 @@ export class HavenWorld extends World {
     this.gateway = buildGateway(await ctx.assets.instance('gateway'));
     this.gateway.group.position.set(gi.x, gi.y + 0.9 + gatewayDrop, gi.z + 4.6);
     scene.add(this.gateway.group);
-    const gateGlow = makeHalo(0x8fb4ff, 22, 0.42);
+    const gy = this.gateway.group.position.y - 0.9;
+    await dress(ctx, scene, 'crystals-b', [[gi.x - 3.6, gy - 0.1, gi.z + 5.4, 20, 0.55], [gi.x + 3.8, gy - 0.1, gi.z + 5.0, -40, 0.45]]);
+    const gateGlow = makeHalo(0xb7a5d8, 22, 0.32);
     gateGlow.position.set(gi.x, gi.y + 6, gi.z + 3.5);
     scene.add(gateGlow);
     await ctx.step('haven: bridge');
@@ -305,8 +318,8 @@ export class HavenWorld extends World {
       const [x, y, z, radius] = far[i]!;
       scene.add(buildWaterfall(v3(x + radius * 0.72, y - 0.4, z + radius * 0.5), radius * 0.2, radius * 2.6, 0.6, this.time));
     }
-    this.motes.push(buildMotes(Math.round(190 * q.density), v3(0, 0.15, -1), v3(11, 3.4, 11), rng.fork(), this.time, { a: 0xffd98a, b: 0x8fe9ff, size: 0.07, gain: 2.2 }));
-    this.motes.push(buildMotes(Math.round(120 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0x6f9cff, size: 0.11, gain: 2.0 }));
+    this.motes.push(buildMotes(Math.round(110 * q.density), v3(0, 0.15, -1), v3(11, 3.4, 11), rng.fork(), this.time, { a: 0xffd98a, b: 0x8fe9ff, size: 0.07, gain: 2.2 }));
+    this.motes.push(buildMotes(Math.round(70 * q.density), v3(0, 1.5, -28), v3(5, 4, 18), rng.fork(), this.time, { a: 0xffe2a0, b: 0x6f9cff, size: 0.11, gain: 2.0 }));
     for (const m of this.motes) scene.add(m.points);
     scene.add(this.bursts.points);
 
@@ -408,7 +421,7 @@ export class HavenWorld extends World {
       ring.moveTo(variant === 'festival' ? HAVEN.festivalRings[i]! : RING_POINTS[i]!);
       ring.setState(variant === 'arrival' || variant === 'festival' ? 'dormant' : 'lit', true);
     });
-    this.look.exposure = variant === 'evening' ? 0.88 : 1.0;
+    this.look.exposure = variant === 'evening' ? 0.84 : 0.94;
     this.setBoard(null);
   }
 

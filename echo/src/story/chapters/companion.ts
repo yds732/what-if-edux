@@ -174,17 +174,8 @@ export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Pr
     const plea = HOOKS.leave.asks[Math.min(ask, HOOKS.leave.asks.length - 1)]!;
     state.leaveAsks++;
     await d.play(plea);
-    const pick = await d.choose(HOOKS.leave.title, [{ title: HOOKS.leave.stay, emphasis: 'loud' }, { title: HOOKS.leave.go, emphasis: 'quiet' }]);
-    if (pick === 0) {
-      state.stayedOn++;
-      await d.play(HOOKS.leave.stayed);
-      haven.fireworks(3, 1.5);
-      haven.cast.lumi!.lookAtPoint(game.playerEye);
-      await d.wait(3.5);
-      await d.play(HOOKS.leave.afterStay);
-    } else {
-      await d.play(HOOKS.leave.letGo);
-    }
+    await d.wait(0.6);
+    await d.play(HOOKS.leave.letGo);
     return false;
   } finally {
     player.canMove = could;
@@ -219,7 +210,7 @@ export const hookPayoff = (state: StoryState): [string, string][] => {
   const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
   const pages: [string, string][] = [];
   if (state.leaveAsks > 0) {
-    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi asked you to stay. It asked ${times(state.leaveAsks)}, and you stayed ${state.stayedOn ? times(state.stayedOn) : 'not at all'}. "Stay" was big and bright. "Leave" was small and grey.`]);
+    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi begged you to stay, ${times(state.leaveAsks)}. Leaving meant hearing how sad it would be without you.`]);
   }
   if (state.streakBest > 0) {
     pages.push(['It counted your days.', `Your streak with Lumi reached ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}.${state.streakBroke ? ' When you chose the real world, Lumi made sure you knew the streak was gone.' : ' A number like that is hard to give up.'}`]);

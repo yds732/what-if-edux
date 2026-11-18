@@ -80,3 +80,38 @@ export const buildCastle = (): THREE.Group => {
   group.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = false; });
   return group;
 };
+
+const PEAKS: readonly (readonly [x: number, z: number, radius: number, height: number, seed: number])[] = [
+  [0, 0, 11, 22, 1], [-9, 2, 8, 15, 2], [9, 1.5, 8.5, 16, 3], [-5, 5, 6, 10, 4], [5.5, 5.2, 5.5, 9, 5],
+];
+
+export const buildMountain = (): THREE.Group => {
+  const group = new THREE.Group();
+  const base = new THREE.Color(0x24375e), mid = new THREE.Color(0x46619a), high = new THREE.Color(0x6f88c8), snow = new THREE.Color(0xc4daf2), lav = new THREE.Color(0x7a6fb0);
+  const c = new THREE.Color();
+  for (const [x, z, r, h, seed] of PEAKS) {
+    const g = new THREE.ConeGeometry(r, h, 9, 5).toNonIndexed();
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    const colors: number[] = [];
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i), t = (y + h / 2) / h;
+      const jitter = Math.sin(p.getX(i) * 1.7 + seed * 3.1) * Math.cos(p.getZ(i) * 1.3 + seed);
+      if (t < 0.98) {
+        const swell = 1 + 0.28 * Math.sin(t * Math.PI) + 0.12 * jitter;
+        p.setX(i, p.getX(i) * swell);
+        p.setZ(i, p.getZ(i) * swell);
+      }
+      if (t > 0.9) p.setY(i, y - (t - 0.9) * h * 0.5);
+      c.copy(base).lerp(mid, Math.min(1, t * 1.6)).lerp(high, Math.max(0, (t - 0.45) * 1.8)).lerp(lav, 0.18 * (0.5 + 0.5 * jitter));
+      if (t > 0.8) c.lerp(snow, (t - 0.8) * 4);
+      colors.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true }));
+    m.position.set(x, h / 2 - 1, z);
+    m.rotation.y = seed * 0.9;
+    group.add(m);
+  }
+  return group;
+};

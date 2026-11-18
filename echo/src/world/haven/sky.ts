@@ -12,7 +12,7 @@ varying vec3 vDir;
 vec3 skyColor(vec3 d){
   float h = d.y;
   // a jewel-toned twilight: a thin band of gold at the horizon, deep teal above it, cobalt, then indigo-violet overhead
-  vec3 zenith = vec3(0.015, 0.02, 0.10), mid = vec3(0.03, 0.10, 0.40), low = vec3(0.10, 0.40, 0.50), horizon = vec3(1.0, 0.62, 0.28);
+  vec3 zenith = vec3(0.05, 0.08, 0.24), mid = vec3(0.10, 0.18, 0.46), low = vec3(0.30, 0.24, 0.46), horizon = vec3(0.95, 0.62, 0.46);
   vec3 c = mix(horizon, low, smoothstep(-0.02, 0.06, h));
   c = mix(c, mid, smoothstep(0.06, 0.34, h));
   c = mix(c, zenith, smoothstep(0.28, 0.9, h));
@@ -24,7 +24,8 @@ vec3 skyColor(vec3 d){
   // nebula: two soft bands of dust across the sky
   float n = fbm3(d * 2.4 + vec3(0.0, 0.0, uTime * 0.004));
   float band = exp(-pow((d.y - 0.42 - 0.25 * d.x) * 3.2, 2.0));
-  c += (vec3(0.18, 0.07, 0.40) * smoothstep(0.42, 0.8, n) + vec3(0.04, 0.44, 0.52) * smoothstep(0.5, 0.9, fbm3(d * 4.1 + 7.0))) * band * 0.38;
+  c += (vec3(0.22, 0.14, 0.40) * smoothstep(0.42, 0.8, n) + vec3(0.14, 0.26, 0.52) * smoothstep(0.5, 0.9, fbm3(d * 4.1 + 7.0))) * band * 0.32;
+  c += vec3(0.42, 0.22, 0.30) * exp(-pow((h - 0.05) * 9.0, 2.0)) * 0.35;
   // below the horizon: the cloud sea's own haze
   c = mix(c, vec3(0.14, 0.24, 0.40), smoothstep(0.0, -0.22, h));
   return c;
