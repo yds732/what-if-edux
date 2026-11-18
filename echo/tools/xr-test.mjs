@@ -21,7 +21,7 @@ const open = async (beat) => {
   const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text().slice(0, 400)); });
   page.on('pageerror', (e) => problems.push(String(e.stack ?? e).slice(0, 800)));
-  await page.goto(`${base}?chapter=tuesday&auto=1&speed=6&handover=${beat}&xr=emulate&q=low&dpr=1`, { waitUntil: 'load' });
+  await page.goto(`${base}?chapter=${beat.split('.')[0]}&auto=1&speed=6&handover=${beat}&xr=emulate&q=low&dpr=1`, { waitUntil: 'load' });
   await page.waitForFunction((n) => (window.__BEATS ?? []).includes(n), beat, { timeout: 120000 });
   const t = {
     page,
@@ -88,7 +88,7 @@ const open = async (beat) => {
 
 // ------------------------------------------------------------------------------------------- 3. a choice
 {
-  const t = await open('tuesday.decision');
+  const t = await open('monday.decision');
   const { page } = t;
   await page.evaluate(() => window.__xrDevice.controllers.right.position.set(0.22, 1.15, -0.3));
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 10000 }).catch(() => undefined);

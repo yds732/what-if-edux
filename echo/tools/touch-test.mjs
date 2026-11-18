@@ -75,15 +75,15 @@ const open = async (query) => {
 
 // ---------------------------------------------------------------- 1. phone, chat, choices, walking
 {
-  const t = await open('?chapter=tuesday&auto=1&speed=6&handover=tuesday.bedroom&q=low&dpr=1');
-  await t.beat('tuesday.bedroom');
+  const t = await open('?chapter=monday&auto=1&speed=6&handover=monday.message&q=low&dpr=1');
+  await t.beat('monday.message');
   await t.page.waitForTimeout(2500);
   const phone = await t.target();
   check('the phone is on screen to be tapped', !!phone && phone.x > 0 && phone.x < W && phone.y > 0 && phone.y < H, JSON.stringify(phone));
   await t.shot('1_phone');
   if (phone) await t.tap(phone.x, phone.y);
   // taps on the LEFT half must count too: that is where a thumb rests
-  check('taps on the left half advance the chat', await t.tapUntil('tuesday.decision', 150, 200));
+  check('taps on the left half advance the chat', await t.tapUntil('monday.decision', 150, 200));
   await t.page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 8000 }).catch(() => undefined);
   await t.page.waitForTimeout(900);
   const two = await t.cards();
@@ -95,7 +95,7 @@ const open = async (query) => {
     await t.page.waitForTimeout(700);
   }
   check('tapping the left card chooses it', (await t.page.evaluate(() => window.__game.state.tuesdayChoice)) === 'meet');
-  check('taps carry the story to the poster scene', await t.tapUntil('tuesday.poster', 700, 120));
+  check('taps carry the story to the poster scene', await t.tapUntil('monday.poster', 700, 120));
   await t.page.waitForTimeout(2600);
   await t.tap(700, 120); // "Hey! Glad you came!"
   await t.page.waitForTimeout(700);
@@ -128,7 +128,7 @@ const open = async (query) => {
   await t.shot('4_poster');
   check('three poster phrases are offered', three.length === 3, JSON.stringify(three));
   if (three.length === 3) await t.tap(three[1].x, three[1].y);
-  await t.beat('tuesday.posterDone', 8000).then(() => check('tapping the middle card writes the poster', true), () => check('tapping the middle card writes the poster', false));
+  await t.beat('monday.posterDone', 8000).then(() => check('tapping the middle card writes the poster', true), () => check('tapping the middle card writes the poster', false));
   await t.close();
 }
 

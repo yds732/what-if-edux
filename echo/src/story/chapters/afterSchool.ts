@@ -2,52 +2,30 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { HOOKS, MONDAY, TUESDAY } from '../script';
-import { chat, enterHaven, holdToRead, liftHeadset, openPhone, restHeadset, stowHeadset, waitUse } from './shared';
-import { breakStreak, giveGem, havenCalls, holdGem, labelLumi, pickGem, refreshSideTasks, tickStreak } from './companion';
+import { MONDAY, TUESDAY } from '../script';
+import { chat, enterHaven, holdToRead, liftHeadset, openPhone, stowHeadset, waitUse } from './shared';
+import { breakStreak, giveGem, holdGem, labelLumi, pickGem, refreshSideTasks, tickStreak } from './companion';
 
-export const tuesday = async (game: Game): Promise<void> => {
-  const { director: d, player, app, audio, hud, state } = game;
-  app.fx.fade = 1;
-  const bedroom = (await d.enter('bedroom', BEDROOM.desk)) as BedroomWorld;
-  bedroom.setNight(0.1, true);
-  bedroom.setMessages(null);
-  restHeadset(game, BEDROOM.dock);
-  game.hands.setStyle('real', true);
-  game.hands.pose('rest');
-  player.canMove = true;
-  audio.setSoundscape('bedroom', 1.5);
-  await d.card('tuesday');
-  const call = havenCalls(game, bedroom, HOOKS.pings.tuesday);
-  await d.fadeIn(1.4);
-  await d.wait(0.8);
-  audio.sfx('notify');
-  hud.setToast(TUESDAY.notification);
+export const jamieAsks = async (game: Game, bedroom: BedroomWorld): Promise<void> => {
+  const { director: d, hud, state } = game;
   d.objective(TUESDAY.objectivePhone);
-  game.reach('tuesday.bedroom');
   await openPhone(game, bedroom, TUESDAY.promptPhone);
   hud.setToast(null);
   d.objective(null);
   const thread: ChatMessage[] = [];
   await chat(game, bedroom, thread, [{ from: 'jamie', text: TUESDAY.message[0].text }]);
-
-  game.reach('tuesday.decision');
+  game.reach('monday.decision');
   const pick = await d.choose(TUESDAY.decision.title, TUESDAY.decision.options);
   state.tuesdayChoice = pick === 0 ? 'meet' : 'haven';
-  call();
   if (state.tuesdayChoice === 'meet') breakStreak(state);
-  if (state.tuesdayChoice === 'meet') await meetJamie(game, bedroom, thread);
-  else await stayInHaven(game, bedroom, thread);
-  await d.fadeOut(1.2);
+  const [you, jamieReply] = state.tuesdayChoice === 'meet' ? TUESDAY.meet.reply : TUESDAY.stay.reply;
+  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: jamieReply.text }]);
+  await d.wait(0.6);
+  bedroom.setMessages(null);
 };
 
-const meetJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[]): Promise<void> => {
+export const meetJamie = async (game: Game): Promise<void> => {
   const { director: d, player, audio, hud } = game;
-  const [you, jamieReply] = TUESDAY.meet.reply;
-  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: jamieReply.text }]);
-  await d.fadeOut(1.0);
-  bedroom.setMessages(null);
-
   const room = (await d.enter('classroom', CLASSROOM.door)) as ClassroomWorld;
   room.setVariant('golden', true);
   room.setScene('poster');
@@ -57,8 +35,8 @@ const meetJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
   game.hands.setStyle('real', true);
   player.canMove = false;
   audio.setSoundscape('classroomWarm', 1.5);
-  await d.card('tuesdaySchool');
-  game.reach('tuesday.poster');
+  await d.card('mondaySchool');
+  game.reach('monday.poster');
   const jamie = room.cast.jamie!;
   jamie.lookAtPoint(game.playerEye);
   player.faceToward(jamie.headWorld(new THREE.Vector3()), 0.01);
@@ -85,7 +63,7 @@ const meetJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
   game.hands.pose('reach', 'rest');
   await d.wait(0.9);
   game.hands.pose('rest');
-  game.reach('tuesday.posterDone');
+  game.reach('monday.posterDone');
   player.faceToward(jamie.headWorld(new THREE.Vector3()), 0.9);
   await d.play(TUESDAY.meet.thanks);
   await d.wait(0.6);
@@ -93,11 +71,8 @@ const meetJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
   hud.setObjective(null);
 };
 
-const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[]): Promise<void> => {
+export const stayInHaven = async (game: Game): Promise<void> => {
   const { director: d, player, audio, headset, state } = game;
-  const [you, jamieReply] = TUESDAY.stay.reply;
-  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: jamieReply.text }]);
-  bedroom.setMessages(null);
   d.objective(MONDAY.objectiveWear);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
@@ -112,7 +87,7 @@ const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   labelLumi(game, haven, null);
   guide.mode = 'still';
   player.canMove = true;
-  game.reach('tuesday.lumi');
+  game.reach('monday.lumiAgain');
   guide.person.lookAtPoint(game.playerEye);
   player.faceToward(guide.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);

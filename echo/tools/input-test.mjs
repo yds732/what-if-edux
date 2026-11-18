@@ -73,13 +73,13 @@ const open = async (query) => {
 
 // ------------------------------------------------------------------------------------------- 1. Haven
 {
-  const t = await open('?chapter=tuesday&dpr=1&q=high');
+  const t = await open('?chapter=friday&dpr=1&q=high');
   const { page } = t;
   const state = () => page.evaluate(() => {
     const g = window.__game;
     return { x: g.player.position.x, z: g.player.position.z, holding: g.star?.holding ?? false, lit: g.worlds.haven?.bridge.rings.filter((r) => r.state === 'lit').length ?? 0 };
   });
-  await t.beat('tuesday.haven');
+  await t.beat('friday.class');
   // the mouse cannot be captured here: let clicks count as they do while a cursor is free
   await page.evaluate(() => { window.__game.input.wantsLock = false; window.__game.director.autoAdvance = false; });
   await page.waitForTimeout(2500);
@@ -91,7 +91,7 @@ const open = async (query) => {
   await page.keyboard.press('Space');
   await page.waitForTimeout(300);
   await page.keyboard.press('Space');
-  await t.beat('tuesday.challenge', 15000).then(() => check('Space advances dialogue', true), () => check('Space advances dialogue', false));
+  await t.beat('friday.voices', 15000).then(() => check('Space advances dialogue', true), () => check('Space advances dialogue', false));
 
   const start = await state();
   await page.keyboard.down('KeyW');
@@ -174,9 +174,9 @@ const open = async (query) => {
 
 // ------------------------------------------------------------------------------------------- 3. Tuesday, the poster
 {
-  const t = await open('?chapter=tuesday&auto=1&speed=6&handover=tuesday.poster&tue=meet&dpr=1&q=high');
+  const t = await open('?chapter=monday&auto=1&speed=6&handover=monday.poster&tue=meet&dpr=1&q=high');
   const { page } = t;
-  await t.beat('tuesday.poster');
+  await t.beat('monday.poster');
   await page.waitForFunction(() => window.__game.player.canMove, undefined, { timeout: 30000 });
   await page.waitForTimeout(600);
   await t.shot('5_door');
@@ -188,7 +188,7 @@ const open = async (query) => {
   await page.waitForTimeout(900);
   await t.shot('6_phrases');
   await page.keyboard.press('Digit2');
-  await t.beat('tuesday.posterDone', 8000).then(() => check('Tuesday: the 2 key picks the second phrase', true), () => check('Tuesday: the 2 key picks the second phrase', false));
+  await t.beat('monday.posterDone', 8000).then(() => check('Monday: the 2 key picks the second phrase', true), () => check('Monday: the 2 key picks the second phrase', false));
   await t.close();
 }
 
@@ -232,21 +232,21 @@ const open = async (query) => {
   await t.close();
 }
 
-// ------------------------------------------------------------------------------------------- 6. Tuesday, the message
+// ------------------------------------------------------------------------------------------- 6. Thursday, the message
 {
-  const t = await open('?chapter=tuesday&auto=1&speed=6&handover=tuesday.notify&dpr=1&q=high');
+  const t = await open('?chapter=thursday&auto=1&speed=6&handover=thursday.oneMore&dpr=1&q=high');
   const { page } = t;
-  await t.beat('tuesday.notify');
+  await t.beat('thursday.oneMore');
   await page.waitForTimeout(900);
   await page.keyboard.press('KeyQ');
-  await t.beat('tuesday.bedroom', 20000).then(() => check('Tuesday: Q takes the headset off', true), () => check('Tuesday: Q takes the headset off', false));
+  await t.beat('thursday.bedroom', 30000).then(() => check('Thursday: Q takes the headset off', true), () => check('Thursday: Q takes the headset off', false));
   await page.waitForFunction(() => [...window.__game.interaction.items].some((i) => i.enabled), undefined, { timeout: 20000 });
   await page.waitForTimeout(1600);
   const phone = await t.target();
   await t.face(...phone);
   await page.waitForTimeout(400);
   await page.keyboard.press('KeyE');
-  await t.beat('tuesday.decision', 30000).then(() => check('Tuesday: E on the phone opens the message', true), () => check('Tuesday: E on the phone opens the message', false));
+  await t.beat('thursday.decision', 30000).then(() => check('Thursday: E on the phone opens the message', true), () => check('Thursday: E on the phone opens the message', false));
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 8000 }).catch(() => undefined);
   await page.waitForTimeout(900);
   // the mouse is free while a choice is up: point at the second card and click it
@@ -260,7 +260,7 @@ const open = async (query) => {
   await page.mouse.down();
   await page.mouse.up();
   await page.waitForTimeout(600);
-  check('Tuesday: clicking the second card chooses to stay in Haven', (await page.evaluate(() => window.__game.state.tuesdayChoice)) === 'haven');
+  check('Thursday: clicking the second card chooses to stay in Haven', (await page.evaluate(() => window.__game.state.thursdayChoice)) === 'haven');
   await t.close();
 }
 

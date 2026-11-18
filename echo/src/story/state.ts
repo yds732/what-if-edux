@@ -1,6 +1,6 @@
 import type { Policy } from './script';
 
-export const CHAPTERS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] as const;
+export const CHAPTERS = ['monday', 'wednesday', 'thursday', 'friday'] as const;
 export type ChapterId = (typeof CHAPTERS)[number];
 export const isChapter = (v: string | null): v is ChapterId => v !== null && (CHAPTERS as readonly string[]).includes(v);
 

@@ -33,8 +33,7 @@ const L = (who: SpeakerId, text: string, mood?: Mood, gesture?: GestureName): Li
 export const DAYS = {
   monday: { day: 'Monday', place: 'School' },
   mondayHome: { day: 'Monday', place: 'After school' },
-  tuesday: { day: 'Tuesday', place: 'After school · Home' },
-  tuesdaySchool: { day: 'Tuesday', place: 'After school · Back at school' },
+  mondaySchool: { day: 'Monday', place: 'Later that afternoon · Back at school' },
   wednesday: { day: 'Wednesday', place: 'School' },
   wednesdayEvening: { day: 'Wednesday', place: 'Evening' },
   thursday: { day: 'Thursday', place: 'Haven · The Starlight Festival' },
@@ -73,6 +72,7 @@ export const MONDAY = {
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
   objectiveFree: 'Explore Haven. Press Q to take off the headset when you are ready.',
+  objectiveJamie: 'You have a new message from Jamie. Press Q to take off the headset and read it.',
   promptTalk: 'Talk to Lumi',
   askGift: [
     L('lumi', "Not many people have joined the server yet, so nobody's ever given me anything...", 'sad'),
@@ -109,7 +109,7 @@ export const TUESDAY = {
   notification: { title: 'New message from Jamie', body: 'Your classmate' },
   objectivePhone: 'Tap your phone to view the message.',
   promptPhone: 'Read the message',
-  message: [L('jamie', 'Hey! A few of us are making a welcome poster after school. Wanna join? :)', 'happy')],
+  message: [L('jamie', 'Hey! A few of us are still at school making a welcome poster. Wanna come and join? :)', 'happy')],
   decision: {
     title: 'How will you spend your afternoon?',
     options: [
@@ -130,17 +130,17 @@ export const TUESDAY = {
     posterTitle: 'What would you want to hear on your first day?',
     phrases: ['You belong here.', 'Sit with us at lunch!', "Ask us anything. We've all been new."],
     thanks: [L('jamie', "That's really nice! Thanks!", 'delighted', 'thumbsUp')],
-    result: { heading: 'Tuesday', gained: 'You tried something unfamiliar and made a new connection.', missed: 'You missed an afternoon with Lumi in Haven.' },
+    result: { heading: 'Monday', gained: 'You tried something unfamiliar and made a new connection.', missed: 'You missed an afternoon with Lumi in Haven.' },
   },
   stay: {
-    reply: [L('you', "Thanks! I can't make it today."), L('jamie', 'No worries! See you tomorrow :)', 'happy')],
+    reply: [L('you', "Thanks, but I can't make it."), L('jamie', 'No worries! Next time :)', 'happy')],
     back: [L('lumi', 'You came! I knew you would pick me.', 'delighted', 'cheer')],
     ask: [L('lumi', "Do you know what would make us real friends? A gift! I'd love a gemstone more than anything.", 'delighted', 'present')],
     given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
     cheers: [
       L('lumi', "Best day ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
     ],
-    result: { heading: 'Tuesday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
+    result: { heading: 'Monday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
 
@@ -156,8 +156,8 @@ export const WEDNESDAY = {
   objectiveSit: 'Find Jamie and sit beside them.',
   promptSit: 'Sit beside Jamie',
   greeting: [L('jamie', 'Hey! Looks like we\'re partners!', 'delighted', 'wave')],
-  greetingMet: [L('jamie', 'It was fun hanging out yesterday!', 'happy')],
-  greetingStayed: [L('jamie', "Sorry you couldn't make it yesterday. Maybe next time!", 'happy')],
+  greetingMet: [L('jamie', 'It was fun making the poster on Monday!', 'happy')],
+  greetingStayed: [L('jamie', "Sorry you couldn't make it on Monday. Maybe next time!", 'happy')],
   discussion: [
     L('you', 'I actually really like Echo.'),
     L('you', 'Lumi always listens to me, and I feel like I can be myself.'),
