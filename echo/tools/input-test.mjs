@@ -197,10 +197,10 @@ const open = async (query) => {
   await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 })
     .then(() => check('Thursday: a prompt asks for the headset to come off, naming the key', true), () => check('Thursday: a prompt asks for the headset to come off, naming the key', false));
   await page.keyboard.press('KeyQ');
-  // Lumi asks for one more minute: 2 picks Leave
+  // Are you sure you want to leave Haven? The only answer is 1, Yes
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
   await page.waitForTimeout(600);
-  await page.keyboard.press('Digit2');
+  await page.keyboard.press('Digit1');
   await t.beat('thursday.bedroom', 60000).then(() => check('Thursday: Q takes the headset off', true), () => check('Thursday: Q takes the headset off', false));
   await page.waitForFunction(() => [...window.__game.interaction.items].some((i) => i.enabled), undefined, { timeout: 20000 });
   await page.waitForTimeout(1600);
@@ -321,11 +321,11 @@ const open = async (query) => {
   await t.close();
 }
 
-// ------------------------------------------------------------------------------------------- 9. Thursday, onto the bridge
+// ------------------------------------------------------------------------------------------- 9. Monday back in Haven, onto the bridge
 {
-  const t = await open('?chapter=thursday&auto=1&speed=6&handover=thursday.festival&dpr=1&q=low');
+  const t = await open('?chapter=monday&tue=haven&auto=1&speed=6&handover=monday.lumiAgain&dpr=1&q=low');
   const { page } = t;
-  await t.beat('thursday.festival', 180000);
+  await t.beat('monday.lumiAgain', 600000);
   // the welcome is read through, and then the walk is the player's
   for (let i = 0; i < 30 && !(await page.evaluate(() => window.__game.player.canMove && !window.__game.hud.subtitle)); i++) {
     await page.keyboard.press('Space');
@@ -349,13 +349,13 @@ const open = async (query) => {
   const edge = await t.walk(0, -9.4, 0.6, 20000);
   const tile = await t.walk(0, -12.3, 0.7, 10000);
   const first = await t.at();
-  check('Thursday: the bridge can be walked onto from the meadow', edge && tile, `(${first.x.toFixed(1)}, ${first.z.toFixed(1)})`);
-  for (let k = 0.03; k <= 0.3001; k += 0.03) {
+  check('Monday: the bridge can be walked onto from the meadow', edge && tile, `(${first.x.toFixed(1)}, ${first.z.toFixed(1)})`);
+  for (let k = 0.03; k <= 1.0001; k += 0.03) {
     const at = await page.evaluate((u) => { const v = window.__game.app.world.bridge.path.getPointAt(u); return [v.x, v.z]; }, k);
     await t.walk(at[0], at[1], 0.6, 8000);
   }
   await t.shot('9_bridge');
-  await t.beat('thursday.oneMore', 8000).then(() => check('Thursday: walking out along the bridge moves the story on', true), () => check('Thursday: walking out along the bridge moves the story on', false));
+  await t.beat('monday.gateway', 8000).then(() => check('Monday: walking across the bridge reaches the portal', true), () => check('Monday: walking across the bridge reaches the portal', false));
   await t.close();
 }
 

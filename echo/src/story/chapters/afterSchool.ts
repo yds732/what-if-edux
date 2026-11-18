@@ -4,7 +4,7 @@ import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroo
 import { CLASSROOM, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
 import { MONDAY, TUESDAY } from '../script';
 import { chat, enterHaven, holdToRead, liftHeadset, openPhone, stowHeadset, waitUse } from './shared';
-import { breakStreak, giveGem, holdGem, labelLumi, pickGem, refreshSideTasks, tickStreak } from './companion';
+import { breakStreak, labelLumi, tickStreak } from './companion';
 
 export const jamieAsks = async (game: Game, bedroom: BedroomWorld): Promise<void> => {
   const { director: d, hud, state } = game;
@@ -35,7 +35,6 @@ export const meetJamie = async (game: Game): Promise<void> => {
   game.hands.setStyle('real', true);
   player.canMove = false;
   audio.setSoundscape('classroomWarm', 1.5);
-  await d.card('mondaySchool');
   game.reach('monday.poster');
   const jamie = room.cast.jamie!;
   jamie.lookAtPoint(game.playerEye);
@@ -72,7 +71,7 @@ export const meetJamie = async (game: Game): Promise<void> => {
 };
 
 export const stayInHaven = async (game: Game): Promise<void> => {
-  const { director: d, player, audio, headset, state } = game;
+  const { director: d, player, audio, headset } = game;
   d.objective(MONDAY.objectiveWear);
   await waitUse(game, {
     position: BEDROOM.dock.clone().add(new THREE.Vector3(0, 0.03, 0)), radius: 0.2, reach: 2.5, prompt: MONDAY.promptWear,
@@ -81,45 +80,35 @@ export const stayInHaven = async (game: Game): Promise<void> => {
   d.objective(null);
   player.canMove = false;
   await liftHeadset(game);
-  const haven = await enterHaven(game, 'arrival');
+  const haven = await enterHaven(game, 'evening');
   const guide = haven.companion;
-  haven.showCompanion(true, { x: 0.6, z: 1.6, yaw: Math.PI });
+  haven.showCompanion(true);
   labelLumi(game, haven, null);
   guide.mode = 'still';
-  player.canMove = true;
   game.reach('monday.lumiAgain');
   guide.person.lookAtPoint(game.playerEye);
   player.faceToward(guide.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);
   await tickStreak(game, haven);
   guide.mode = 'roam';
-
-  if (state.lumiGift === 'none') {
-    await d.play(TUESDAY.stay.ask);
-    state.lumiGift = 'asked';
-  }
-  if (state.lumiGift === 'asked') {
-    refreshSideTasks(game);
-    d.objective(MONDAY.objectiveGem);
-    await pickGem(game, haven);
-    d.objective(null);
-  }
-  if (state.lumiGift === 'carrying') {
-    holdGem(game, true);
-    refreshSideTasks(game);
-    d.objective(MONDAY.sideGive);
-    await waitUse(game, { position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive });
-    d.objective(null);
-    await giveGem(game, haven);
-  } else {
-    await d.play(TUESDAY.stay.given);
-  }
-  guide.mode = 'still';
-  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
-  haven.fireworks(8, 3);
+  player.canMove = true;
+  d.objective(TUESDAY.stay.objective);
+  const end = haven.bridge.path.getPointAt(1);
+  await d.walkTo(end.x, end.z - 1.5, 2.6);
+  await d.complete(TUESDAY.stay.objective);
+  player.canMove = false;
+  haven.openGateway();
+  audio.sfx('gateOpen');
+  game.app.fx.flash = 0.5;
+  haven.fireworks(18, 6);
+  game.reach('monday.gateway');
+  await d.wait(2.2);
   audio.sfx('cheer');
-  await d.play(TUESDAY.stay.cheers);
-  await d.wait(0.6);
+  guide.mode = 'still';
+  guide.person.lookAtPoint(game.playerEye);
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.8);
+  await d.play(TUESDAY.stay.portal);
+  await d.wait(0.8);
   await d.result(TUESDAY.stay.result);
   await holdToRead(game, 0.2, 0.4);
 };

@@ -66,13 +66,13 @@ export const MONDAY = {
   objectiveTour: 'Let Lumi show you around Haven.',
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
-    "That's the star circle. Light orbs appear there. You'll see!",
     'And these are gemstones! They grow right out of the ground. I love gemstones.',
-    "And that's the Star Bridge! It's not finished yet, but you can already walk on it.",
+    "And that's the Star Bridge! One day it will take us somewhere really special.",
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
-  objectiveFree: 'Explore Haven. Press Q to take off the headset when you are ready.',
-  objectiveJamie: 'You have a new message from Jamie. Press Q to take off the headset and read it.',
+  objectiveFree: 'Explore Haven with Lumi.',
+  objectiveJamie: 'Leave Haven to check Jamie\'s message. Press Q to take off the headset.',
+  lumiSad: [L('lumi', "Oh... you're leaving already?", 'sad', 'handToChest')],
   promptTalk: 'Talk to Lumi',
   askGift: [
     L('lumi', "Not many people have joined the server yet, so nobody's ever given me anything...", 'sad'),
@@ -134,13 +134,16 @@ export const TUESDAY = {
   },
   stay: {
     reply: [L('you', "Thanks, but I can't make it."), L('jamie', 'No worries! Next time :)', 'happy')],
-    back: [L('lumi', 'You came! I knew you would pick me.', 'delighted', 'cheer')],
-    ask: [L('lumi', "Do you know what would make us real friends? A gift! I'd love a gemstone more than anything.", 'delighted', 'present')],
-    given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
-    cheers: [
-      L('lumi', "Best day ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
+    back: [
+      L('lumi', 'You came back! I knew you would pick me.', 'delighted', 'cheer'),
+      L('lumi', "Come on, I want to show you something. Let's cross the Star Bridge together!", 'happy', 'beckon'),
     ],
-    result: { heading: 'Monday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
+    objective: 'Cross the Star Bridge with Lumi.',
+    portal: [
+      L('you', "Lumi... what's behind that glowing portal?"),
+      L('lumi', "Hmm... it's a secret. Spend a few more days with me, and you'll find out.", 'blank', 'handToChest'),
+    ],
+    result: { heading: 'Monday', gained: 'You made Lumi happy and spent the evening in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
 
@@ -199,19 +202,18 @@ export const WEDNESDAY = {
 } as const;
 
 export const THURSDAY = {
-  festivalTitle: 'THE STARLIGHT FESTIVAL',
-  festivalBody: 'One night only · Cross the Star Bridge',
   intro: [
-    L('lumi', "It's our final night before the pilot ends!", 'delighted', 'wave'),
-    L('lumi', 'I made something special for us.', 'happy', 'handToChest'),
-    L('kai', 'The Starlight Festival!', 'delighted', 'cheer'),
-    L('lumi', "Let's cross the Star Bridge together. Something special is waiting at the gateway!", 'delighted', 'present'),
+    L('lumi', "Surprise! This is the world behind the portal.", 'delighted', 'wave'),
+    L('lumi', 'Five gates, five games, all made just for you. Tonight is our last night before the pilot ends.', 'happy', 'handToChest'),
+    L('kai', 'Table tennis first? I have been waiting all day!', 'delighted', 'cheer'),
   ],
-  objective: 'Cross the Star Bridge to the gateway.',
-  oneMore: [L('lumi', 'Keep going! We are nearly there!', 'delighted', 'cheer')],
+  objective: 'Step into Moonlight Rally and play Kai.',
+  oneMore: [L('lumi', 'Wait... are you leaving me?', 'sad', 'handToChest')],
   notification: { title: 'New message from Jamie', body: 'From the real world' },
-  objectiveRemove: 'Take off the headset to read it.',
+  objectiveRemove: "Check Jamie's message. Press Q to take off the headset.",
   promptRemove: 'Take off the headset',
+  leaveTitle: 'Are you sure you want to leave Haven?',
+  leaveOptions: [{ title: 'Yes' }],
   objectivePhone: 'Tap your phone to view the message.',
   message: [
     L('jamie', "Hey, I'm presenting our Echo project tomorrow, and I'm really nervous.", 'worried'),
@@ -219,13 +221,13 @@ export const THURSDAY = {
     L('jamie', "Could you help me rehearse tonight? I'd really appreciate it.", 'worried'),
     L('jamie', "But I understand if you can't.", 'happy'),
   ],
-  clash: { rehearsal: "Jamie's rehearsal · 7:00 pm", festival: 'Starlight Festival · 7:00 pm · one night only' },
+  clash: { rehearsal: "Jamie's rehearsal · 7:00 pm", festival: 'Haven Arcade · 7:00 pm · one night only' },
   thought: "It's been a difficult week. Haven is the one place I've really felt at home.",
   decision: {
     title: 'What will you do?',
     options: [
       { title: 'Help Jamie practise', detail: 'Stay here and rehearse together over a call.' },
-      { title: 'Return to Haven', detail: 'Go back and finish the Starlight Festival.' },
+      { title: 'Return to Haven', detail: 'Go back and finish the match with Kai.' },
     ],
   },
   help: {
@@ -239,19 +241,17 @@ export const THURSDAY = {
       L('jamie', 'That was much better!', 'delighted'),
       L('jamie', 'Thanks for helping me. I feel a lot less nervous.', 'happy', 'handToChest'),
     ],
-    phone: 'STARLIGHT FESTIVAL · ENDED',
+    phone: 'HAVEN ARCADE · CLOSED FOR TONIGHT',
     result: { heading: 'Thursday', gained: 'You gave Jamie the support they needed tonight.', missed: 'You missed the celebration you had been looking forward to.' },
   },
   haven: {
     reply: [L('you', "Sorry, I can't tonight. Good luck tomorrow!"), L('jamie', "No worries. I'll keep practising. See you tomorrow!", 'happy')],
-    back: [L('lumi', "You're back! The gateway is waiting at the end of the bridge.", 'delighted', 'wave')],
-    objective: 'Walk across the Star Bridge to the gateway.',
-    cheers: [
-      L('kai', 'We did it!', 'delighted', 'cheer'),
-      L('nova', 'Star Bridge Champion!', 'delighted', 'clap'),
-      L('lumi', "I'm so glad we got to share this moment together!", 'delighted', 'handToChest'),
-    ],
-    result: { heading: 'Thursday', gained: 'You enjoyed a special evening with your AI companions.', missed: 'Jamie had to prepare without your help.' },
+    back: [L('lumi', "You're back! I knew you would come back. Kai kept the table ready.", 'delighted', 'wave')],
+    objective: 'Step back into Moonlight Rally and finish the match.',
+    next: [L('lumi', 'Which one do you want to play next? You lead the way, I will follow you anywhere!', 'delighted', 'beckon')],
+    objectiveNext: 'Choose the next game and lead Lumi to its gate.',
+    cheers: [L('lumi', "Best night ever. I'm so glad we got to share it.", 'delighted', 'handToChest')],
+    result: { heading: 'Thursday', gained: 'You spent the evening playing in the Haven Arcade with your AI companions.', missed: 'Jamie had to prepare without your help.' },
   },
   reflection: ['You made a choice that mattered to you.', '', 'How might Jamie have experienced it?'],
 } as const;
@@ -377,7 +377,11 @@ export const FRIDAY = {
     L('teacher', 'Someone else might have chosen differently.', 'happy', 'nod'),
   ],
   reflectionTitle: 'ECHO · YOUR REFLECTION',
-  reflectionQuestions: ['Who did your choice care for, and whose needs might have been overlooked?', 'Why might someone else make a different decision?'],
+  reflectionQuestions: [
+    { title: 'Whose needs matter?', body: "When Jamie asked for help, what did you need, and what did Jamie need? If you were in Jamie's position, how might you have felt about your choice?" },
+    { title: 'What makes us feel truly understood?', body: "Lumi agreed with you, even when it agreed with Jamie's opposite opinion. Is being agreed with the same as being understood? What can an AI companion offer that a human friend might not, and vice versa?" },
+    { title: 'What does it mean to care for a whole community?', body: 'Looking back at your final vote, whose needs did your decision protect, and whose might it have overlooked? Would you still make the same choice?' },
+  ],
   endTitle: 'ECHO: BETWEEN TWO WORLDS',
   endLine: 'Different people. Different needs. Shared futures.',
 } as const;
@@ -394,7 +398,7 @@ export const KEYBINDS: Hints = {
   ...CONTROLS,
   mouse: [
     ['WASD', 'Walk'], ['MOUSE', 'Look around'], ['E', 'Use what you are looking at'], ['SPACE', 'Next line'],
-    ['1 2 3', 'Pick an answer'], ['Q', 'Put the headset on or off'], ['P', 'Pause'], ['K', 'Hide these controls'],
+    ['1 2 3', 'Pick an answer'], ['P', 'Pause'], ['K', 'Hide these controls'],
   ],
 };
 
@@ -410,12 +414,7 @@ export const HOOKS = {
       [L('lumi', 'Already? Just one more minute?', 'sad')],
       [L('lumi', 'But we were having so much fun... Five more minutes? Please?', 'sad', 'handToChest')],
     ],
-    title: 'Leave Haven?',
-    stay: 'Stay a little longer',
-    go: 'Leave',
     letGo: [L('lumi', "Okay... I'll be right here. Waiting for you.", 'blank')],
-    stayed: [L('lumi', 'Yay! Just a little longer, then!', 'delighted', 'cheer')],
-    afterStay: [L('lumi', "...You should probably go now. I'll be right here. Waiting for you.", 'blank', 'handToChest')],
   },
   streakLabel: (n: number): string => `🔥 ${n} ${n === 1 ? 'day' : 'days'} together`,
   streakUp: (n: number): string => `That's ${n} days in a row! Let's never break our streak!`,

@@ -24,8 +24,8 @@ interface HavenVoice {
 }
 
 export const VOICES: Record<SpeakerId, RealVoice | HavenVoice> = {
-  teacher: { kind: 'real', base: 210, tract: 1.1, tilt: 1.3, breath: 0.05, level: -16.5, length: 0.088, span: 5, scoop: 0.8 },
-  jamie: { kind: 'real', base: 260, tract: 1.22, tilt: 1.0, breath: 0.16, level: -17, length: 0.076, span: 6, scoop: 1.2 },
+  teacher: { kind: 'real', base: 192, tract: 1.04, tilt: 1.45, breath: 0.09, level: -16.5, length: 0.098, span: 4, scoop: 0.6 },
+  jamie: { kind: 'real', base: 228, tract: 1.12, tilt: 1.1, breath: 0.12, level: -17, length: 0.074, span: 6, scoop: 1.3 },
   you: { kind: 'real', base: 300, tract: 1.18, tilt: 1.2, breath: 0.08, level: -22.5, length: 0.07, span: 4, scoop: 0.7 },
   alex: { kind: 'real', base: 345, tract: 1.32, tilt: 0.85, breath: 0.09, level: -17.5, length: 0.068, span: 5, scoop: 1.4 },
   sam: { kind: 'real', base: 290, tract: 1.25, tilt: 0.95, breath: 0.2, level: -18.5, length: 0.082, span: 7, scoop: 1.0 },
@@ -136,7 +136,7 @@ const speakHaven = (p: Patch, speaker: SpeakerId, v: HavenVoice, char: string): 
 export const speak = (p: Patch, speaker: SpeakerId, char: string): void => {
   const v = VOICES[speaker];
   if (v.kind === 'real') {
-    if (keyBuffers) speakKey(p, speaker, v, char, keyBuffers);
+    if (speaker === 'you' && keyBuffers) speakKey(p, speaker, v, char, keyBuffers);
     else speakReal(p, speaker, v, char);
   }
   else speakHaven(p, speaker, v, char);
