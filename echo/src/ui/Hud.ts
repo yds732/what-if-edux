@@ -65,7 +65,7 @@ export class Hud {
   private sub: { line: SubtitleLine; lines: string[]; chars: number; total: number; waiting: boolean } | null = null;
   private cardText = { title: '', subtitle: '' };
   private resultData: { heading: string; gained: string; missed: string } = { heading: '', gained: '', missed: '' };
-  private toastData: { title: string; body: string; icon?: 'mail' | 'speaker' } = { title: '', body: '' };
+  private toastData: { title: string; body: string; icon?: 'mail' | 'speaker'; center?: boolean } = { title: '', body: '' };
   private reflectionLines: string[] = [];
   private counterData = { label: '', value: 0, total: 3, pulse: 0 };
   private hints: Hints | null = null;
@@ -289,7 +289,7 @@ export class Hud {
     this.result.widget.visible = true;
   }
 
-  setToast(data: { title: string; body: string; icon?: 'mail' | 'speaker' } | null): void {
+  setToast(data: { title: string; body: string; icon?: 'mail' | 'speaker'; center?: boolean } | null): void {
     if (data === null) {
       this.toast.widget.visible = false;
       return;
@@ -424,7 +424,7 @@ export class Hud {
     this.result.widget.x = 0;
     this.result.widget.y = 20;
     this.toast.widget.x = 0;
-    this.toast.widget.y = vh / 2 - this.toast.widget.panel.height / 2 - edge + PAD;
+    this.toast.widget.y = this.toastData.center ? 40 : vh / 2 - this.toast.widget.panel.height / 2 - edge + PAD;
     this.reflection.widget.x = 0;
     this.reflection.widget.y = 30;
     const corner = this.mode === 'touch' ? 62 / this.uiScale : 0;
@@ -800,11 +800,17 @@ export class Hud {
 
   private paintReflection(): void {
     const widget = this.reflection.widget;
-    let wrapped: string[] = [];
+    let wrapped: { text: string; bullet: 0 | 1 | 2 }[] = [];
+    let list = 0;
     const maxW = Math.min(1000, this.vw - 60);
     widget.panel.paint((ctx) => {
       ctx.font = displayFont(400, 38, true);
-      wrapped = this.reflectionLines.flatMap((l) => (l === '' ? [''] : wrap(ctx, l, maxW - 60)));
+      wrapped = this.reflectionLines.flatMap((l): { text: string; bullet: 0 | 1 | 2 }[] => {
+        if (l === '') return [{ text: '', bullet: 0 as const }];
+        if (!l.startsWith('• ')) return wrap(ctx, l, maxW - 60).map((text) => ({ text, bullet: 0 as const }));
+        return wrap(ctx, l.slice(2), maxW - 110).map((text, i) => ({ text, bullet: i === 0 ? (1 as const) : (2 as const) }));
+      });
+      list = Math.max(0, ...wrapped.filter((l) => l.bullet).map((l) => ctx.measureText(l.text).width + 40));
     });
     widget.panel.resize(maxW, wrapped.length * 50 + 70);
     widget.panel.paint((ctx, w, h) => {
@@ -830,7 +836,18 @@ export class Hud {
       ctx.shadowBlur = 16;
       ctx.font = displayFont(400, 38, true);
       ctx.fillStyle = '#ffffff';
-      wrapped.forEach((line, i) => ctx.fillText(line, w / 2, h / 2 + (i - (wrapped.length - 1) / 2) * 50));
+      const left = w / 2 - list / 2;
+      wrapped.forEach((line, i) => {
+        const y = h / 2 + (i - (wrapped.length - 1) / 2) * 50;
+        if (!line.bullet) {
+          ctx.textAlign = 'center';
+          ctx.fillText(line.text, w / 2, y);
+          return;
+        }
+        ctx.textAlign = 'left';
+        if (line.bullet === 1) ctx.fillText('•', left, y);
+        ctx.fillText(line.text, left + 40, y);
+      });
     });
   }
 

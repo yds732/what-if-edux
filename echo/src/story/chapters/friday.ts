@@ -84,12 +84,10 @@ export const friday = async (game: Game): Promise<void> => {
   await d.fadeOut(1.6, 0x0b0d1a);
   audio.setSoundscape('ending', 3);
   game.reach('friday.hooks');
-  for (const [heading, detail] of hookPayoff(state)) {
-    hud.setReflection([HOOKS.payoffTitle, '', heading, '', detail]);
-    await holdToRead(game, 3.5, 20);
-    hud.setReflection(null);
-    await d.wait(0.5);
-  }
+  hud.setReflection([HOOKS.payoffTitle, '', ...hookPayoff(state)]);
+  await holdToRead(game, 3.5, 25);
+  hud.setReflection(null);
+  await d.wait(0.5);
   game.reach('friday.reflection');
   for (const [i, q] of FRIDAY.reflectionQuestions.entries()) {
     hud.setReflection([FRIDAY.reflectionTitle, '', `${i + 1}. ${q.title}`, '', q.body]);

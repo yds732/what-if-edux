@@ -44,7 +44,7 @@ export class Director {
     return this.game.app.tasks.tween(seconds, onUpdate, easing, this.signal);
   }
 
-  private advancePressed(): boolean {
+  advancePressed(): boolean {
     const input = this.game.input;
     if (this.game.hud.choosing) return false;
     const tapped = input.mode === 'touch' ? input.released.has('primary') && input.wasTap : input.pressed.has('primary');
@@ -130,6 +130,7 @@ export class Director {
     hud.setReticleVisible(false);
     input.freePointer();
     const fx = this.game.app.fx;
+    if (fx.fade < 0.01) fx.fadeColor.set(0x05040a);
     this.tween(0.5, (k) => (fx.dim = k)).catch(() => undefined);
     try {
       const shown = hud.choose(title, [...options], this.signal);
