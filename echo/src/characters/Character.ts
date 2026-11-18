@@ -113,8 +113,8 @@ export class Character {
     this.applyPose(1e6);
   }
 
-  static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows): Promise<Character> {
-    return new Character(spec, await ctx.assets.model(id), shadowMaps);
+  static async create(ctx: BuildContext, spec: CharacterSpec, id: string, shadowMaps = ctx.quality.shadows, weight?: 'medium' | 'low'): Promise<Character> {
+    return new Character(spec, await ctx.assets.model(id, weight), shadowMaps);
   }
 
   place(x: number, y: number, z: number, yawRad = 0): this {

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 import { Character } from '../../characters/Character';
 import { CAST, type CastName } from '../../characters/cast';
 import { place, sweep, torus, v3 } from '../../core/geo';
@@ -8,7 +7,7 @@ import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
 import type { Future } from '../../story/script';
 import { Panel } from '../../ui/Panel';
-import { THEMES, font, glass, roundRect, spaced, wrap } from '../../ui/draw';
+import { font, roundRect, spaced, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, characterYaw, type Anchor, type BuildContext, type FrameContext } from '../World';
 import type { Obstacle } from '../colliders';
 import { dress, framed, sizeOf, type Spot } from '../dressing';
@@ -36,6 +35,7 @@ export const CLASSROOM = {
 } as const satisfies Record<string, Anchor | THREE.Vector3>;
 
 export type ClassroomVariant = 'morning' | 'golden' | 'viewer';
+const INK = { accent: '#1f5fb8', text: '#142645', body: '#22375c', dim: 'rgba(34, 55, 92, 0.75)' };
 export type ScreenContent =
   | { kind: 'title'; eyebrow: string; title: string; body: string }
   | { kind: 'voice'; name: string; line: string }
@@ -43,14 +43,9 @@ export type ScreenContent =
 
 const W = 5, D = 6, H = 3.4;
 export const FLOOR_MARK = 0.02;
-const LIGHT_COLS = [-2.8, 0, 2.8], LIGHT_ROWS = [-3.6, -0.6, 2.4];
-const ORB_R = 0.16;
-const LAMP_COLOR = 0xfff1e0, PENDANT_POWER = 3.0;
-const BORDER = { y: 0.24, off: 0.05, color: 0xcfe4ff, power: 0.9 };
-const BORDER_LAMPS: readonly (readonly [number, number])[] = [
-  [-2.5, -D + 0.35], [2.5, -D + 0.35], [-2.5, D - 0.35], [2.5, D - 0.35],
-  [W - 0.35, -3.6], [W - 0.35, 2.4], [-W + 0.35, -3], [-W + 0.35, 3],
-];
+const RINGS: readonly (readonly [number, number, number])[] = [[-2.1, -1.4, 0.75], [2.1, -1.4, 0.75], [-2.1, 2.2, 0.75], [2.1, 2.2, 0.75], [0.2, -3.9, 1.1]];
+const LAMP_COLOR = 0xfff6ec, RING_POWER = 4.2;
+const BORDER = { y: 0.24, off: 0.05, color: 0xcfe4ff };
 const DOOR_GAP = { z0: -2.45, z1: -1.35 };
 const DESK = { wide: 1.5, deep: 0.64, top: 0.82, yaw: 18 * (Math.PI / 180) };
 const SIGN = { wide: 0.8, tall: 1.2 };
@@ -124,7 +119,6 @@ export class ClassroomWorld extends World {
   private ceiling!: THREE.Mesh;
   private readonly lamps: THREE.PointLight[] = [];
   private border!: THREE.Mesh;
-  private readonly windows: THREE.RectAreaLight[] = [];
   private screen!: Panel;
   private poster!: Panel;
   private posterGroup = new THREE.Group();
@@ -147,7 +141,7 @@ export class ClassroomWorld extends World {
     this.near = 0.05;
     this.far = 1400;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003, dof: 0.5,
+      exposure: 1.0, bloom: 0.06, ao: 1.0, saturation: 1.06, contrast: 0.16, vignette: 0.26, grain: 0.012, chroma: 0.003, dof: 0,
       shadowTint: new THREE.Color(0.0, 0.004, 0.012), highlightTint: new THREE.Color(0.012, 0.006, -0.004),
     }));
     this.clearColor.set(0xbfd0ea);
@@ -165,13 +159,13 @@ export class ClassroomWorld extends World {
     scene.add(this.city.group);
     await ctx.step('classroom: city');
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: carpet(new Rng(2082), W * 2, D * 2), roughness: 0.96 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: resinFloor(new Rng(2082), W * 2, D * 2), roughness: 0.42 }));
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
     const b = new Builder();
-    const wall = 0xe9ecf3, trim = 0xc9cedb, accent = 0x7fa0c9;
+    const wall = 0xe4e8ef, trim = 0xd6dbe4;
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, -D - 0.08]);
     b.box('matte', wall, [W * 2, H, 0.16], [0, H / 2, D + 0.08]);
     b.box('matte', wall, [0.16, H, D * 2], [W + 0.08, H / 2, 0]);
@@ -186,28 +180,22 @@ export class ClassroomWorld extends World {
     }
     for (const z of centres) {
       const frame = [v3(0, WY0, z - WW / 2), v3(0, WY0, z + WW / 2), v3(0, WY1, z + WW / 2), v3(0, WY1, z - WW / 2), v3(0, WY0, z - WW / 2)];
-      b.add('metal', 0xf2f3f7, place(sweep(frame, () => 0.045, { radial: 6, polyline: true, steps: 4, startCap: 'flat', endCap: 'flat' }), [-W - 0.02, 0, 0]));
+      b.add('metal', 0x2c313c, place(sweep(frame, () => 0.028, { radial: 6, polyline: true, steps: 4, startCap: 'flat', endCap: 'flat' }), [-W - 0.02, 0, 0]));
     }
-    b.box('satin', 0xd2ad7f, [0.34, 0.04, D * 2 - 0.6], [-W + 0.17, WY0 - 0.02, 0], { r: 0.012 });
-    b.box('satin', 0xb98c5a, [0.02, 0.04, D * 2 - 0.58], [-W + 0.34, WY0 - 0.02, 0], { r: 0.008 });
-    b.box('satin', 0xf2f3f7, [0.02, 0.12, D * 2 - 0.64], [-W + 0.02, WY0 - 0.1, 0]);
+    b.box('gloss', 0xf4f5f8, [0.34, 0.04, D * 2 - 0.6], [-W + 0.17, WY0 - 0.02, 0], { r: 0.012 });
+    b.box('glow', 0xcfe4ff, [0.006, 0.004, D * 2 - 0.7], [-W + 0.33, WY0 - 0.043, 0]);
     b.box('satin', trim, [W * 2, 0.1, 0.03], [0, 0.05, -D + 0.015]);
     b.box('satin', trim, [0.03, 0.1, D * 2], [W - 0.015, 0.05, 0]);
     b.box('satin', trim, [W * 2, 0.1, 0.03], [0, 0.05, D - 0.015]);
-    b.box('satin', accent, [W * 2, 0.5, 0.02], [0, 0.35, -D + 0.012]);
 
-    const STAGE = { wide: 7.4, deep: 1.9, z: -5.05 }, BOARD = 0.158, grain = new Rng(2083);
-    b.box('satin', 0xa47c4f, [STAGE.wide, STAGE_HEIGHT - 0.02, STAGE.deep], [0, (STAGE_HEIGHT - 0.02) / 2, STAGE.z]);
-    const boards = Math.round(STAGE.deep / BOARD);
-    for (let i = 0; i < boards; i++) {
-      const tone = new THREE.Color(0xd6b081).offsetHSL(grain.range(-0.008, 0.008), grain.range(-0.04, 0.04), grain.range(-0.045, 0.03));
-      b.box('satin', tone, [STAGE.wide - 0.04, 0.02, BOARD - 0.006], [0, STAGE_HEIGHT - 0.01, STAGE.z + STAGE.deep / 2 - BOARD / 2 - i * BOARD], { r: 0.003 });
-    }
-    b.box('satin', 0xb98c5a, [STAGE.wide + 0.02, STAGE_HEIGHT + 0.004, 0.05], [0, (STAGE_HEIGHT + 0.004) / 2, STAGE.z + STAGE.deep / 2 - 0.02], { r: 0.012 });
-    for (const s of [-1, 1]) b.box('satin', 0xb98c5a, [0.05, STAGE_HEIGHT + 0.004, STAGE.deep], [s * (STAGE.wide / 2 - 0.02), (STAGE_HEIGHT + 0.004) / 2, STAGE.z], { r: 0.012 });
-    b.box('gloss', 0x1a1e2c, [5.0, 2.3, 0.07], [0.2, 2.05, -D + 0.05], { r: 0.035 });
-    b.box('metal', 0xd9dde8, [5.16, 2.46, 0.04], [0.2, 2.05, -D + 0.022], { r: 0.05 });
+    const STAGE = { wide: 7.4, deep: 1.9, z: -5.05 };
+    b.box('satin', 0xe9ecf1, [STAGE.wide, STAGE_HEIGHT - 0.012, STAGE.deep], [0, (STAGE_HEIGHT - 0.012) / 2, STAGE.z], { r: 0.01 });
+    b.box('satin', 0xd9dde5, [STAGE.wide - 0.02, 0.012, STAGE.deep - 0.02], [0, STAGE_HEIGHT - 0.006, STAGE.z], { r: 0.004 });
+    b.box('glow', 0xbfe0ff, [STAGE.wide - 0.1, 0.006, 0.006], [0, 0.03, STAGE.z + STAGE.deep / 2 + 0.002]);
+    b.box('gloss', 0xf7f8fa, [5.2, 2.5, 0.07], [0.2, 2.05, -D + 0.045], { r: 0.06 });
+    b.box('glow', 0xcfe4ff, [4.6, 0.006, 0.006], [0.2, 2.05 - 1.255, -D + 0.07]);
     const sets = [this.frontRow, scene].map((to) => ({ to, b: new Builder(), chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[], colliders: [] as Obstacle[] }));
+    const chairRng = new Rng(2084);
     for (const t of TABLES) {
       const set = sets[t.front ? 0 : 1]!;
       buildTable(set.b, t, rng);
@@ -219,9 +207,9 @@ export class ClassroomWorld extends World {
         const [cx, cz] = onTable(t, p.side * TABLE.seatX + (state === 'askew' ? rng.range(-0.12, 0.12) : 0), p.facing * back);
         const turn = (p.facing === 1 ? 180 : 0) + t.yaw + (state === 'askew' ? rng.pick([-1, 1]) * rng.range(10, 22) : rng.range(-4, 4));
         set.chairs.push([cx, 0, cz, turn]);
-        if (used || rng.chance(0.4)) {
-          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.1);
-          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-8, 8)]);
+        if (used) {
+          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.08);
+          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-5, 5)]);
         }
         if (p.who) {
           set.colliders.push({ kind: 'circle', cx, cz, r: 0.3 });
@@ -232,10 +220,14 @@ export class ClassroomWorld extends World {
         }
       }
     }
+    for (const [gx, gz, front] of [[-GROUP_X, GROUP_Z[0], true], [GROUP_X, GROUP_Z[0], true], [-GROUP_X, GROUP_Z[1], false], [GROUP_X, GROUP_Z[1], false]] as const) {
+      const set = sets[front ? 0 : 1]!;
+      set.to.add(groupTable(gx, gz));
+    }
     for (const set of sets) {
       set.b.finish(set.to);
-      await dress(ctx, set.to, 'chair', set.chairs);
-      set.to.add(tablets(set.slates));
+      set.to.add(shellChairs(set.chairs, chairRng));
+      set.to.add(holoScreens(set.slates));
       await dress(ctx, set.to, 'backpack', set.bags);
     }
     this.colliders.obstacles.push(...sets[1]!.colliders);
@@ -244,7 +236,16 @@ export class ClassroomWorld extends World {
     await ctx.step('classroom: desks');
 
     const [, plinthTall] = await sizeOf(ctx, 'plinth');
-    (await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]])).scale.y = CLASSROOM.plinth.y / plinthTall;
+    const plinth = await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]]);
+    plinth.scale.y = CLASSROOM.plinth.y / plinthTall;
+    plinth.traverse((o) => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const m = (o.material as THREE.MeshStandardMaterial).clone();
+      m.map = null;
+      m.color.set(0xf3f4f7);
+      m.roughness = 0.3;
+      o.material = m;
+    });
     {
       const c = Math.cos(DESK.yaw), s = Math.sin(DESK.yaw);
       const at = (lx: number, y: number, lz: number): [number, number, number] =>
@@ -258,17 +259,25 @@ export class ClassroomWorld extends World {
       scene.add(teacherThings(at(0, top, 0), DESK.yaw));
     }
 
-    const [cubbyWide, , cubbyDeep] = await sizeOf(ctx, 'lockers');
-    const cubbies = Math.floor((W * 2 - 1.6) / (cubbyWide + 0.06));
-    await dress(ctx, scene, 'lockers', Array.from({ length: cubbies }, (_, i): Spot => [(i - (cubbies - 1) / 2) * (cubbyWide + 0.06), 0, D - cubbyDeep / 2 - 0.02, 180]));
+    {
+      const unitWide = 1.72, units = 4, deep = 0.45;
+      const bagSpots: Spot[] = [];
+      const bagRng = new Rng(2085);
+      for (let i = 0; i < units; i++) {
+        const x = (i - (units - 1) / 2) * (unitWide + 0.06);
+        trayUnit(b, x, D - deep / 2 - 0.02, unitWide, deep, bagRng);
+        for (let k = 0; k < 2; k++) if (bagRng.chance(0.7)) bagSpots.push([x + bagRng.range(-0.6, 0.6), TRAY_UNIT_TALL, D - deep / 2 - 0.02, 180 + bagRng.range(-30, 30), 0.9]);
+      }
+      await dress(ctx, scene, 'backpack', bagSpots);
+    }
 
-    const [, , shelfDeep] = await sizeOf(ctx, 'bookshelf');
-    await dress(ctx, scene, 'bookshelf', [[W - shelfDeep / 2 - 0.02, 0, BOOKSHELF_Z, -90]]);
+    const shelfDeep = 0.42;
+    bookcase(b, W - shelfDeep / 2 - 0.02, BOOKSHELF_Z, shelfDeep, new Rng(2086));
     this.colliders.box(W - shelfDeep / 2, BOOKSHELF_Z, shelfDeep / 2 + 0.05, 0.55);
-    await dress(ctx, scene, 'door', [[W - 0.07, 0, -1.9, -90]]);
+    slidingDoor(b, W, -1.9);
     const hang = async (id: string, wide: number, x: number, y: number, z: number, turn: number): Promise<void> => {
       const picture = await ctx.assets.picture(id);
-      const hung = framed(picture.map, wide, (wide * picture.entry.size[1]) / picture.entry.size[0]);
+      const hung = framed(picture.map, wide, (wide * picture.entry.size[1]) / picture.entry.size[0], 0xf4f5f8);
       hung.position.set(x, y, z);
       hung.rotation.y = turn;
       scene.add(hung);
@@ -336,11 +345,14 @@ export class ClassroomWorld extends World {
     await dress(ctx, scene, 'plant-tall', corners.map(([x, y, z]): Spot => [x, y, z, rng.range(0, 360)]));
     for (const [x, , z] of corners) this.colliders.circle(x, z, 0.4);
     await dress(ctx, scene, 'plant-small', centres.map((z): Spot => [-W + 0.13, WY0, z + rng.range(-0.6, 0.6), rng.range(0, 360), rng.range(0.9, 1.25)]));
+    const tint = new THREE.MeshStandardMaterial({ color: 0x5a7394, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.38, depthWrite: false });
     centres.forEach((z, i) => {
       const drop = BLIND_DROPS[i]!;
-      b.box('matte', 0xe6e2d6, [0.01, drop, WW + 0.06], [-W + 0.06, WY1 - drop / 2, z]);
-      b.box('satin', 0xc9ccd2, [0.025, 0.025, WW + 0.06], [-W + 0.065, WY1 - drop, z], { r: 0.008 });
-      b.box('satin', 0xf0f1f4, [0.09, 0.09, WW + 0.16], [-W + 0.06, WY1 + 0.06, z], { r: 0.02 });
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(WW, drop), tint);
+      pane.position.set(-W + 0.01, WY1 - drop / 2, z);
+      pane.rotation.y = Math.PI / 2;
+      scene.add(pane);
+      b.box('glow', 0xcfe4ff, [0.004, 0.004, WW - 0.04], [-W + 0.012, WY1 - drop, z]);
     });
     const sheet = (texture: THREE.Texture, wide: number, tall: number, x: number, y: number, z: number, turn: number): void => {
       const paper = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 }));
@@ -352,23 +364,32 @@ export class ClassroomWorld extends World {
     sheet(chartPaper(new Rng(7)), 0.62, 0.86, -W + 0.004, 1.75, -2.8, Math.PI / 2);
     sheet(feelingsChart(), 0.66, 0.66, -W + 0.004, 1.85, 0, Math.PI / 2);
     sheet(chartPaper(new Rng(11)), 0.62, 0.86, -W + 0.004, 1.7, 2.8, Math.PI / 2);
-    const board = framed(displayBoard(new Rng(9)), 4.2, 1.05, 0xc0392b);
+    const board = framed(displayBoard(new Rng(9)), 4.2, 1.05, 0xf4f5f8);
     board.position.set(-0.3, 2.3, D - 0.005);
     board.rotation.y = Math.PI;
     scene.add(board);
     const easel = { x: -4.25, z: -3.55, turn: 55 * RAD };
     const ex = (lx: number, lz: number): [number, number] => [easel.x + lx * Math.cos(easel.turn) + lz * Math.sin(easel.turn), easel.z - lx * Math.sin(easel.turn) + lz * Math.cos(easel.turn)];
-    for (const [lx, lz, lean] of [[-0.3, 0.05, 0.1], [0.3, 0.05, -0.1], [0, -0.28, 0]] as const) {
-      const [x, z] = ex(lx, lz);
-      b.box('metal', 0x8e959e, [0.022, 1.75, 0.022], [x, 0.87, z], { rot: [lz < 0 ? -0.2 : 0.06, easel.turn, lean] });
+    {
+      for (const lx of [-0.5, 0.5]) {
+        const [lxw, lzw] = ex(lx, 0);
+        b.box('satin', 0xe9ecf1, [0.04, 1.75, 0.035], [lxw, 0.875, lzw], { r: 0.012, rot: [0, easel.turn, 0] });
+        b.cyl('satin', 0xe9ecf1, 0.12, 0.025, [lxw, 0, lzw], { radial: 24 });
+      }
+      const [px, pz] = ex(0, 0.03);
+      b.box('gloss', 0xf4f5f8, [1.08, 0.78, 0.03], [px, 1.28, pz], { r: 0.03, rot: [0, easel.turn, 0] });
+      const [tx, tz] = ex(0, 0.07);
+      b.box('satin', 0xe9ecf1, [0.6, 0.02, 0.05], [tx, 0.885, tz], { r: 0.008, rot: [0, easel.turn, 0] });
+      for (const [k, c] of [0x2f5fc0, 0xd8453a, 0x2f9a5c].entries()) {
+        const [mx, mz] = ex(-0.12 + k * 0.1, 0.07);
+        b.box('satin', c, [0.12, 0.018, 0.018], [mx, 0.905, mz], { r: 0.008, rot: [0, easel.turn, 0] });
+      }
+      const pad = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.7), new THREE.MeshStandardMaterial({ map: whiteboardRules(), roughness: 0.25 }));
+      const [qx, qz] = ex(0, 0.047);
+      pad.position.set(qx, 1.28, qz);
+      pad.rotation.set(0, easel.turn, 0, 'YXZ');
+      scene.add(pad);
     }
-    const [px, pz] = ex(0, 0.09);
-    b.box('satin', 0xf4f4f2, [0.66, 0.84, 0.02], [px, 1.32, pz], { rot: [-0.08, easel.turn, 0] });
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.78), new THREE.MeshStandardMaterial({ map: chartPaper(new Rng(21)), roughness: 0.9 }));
-    const [qx, qz] = ex(0, 0.104);
-    pad.position.set(qx, 1.32, qz);
-    pad.rotation.set(-0.08, easel.turn, 0, 'YXZ');
-    scene.add(pad);
     this.colliders.circle(easel.x, easel.z, 0.42);
     b.finish(scene);
     await ctx.step('classroom: furniture');
@@ -389,19 +410,26 @@ export class ClassroomWorld extends World {
       { min: new THREE.Vector3(-W, 0.05, -D), max: new THREE.Vector3(W, H - 0.05, D) }, ctx.quality.density);
     scene.add(this.beams.group);
     const panels = new Builder();
-    const lamp = (x: number, y: number, z: number, power: number): void => {
-      const light = new THREE.PointLight(LAMP_COLOR, power, 0, 2);
-      light.position.set(x, y, z);
-      light.userData.power = power;
+    for (const [x, z, r] of RINGS) {
+      const y = H - 0.42;
+      const ring = new THREE.TorusGeometry(r, 0.03, 10, 96);
+      ring.rotateX(Math.PI / 2);
+      ring.deleteAttribute('uv');
+      panels.add('satin', 0xf4f5f8, place(ring, [x, y + 0.012, z]));
+      const band = new THREE.TorusGeometry(r, 0.022, 8, 96);
+      band.rotateX(Math.PI / 2);
+      band.scale(1, 0.5, 1);
+      band.deleteAttribute('uv');
+      panels.add('glow', 0xffffff, place(band, [x, y - 0.014, z]));
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * TAU;
+        panels.cyl('metal', 0x2a2a2a, 0.002, H - y, [x + Math.cos(a) * r, y, z + Math.sin(a) * r], { radial: 5 });
+      }
+      const light = new THREE.PointLight(LAMP_COLOR, RING_POWER * (r > 1 ? 1.2 : 1), 0, 2);
+      light.position.set(x, y - 0.2, z);
+      light.userData.power = light.intensity;
       this.lamps.push(light);
       scene.add(light);
-    };
-    for (const x of LIGHT_COLS) for (const z of LIGHT_ROWS) {
-      const orb = new THREE.SphereGeometry(ORB_R, 32, 20);
-      orb.deleteAttribute('uv');
-      panels.add('glow', 0xffffff, place(orb, [x, H - 2 * ORB_R - ORB_R, z]));
-      panels.cyl('metal', 0x2a2a2a, 0.002, 2 * ORB_R + 0.01, [x, H - 2 * ORB_R - 0.005, z], { radial: 6 });
-      lamp(x, H - 3 * ORB_R, z, PENDANT_POWER);
     }
     this.ceiling = panels.finish(scene, { glow: 2.2, shadows: false }).glow!;
     {
@@ -416,23 +444,6 @@ export class ClassroomWorld extends World {
         for (const edge of [-1, 1]) border.box('glow', BORDER.color, size(len, 0.005, 0.02), [x, y + edge * 0.0275, z]);
       }
       this.border = border.finish(scene, { glow: 2.4, shadows: false }).glow!;
-      if (ctx.quality.tier !== 'low') {
-        for (const [x, z] of BORDER_LAMPS) {
-          const light = new THREE.PointLight(BORDER.color, BORDER.power, 0, 2);
-          light.position.set(x, y + 0.15, z);
-          light.userData.power = BORDER.power;
-          this.lamps.push(light);
-          scene.add(light);
-        }
-      }
-    }
-    RectAreaLightUniformsLib.init();
-    for (const [i, z] of centres.entries()) {
-      const sky = new THREE.RectAreaLight(0xe4ecff, 0, WW, WY1 - BLIND_DROPS[i]! - WY0);
-      sky.position.set(-W + 0.02, (WY0 + WY1 - BLIND_DROPS[i]!) / 2, z);
-      sky.lookAt(0, sky.position.y, z);
-      this.windows.push(sky);
-      scene.add(sky);
     }
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xcfe0ff, roughness: 0.04, transparent: true, opacity: 0.08, depthWrite: false });
     for (const z of centres) {
@@ -445,7 +456,7 @@ export class ClassroomWorld extends World {
     this.screen = new Panel(1920, 880, { world: true });
     this.screen.mesh.scale.set(4.84, 2.2, 1);
     this.screen.mesh.position.set(0.2, 2.05, -D + 0.092);
-    this.screen.mesh.material.color.setScalar(1.25);
+    this.screen.mesh.material.color.setScalar(0.96);
     scene.add(this.screen.mesh);
     const screenLight = new THREE.PointLight(0x9fc6ff, 2.2, 9, 1.6);
     screenLight.position.set(0.2, 2.1, -4.9);
@@ -473,7 +484,9 @@ export class ClassroomWorld extends World {
     teacher.placeAt(CLASSROOM.teacher);
     this.colliders.circle(CLASSROOM.teacher.position.x, CLASSROOM.teacher.position.z, 0.4);
     for (const s of SEATING) {
-      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who));
+      const main = s.who === 'jamie';
+      const weight = main ? undefined : s.who === 'yusra' ? 'medium' : 'low';
+      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who, main ? ctx.quality.shadows : false, weight));
       person.placeAt(s.seat).setPose(s.pose, { immediate: true, seat: SEAT });
       if (s.who !== 'jamie') person.setLiveliness(0.7);
     }
@@ -527,15 +540,11 @@ export class ClassroomWorld extends World {
     this.sun.position.set(-12, 9 - 6.2 * m.warm, -3 + 2 * m.warm);
     for (const l of this.lamps) l.intensity = (l.userData.power as number) * m.room;
     const daylight = m.sun / 4.4;
-    for (const w of this.windows) {
-      w.intensity = 2.2 * daylight;
-      w.color.setRGB(0.9 + 0.1 * m.warm, 0.93 - 0.2 * m.warm, 1.0 - 0.45 * m.warm);
-    }
-    this.fill.intensity = 0.012;
+    this.fill.intensity = 0.04 + 0.26 * daylight;
     this.fill.color.setRGB(0.95 + 0.05 * m.warm, 0.93 - 0.18 * m.warm, 0.9 - 0.4 * m.warm);
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);
     (this.border.material as THREE.MeshBasicMaterial).color.setScalar(0.1 + 2.4 * m.room);
-    this.scene.environmentIntensity = 0.03 + 0.03 * m.room + 0.02 * m.warm;
+    this.scene.environmentIntensity = 0.07 + 0.06 * m.room + 0.02 * m.warm;
     this.city.setNight(m.night);
     this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (m.sun / 4.4) * (1.2 + 0.2 * m.warm));
     this.look.exposure = this.variant === 'viewer' ? 1.15 : 1.0;
@@ -595,14 +604,17 @@ export class ClassroomWorld extends World {
 
   setScreen(content: ScreenContent): void {
     this.screenPulse = 1;
-    const theme = THEMES.real;
+    if (content.kind === 'title' && !content.title && !content.eyebrow && !content.body) {
+      content = { kind: 'title', eyebrow: 'Harbour District School · Class 1', title: 'Good morning!', body: 'Find your seat and say hello to your group.' };
+    }
     this.screen.paint((ctx, w, h) => {
       const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, '#0f1730');
-      g.addColorStop(1, '#1a2a52');
+      g.addColorStop(0, '#bcd9f8');
+      g.addColorStop(1, '#7eaee6');
       ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = 'rgba(140, 190, 255, 0.16)';
+      roundRect(ctx, 0, 0, w, h, 34);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(60, 130, 215, 0.26)';
       ctx.lineWidth = 3;
       for (let i = 1; i <= 6; i++) {
         ctx.beginPath();
@@ -611,50 +623,55 @@ export class ClassroomWorld extends World {
       }
       ctx.textBaseline = 'middle';
       if (content.kind === 'title') {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 34);
         spaced(ctx, content.eyebrow.toUpperCase(), 130, 190, 10);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = font(300, 118);
+        ctx.fillStyle = INK.text;
+        ctx.font = font(500, 118);
         wrap(ctx, content.title, w - 520).forEach((l, i) => ctx.fillText(l, 124, 330 + i * 128));
         const n = wrap(ctx, content.title, w - 520).length;
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.9)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(400, 48);
         wrap(ctx, content.body, w - 620).forEach((l, i) => ctx.fillText(l, 130, 330 + n * 128 + 20 + i * 62));
       } else if (content.kind === 'voice') {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 34);
         spaced(ctx, 'ECHO COMMUNITY CONSULTATION', 130, 150, 10);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(300, 130);
         ctx.fillText(content.name, 124, 330);
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.92)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(300, 58);
         wrap(ctx, `“${content.line}”`, w - 560).forEach((l, i) => ctx.fillText(l, 130, 500 + i * 76));
       } else {
         const f = content.future;
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 32);
         spaced(ctx, content.heading, 110, 96, 9);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(600, 104);
         ctx.fillText(f.title, 104, 216);
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.92)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(300, 46);
         ctx.fillText(f.summary, 110, 310);
         const col = (x: number, good: boolean, head: string, body: string): void => {
-          glass(ctx, x, 380, 830, 300, theme, { radius: 30, glow: 0.4, border: good ? 'rgba(150, 230, 190, 0.7)' : 'rgba(255, 200, 140, 0.7)', borderWidth: 3 });
-          ctx.fillStyle = good ? '#9fe6c9' : '#ffcf9a';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+          roundRect(ctx, x, 380, 830, 300, 30);
+          ctx.fill();
+          ctx.strokeStyle = good ? 'rgba(60, 170, 120, 0.6)' : 'rgba(220, 140, 60, 0.6)';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.fillStyle = good ? '#2f9a6c' : '#d27a2c';
           ctx.font = font(600, 28);
           spaced(ctx, good ? 'WHAT IT GIVES' : 'WHAT IT COSTS', x + 44, 434, 6);
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = INK.text;
           ctx.font = font(600, 40);
           let y = 500;
           for (const l of wrap(ctx, head, 740)) {
             ctx.fillText(l, x + 44, y);
             y += 50;
           }
-          ctx.fillStyle = 'rgba(220, 232, 255, 0.88)';
+          ctx.fillStyle = INK.body;
           ctx.font = font(400, 32);
           for (const l of wrap(ctx, body, 740)) {
             ctx.fillText(l, x + 44, y + 8);
@@ -663,10 +680,10 @@ export class ClassroomWorld extends World {
         };
         col(104, true, f.gain.head, f.gain.body);
         col(984, false, f.cost.head, f.cost.body);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(300, 56);
         ctx.fillText(`“${f.question}”`, 110, 762);
-        ctx.fillStyle = 'rgba(200, 215, 245, 0.7)';
+        ctx.fillStyle = INK.dim;
         ctx.font = font(400, 28);
         ctx.textAlign = 'right';
         ctx.fillText(content.note, w - 110, 826);
@@ -732,7 +749,7 @@ export class ClassroomWorld extends World {
       this.applyMood();
     }
     this.screenPulse = Math.max(0, this.screenPulse - dt * 2);
-    this.screen.mesh.material.color.setScalar(1.25 + this.screenPulse * 1.5);
+    this.screen.mesh.material.color.setScalar(0.96 + this.screenPulse * 0.2);
     let any = 0;
     for (const who of ['alex', 'sam', 'riley']) {
       const person = this.cast[who]!;
@@ -850,95 +867,18 @@ const thankYouCard = (): THREE.CanvasTexture => canvasTexture(450, 330, (ctx) =>
   ctx.fillText('Thank you!', 225, 300);
 });
 
-const TABLET = { wide: 0.34, tall: 0.24, thick: 0.0045, lean: 24 * RAD, standAt: 0.55, standBack: 0.075 };
-let tabletScreen: THREE.CanvasTexture | null = null;
-
-const tablets = (spots: readonly Spot[]): THREE.Group => {
-  const group = new THREE.Group();
-  if (spots.length === 0) return group;
-  const { wide, tall, thick, lean, standAt, standBack } = TABLET;
-  const c = Math.cos(lean), s = Math.sin(lean), lift = 0.002;
-  const along = (a: number, out: number): THREE.Vector3 => new THREE.Vector3(0, lift + a * c + out * s, -a * s + out * c);
-  const glass = place(new THREE.BoxGeometry(wide, tall, thick), along(tall / 2, -thick / 2), [-lean, 0, 0]);
-  const face = place(new THREE.PlaneGeometry(wide, tall), along(tall / 2, 0.0003), [-lean, 0, 0]);
-  const top = along(standAt * tall, -thick), foot = new THREE.Vector3(0, 0.0015, top.z - standBack);
-  const legLength = top.distanceTo(foot);
-  const leg = place(new THREE.BoxGeometry(wide * 0.36, legLength, 0.003), top.clone().add(foot).multiplyScalar(0.5), [Math.atan2(top.z - foot.z, top.y - foot.y), 0, 0]);
-  if (!tabletScreen) tabletScreen = tabletUi();
-  const parts: [THREE.BufferGeometry, THREE.Material, boolean][] = [
-    [glass, new THREE.MeshPhysicalMaterial({ color: 0x101318, roughness: 0.18, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.05 }), true],
-    [leg, new THREE.MeshStandardMaterial({ color: 0xc3c9d1, roughness: 0.3, metalness: 0.9 }), true],
-    [face, new THREE.MeshBasicMaterial({ map: tabletScreen, color: new THREE.Color().setScalar(1.25) }), false],
-  ];
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
-  for (const [geometry, material, shadows] of parts) {
-    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
-    spots.forEach(([x, y, z, yaw = 0], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one)));
-    mesh.castShadow = shadows;
-    mesh.receiveShadow = shadows;
-    mesh.computeBoundingSphere();
-    group.add(mesh);
-  }
-  return group;
-};
-
-const tabletUi = (): THREE.CanvasTexture => {
-  const w = 540, h = 380;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const g = canvas.getContext('2d')!;
-  const bg = g.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, '#0d1b33');
-  bg.addColorStop(1, '#123c4f');
-  g.fillStyle = bg;
-  g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(140, 210, 255, 0.9)';
-  g.font = font(600, 22);
-  g.fillText('Today', 28, 46);
-  g.fillStyle = 'rgba(200, 225, 255, 0.45)';
-  g.fillRect(28, 60, 120, 3);
-  const cards: [number, number, number, number, string][] = [[28, 84, 300, 120, 'rgba(120, 190, 255, 0.16)'], [28, 220, 300, 130, 'rgba(120, 230, 210, 0.14)'], [348, 84, 164, 266, 'rgba(255, 255, 255, 0.07)']];
-  for (const [x, y, cw, ch, fill] of cards) {
-    g.fillStyle = fill;
-    roundRect(g, x, y, cw, ch, 16);
-    g.fill();
-  }
-  g.fillStyle = 'rgba(220, 235, 255, 0.55)';
-  for (const [x, y, lw] of [[48, 116, 200], [48, 140, 240], [48, 164, 150], [48, 252, 220], [48, 276, 180], [48, 300, 240]] as const) g.fillRect(x, y, lw, 8);
-  g.lineWidth = 12;
-  g.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-  g.beginPath(); g.arc(430, 190, 52, 0, TAU); g.stroke();
-  g.strokeStyle = '#6fd3ff';
-  g.lineCap = 'round';
-  g.beginPath(); g.arc(430, 190, 52, -Math.PI / 2, -Math.PI / 2 + TAU * 0.68); g.stroke();
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  return map;
-};
-
-const STEEL = 0x8e959e;
-
 const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
   const turn = t.yaw * RAD;
   const at = (lx: number, y: number, lz: number): [number, number, number] => {
     const [x, z] = onTable(t, lx, lz);
     return [x, y, z];
   };
-  b.box('satin', 0xdcb889, [TABLE.wide, 0.022, TABLE.deep], at(0, TABLE.top - 0.011, 0), { r: 0.006, rot: [0, turn, 0] });
-  b.box('satin', 0xa9875c, [TABLE.wide + 0.004, 0.008, TABLE.deep + 0.004], at(0, TABLE.top - 0.026, 0), { rot: [0, turn, 0] });
-  for (const lz of [-1, 1]) b.box('metal', STEEL, [TABLE.wide - 0.1, 0.034, 0.018], at(0, TABLE.top - 0.05, lz * (TABLE.deep / 2 - 0.035)), { rot: [0, turn, 0] });
-  for (const lx of [-1, 1]) {
-    b.box('metal', STEEL, [0.018, 0.034, TABLE.deep - 0.07], at(lx * (TABLE.wide / 2 - 0.045), TABLE.top - 0.05, 0), { rot: [0, turn, 0] });
-    for (const lz of [-1, 1]) b.cyl('metal', STEEL, 0.014, TABLE.top - 0.03, at(lx * (TABLE.wide / 2 - 0.045), 0, lz * (TABLE.deep / 2 - 0.035)), { radial: 10 });
-  }
   for (let i = rng.int(0, 2); i > 0; i--) {
     b.box('matte', 0xf7f6f1, [0.21, 0.002, 0.297], at(rng.range(-0.5, 0.5), TABLE.top + 0.001 + i * 0.001, rng.range(-0.12, 0.12)), { rot: [0, turn + rng.range(-0.6, 0.6), 0] });
   }
   if (rng.chance(0.45)) {
     const [x, y, z] = at(rng.pick([-1, 1]) * rng.range(0.05, 0.2), TABLE.top, rng.range(-0.15, 0.15));
-    b.cyl('satin', rng.pick([0x3b6fd0, 0xe25b45, 0x3fa66a, 0xf2b632]), 0.035, 0.085, [x, y, z], { radial: 14 });
+    b.cyl('gloss', rng.pick([0xf4f5f8, 0x9cc4e8, 0x9fd8c4, 0xf2b8a0]), 0.035, 0.085, [x, y, z], { radial: 14 });
     for (let k = 0; k < 4; k++) b.cyl('satin', rng.pick([0xf2c230, 0x3b6fd0, 0xe25b45, 0x2f9e5f]), 0.004, 0.15, [x + rng.range(-0.015, 0.015), y + 0.02, z + rng.range(-0.015, 0.015)], { radial: 6, rot: [rng.range(-0.25, 0.25), 0, rng.range(-0.25, 0.25)] });
   }
   if (rng.chance(0.4)) {
@@ -946,6 +886,271 @@ const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
     for (let k = 0; k < rng.int(1, 3); k++) b.box('satin', rng.pick([0x2f6fbf, 0xd9473a, 0x39a35b, 0x8a5cc2, 0xf0a830]), [0.17, 0.008, 0.235], at(lx + rng.range(-0.01, 0.01), TABLE.top + 0.004 + k * 0.009, lz), { rot: [0, spin + rng.range(-0.15, 0.15), 0] });
   }
 };
+
+const glowPool = (aspect: number): THREE.CanvasTexture => canvasTexture(512, Math.round(512 / aspect), (ctx) => {
+  const w = 512, h = Math.round(512 / aspect);
+  ctx.filter = 'blur(28px)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+  roundRect(ctx, 60, 60, w - 120, h - 120, Math.min(w, h) / 2 - 60);
+  ctx.fill();
+});
+
+const groupTable = (cx: number, cz: number): THREE.Group => {
+  const group = new THREE.Group();
+  const wide = TABLE.wide * 2 + 0.04, deep = TABLE.deep * 2 + 0.04, thick = 0.05, round = 0.5;
+  const shape = (w: number, d: number, r: number): THREE.Shape => {
+    const sh = new THREE.Shape(), hw = w / 2, hd = d / 2;
+    sh.moveTo(-hw + r, -hd);
+    sh.lineTo(hw - r, -hd); sh.quadraticCurveTo(hw, -hd, hw, -hd + r);
+    sh.lineTo(hw, hd - r); sh.quadraticCurveTo(hw, hd, hw - r, hd);
+    sh.lineTo(-hw + r, hd); sh.quadraticCurveTo(-hw, hd, -hw, hd - r);
+    sh.lineTo(-hw, -hd + r); sh.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+    return sh;
+  };
+  const bevel = 0.022;
+  const slabGeo = new THREE.ExtrudeGeometry(shape(wide - 2 * bevel, deep - 2 * bevel, round), { depth: thick - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, curveSegments: 32 });
+  slabGeo.rotateX(-Math.PI / 2);
+  slabGeo.translate(0, TABLE.top - thick + bevel, 0);
+  const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ color: 0xf6f7f9, roughness: 0.28 }));
+  slab.castShadow = slab.receiveShadow = true;
+  const underGeo = new THREE.ExtrudeGeometry(shape(wide - 0.3, deep - 0.3, round - 0.1), { depth: 0.03, bevelEnabled: false, curveSegments: 32 });
+  underGeo.rotateX(-Math.PI / 2);
+  underGeo.translate(0, TABLE.top - thick - 0.03, 0);
+  const under = new THREE.Mesh(underGeo, new THREE.MeshStandardMaterial({ color: 0xd9dee7, roughness: 0.4 }));
+  const pts = shape(wide - 0.32, deep - 0.32, round - 0.11).getSpacedPoints(160).map((q) => new THREE.Vector3(q.x, TABLE.top - thick - 0.031, -q.y));
+  const ring = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 240, 0.005, 6, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.88, 1.0).multiplyScalar(2.4) }));
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(wide + 0.8, deep + 0.8), new THREE.MeshBasicMaterial({ map: glowPool((wide + 0.8) / (deep + 0.8)), color: new THREE.Color(0.45, 0.62, 0.9).multiplyScalar(0.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.004;
+  group.add(slab, under, ring, pool);
+  group.position.set(cx, 0, cz);
+  return group;
+};
+
+const holoUi = (): THREE.CanvasTexture => canvasTexture(512, 340, (g) => {
+  const w = 512, h = 340;
+  const bg = g.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, 'rgba(90, 170, 255, 0.30)');
+  bg.addColorStop(1, 'rgba(60, 130, 230, 0.16)');
+  g.fillStyle = bg;
+  roundRect(g, 6, 6, w - 12, h - 12, 22);
+  g.fill();
+  g.strokeStyle = 'rgba(190, 228, 255, 0.95)';
+  g.lineWidth = 4;
+  g.stroke();
+  g.fillStyle = 'rgba(225, 242, 255, 0.95)';
+  g.font = font(600, 26);
+  g.fillText('Today', 32, 52);
+  g.fillStyle = 'rgba(200, 230, 255, 0.5)';
+  g.fillRect(32, 64, 110, 3);
+  for (const [x, y, cw, ch] of [[32, 88, 290, 100], [32, 204, 290, 110], [342, 88, 138, 226]] as const) {
+    g.fillStyle = 'rgba(160, 215, 255, 0.16)';
+    roundRect(g, x, y, cw, ch, 14);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(225, 242, 255, 0.7)';
+  for (const [x, y, lw] of [[50, 118, 200], [50, 142, 240], [50, 166, 150], [50, 236, 220], [50, 260, 180], [50, 284, 240]] as const) g.fillRect(x, y, lw, 7);
+  g.lineWidth = 11;
+  g.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  g.beginPath(); g.arc(411, 200, 44, 0, TAU); g.stroke();
+  g.strokeStyle = '#8fe3ff';
+  g.lineCap = 'round';
+  g.beginPath(); g.arc(411, 200, 44, -Math.PI / 2, -Math.PI / 2 + TAU * 0.68); g.stroke();
+});
+
+const holoScreens = (spots: readonly Spot[]): THREE.Group => {
+  const group = new THREE.Group();
+  if (spots.length === 0) return group;
+  const wide = 0.38, tall = 0.25, lift = 0.24, lean = 14 * RAD;
+  const pane = new THREE.PlaneGeometry(wide, tall);
+  pane.rotateX(-lean);
+  pane.translate(0, lift + tall / 2, 0);
+  const dot = new THREE.CircleGeometry(0.022, 24);
+  dot.rotateX(-Math.PI / 2);
+  dot.translate(0, 0.002, 0.03);
+  const beam = new THREE.CylinderGeometry(wide * 0.42, 0.012, lift, 24, 1, true);
+  beam.translate(0, lift / 2, 0.03);
+  beam.scale(1, 1, 0.35);
+  const parts: [THREE.BufferGeometry, THREE.Material][] = [
+    [pane, new THREE.MeshBasicMaterial({ map: holoUi(), color: new THREE.Color().setScalar(1.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false })],
+    [dot, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.85, 1.0).multiplyScalar(2.4) })],
+    [beam, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.55, 0.9).multiplyScalar(0.18), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })],
+  ];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  for (const [geometry, material] of parts) {
+    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+    spots.forEach(([x, y, z, yaw = 0], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one)));
+    mesh.computeBoundingSphere();
+    mesh.renderOrder = 3;
+    group.add(mesh);
+  }
+  return group;
+};
+
+const shellChairs = (spots: readonly Spot[], rng: Rng): THREE.Group => {
+  const group = new THREE.Group();
+  if (spots.length === 0) return group;
+  const wide = 0.42, N = 28, M = 20, thick = 0.022;
+  const profile: THREE.Vector2[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    if (t < 0.5) {
+      const u = t / 0.5;
+      profile.push(new THREE.Vector2(0.19 - u * 0.31, SEAT - 0.014 * Math.sin(u * Math.PI) - (u < 0.12 ? 0.03 * (1 - u / 0.12) ** 2 : 0)));
+    } else {
+      const u = (t - 0.5) / 0.5, a = u * (Math.PI / 2 + 0.28);
+      profile.push(new THREE.Vector2(-0.12 - 0.1 * Math.sin(a), SEAT + 0.1 * (1 - Math.cos(a)) + u * u * 0.22));
+    }
+  }
+  const cols = profile.length;
+  const inner: THREE.Vector3[] = [];
+  for (let j = 0; j <= M; j++) {
+    const v = j / M, x = (v - 0.5) * wide;
+    const side = Math.pow(Math.abs(v - 0.5) * 2, 2.5);
+    for (const [k, p] of profile.entries()) {
+      const up = k / (cols - 1);
+      inner.push(new THREE.Vector3(x * (1 - 0.1 * side * up), p.y + 0.035 * side, p.x + 0.03 * side * up));
+    }
+  }
+  const g0 = new THREE.BufferGeometry().setFromPoints(inner);
+  const idx0: number[] = [];
+  for (let j = 0; j < M; j++) for (let i = 0; i < cols - 1; i++) {
+    const a = j * cols + i, b = a + cols;
+    idx0.push(a, b, a + 1, a + 1, b, b + 1);
+  }
+  g0.setIndex(idx0);
+  g0.computeVertexNormals();
+  const n0 = g0.attributes.normal as THREE.BufferAttribute;
+  const pos: number[] = [], idx: number[] = [];
+  const count = inner.length;
+  for (const p of inner) pos.push(p.x, p.y, p.z);
+  for (let i = 0; i < count; i++) pos.push(inner[i]!.x - n0.getX(i) * thick, inner[i]!.y - n0.getY(i) * thick, inner[i]!.z - n0.getZ(i) * thick);
+  idx.push(...idx0);
+  for (let t = 0; t < idx0.length; t += 3) idx.push(idx0[t]! + count, idx0[t + 2]! + count, idx0[t + 1]! + count);
+  const edge = (a: number, b: number): void => { idx.push(a, a + count, b, b, a + count, b + count); };
+  for (let i = 0; i < cols - 1; i++) { edge(i + 1, i); edge(M * cols + i, M * cols + i + 1); }
+  for (let j = 0; j < M; j++) { edge(j * cols, (j + 1) * cols); edge((j + 1) * cols + cols - 1, j * cols + cols - 1); }
+  const shell = new THREE.BufferGeometry();
+  shell.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  shell.setIndex(idx);
+  shell.computeVertexNormals();
+  const topPts = Array.from({ length: M + 1 }, (_, j) => inner[j * cols + cols - 1]!.clone().add(new THREE.Vector3(0, -0.012, -0.006)));
+  const seam = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(topPts), 40, 0.004, 6);
+  const ring = new THREE.TorusGeometry(0.13, 0.008, 8, 48);
+  ring.rotateX(Math.PI / 2);
+  ring.translate(0, 0.07, 0.02);
+  const hub = new THREE.CylinderGeometry(0.1, 0.12, 0.03, 32);
+  hub.translate(0, 0.07, 0.02);
+  const floorGlow = new THREE.PlaneGeometry(0.62, 0.62);
+  floorGlow.rotateX(-Math.PI / 2);
+  floorGlow.translate(0, 0.003, 0.02);
+  const colours = [0xf6f7f9, 0xf6f7f9, 0xcfe2f6, 0xb8d4f2];
+  const cyan = new THREE.Color(0.65, 0.86, 1.0).multiplyScalar(2.4);
+  const parts: [THREE.BufferGeometry, THREE.Material, boolean][] = [
+    [shell, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.26, side: THREE.DoubleSide }), true],
+    [seam, new THREE.MeshBasicMaterial({ color: cyan }), false],
+    [hub, new THREE.MeshStandardMaterial({ color: 0xe9edf3, roughness: 0.3, metalness: 0.3 }), true],
+    [ring, new THREE.MeshBasicMaterial({ color: cyan }), false],
+    [floorGlow, new THREE.MeshBasicMaterial({ map: glowPool(1), color: new THREE.Color(0.45, 0.65, 0.95).multiplyScalar(0.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), false],
+  ];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
+  for (const [k, [geometry, material, shadows]] of parts.entries()) {
+    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+    spots.forEach(([x, y, z, yaw = 0], i) => {
+      mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one));
+      if (k === 0) mesh.setColorAt(i, c.set(rng.pick(colours)));
+    });
+    mesh.castShadow = mesh.receiveShadow = shadows;
+    mesh.computeBoundingSphere();
+    group.add(mesh);
+  }
+  return group;
+};
+
+const TRAY_UNIT_TALL = 1.02;
+
+const trayUnit = (b: Builder, x: number, z: number, wide: number, deep: number, rng: Rng): void => {
+  const tall = TRAY_UNIT_TALL, foot = 0.08, front = z - deep / 2, cols = 3, rows = 6, t = 0.02;
+  b.box('satin', 0xf2f3f6, [wide, tall - foot, deep], [x, foot + (tall - foot) / 2, z], { r: 0.012 });
+  b.box('gloss', 0xf8f9fb, [wide + 0.02, 0.025, deep + 0.02], [x, tall - 0.0125, z], { r: 0.008 });
+  b.box('satin', 0x2b303b, [wide - 0.06, foot, deep - 0.08], [x, foot / 2, z + 0.03]);
+  b.box('glow', 0xcfe4ff, [wide - 0.1, 0.004, 0.004], [x, 0.01, front + 0.05]);
+  const colours = [0x9cc4e8, 0x9fd8c4, 0xf3c1a8, 0xc9c2ec, 0xf6dc8c, 0xf4f5f8];
+  const cw = (wide - t * (cols + 1)) / cols, rh = (tall - foot - t * (rows + 1)) / rows;
+  for (let cIdx = 0; cIdx < cols; cIdx++) for (let r = 0; r < rows; r++) {
+    const cx = x - wide / 2 + t + cw / 2 + cIdx * (cw + t), cy = foot + t + rh / 2 + r * (rh + t);
+    const out = rng.chance(0.12) ? 0.06 : 0;
+    b.box('satin', rng.pick(colours), [cw - 0.006, rh - 0.006, 0.02], [cx, cy, front - 0.01 - out], { r: 0.008 });
+    b.box('satin', 0x3a404c, [cw * 0.36, 0.016, 0.006], [cx, cy + rh * 0.12, front - 0.021 - out], { r: 0.004 });
+    b.box('glow', 0xe6f2ff, [cw * 0.22, 0.008, 0.003], [cx, cy - rh * 0.22, front - 0.021 - out]);
+  }
+};
+
+const bookcase = (b: Builder, x: number, z: number, deep: number, rng: Rng): void => {
+  const wide = 1.1, tall = 1.6, t = 0.025, face = x - deep / 2;
+  b.box('satin', 0xf2f3f6, [deep, t, wide], [x, tall - t / 2, z], { r: 0.006 });
+  b.box('satin', 0xf2f3f6, [deep, 0.06, wide], [x, 0.03, z], { r: 0.006 });
+  for (const s of [-1, 1]) b.box('satin', 0xf2f3f6, [deep, tall, t], [x, tall / 2, z + s * (wide / 2 - t / 2)], { r: 0.006 });
+  b.box('matte', 0xdfe3ea, [0.01, tall, wide], [x + deep / 2 - 0.005, tall / 2, z]);
+  const levels = [0.06, 0.45, 0.85, 1.22];
+  for (const y of levels.slice(1)) {
+    b.box('satin', 0xf2f3f6, [deep, t, wide - 2 * t], [x, y, z], { r: 0.004 });
+    b.box('glow', 0xfff3e2, [0.004, 0.004, wide - 0.1], [face + 0.03, y - t / 2 - 0.002, z]);
+  }
+  const colours = [0xe25b45, 0x3b6fd0, 0xf2b632, 0x3fa66a, 0x8a5cc2, 0xf4f5f8, 0x2c3e66, 0xf28fae];
+  for (const y of levels) {
+    let at = z - wide / 2 + t + 0.02;
+    const end = z + wide / 2 - t - 0.04;
+    while (at < end - 0.05) {
+      const thick = rng.range(0.015, 0.04), h = rng.range(0.22, 0.3), d = rng.range(0.16, 0.24);
+      if (at + thick > end) break;
+      b.box('satin', rng.pick(colours), [d, h, thick], [face + 0.03 + d / 2, y + (y === levels[0] ? 0.03 : t / 2) + h / 2, at + thick / 2], { r: 0.003 });
+      at += thick + 0.002 + (rng.chance(0.12) ? 0.08 : 0);
+    }
+  }
+};
+
+const slidingDoor = (b: Builder, wallX: number, z: number): void => {
+  const x = wallX - 0.03, wide = 1.0, tall = 2.1;
+  for (const s of [-1, 1]) b.box('satin', 0xf4f5f8, [0.06, tall + 0.05, 0.05], [x, (tall + 0.05) / 2, z + s * (wide / 2 + 0.025)], { r: 0.01 });
+  b.box('satin', 0xf4f5f8, [0.06, 0.05, wide + 0.1], [x, tall + 0.025, z], { r: 0.01 });
+  b.box('satin', 0xe9ecf1, [0.04, tall - 0.01, wide - 0.01], [x - 0.005, tall / 2, z], { r: 0.008 });
+  b.box('gloss', 0xc6d6e6, [0.006, tall - 0.5, wide * 0.3], [x - 0.028, tall / 2 + 0.05, z - wide * 0.18]);
+  b.box('glow', 0xcfe4ff, [0.004, tall - 0.6, 0.006], [x - 0.031, tall / 2 + 0.05, z + wide * 0.02]);
+  b.box('metal', 0xb9bec8, [0.03, 0.55, 0.022], [x - 0.04, 1.05, z + wide * 0.36], { r: 0.008 });
+};
+
+const whiteboardRules = (): THREE.CanvasTexture => canvasTexture(1000, 700, (ctx) => {
+  ctx.fillStyle = '#fbfcfd';
+  ctx.fillRect(0, 0, 1000, 700);
+  ctx.fillStyle = 'rgba(120, 130, 150, 0.06)';
+  ctx.font = `400 46px ${HAND}`;
+  ctx.fillText('fractions  ½  ¼', 560, 640);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#2f5fc0';
+  ctx.font = `700 76px ${HAND}`;
+  ctx.fillText('Our Class Rules', 70, 110);
+  ctx.strokeStyle = '#2f5fc0';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(70, 132); ctx.quadraticCurveTo(330, 146, 610, 128); ctx.stroke();
+  const rules: [string, string][] = [['1. Be kind to everyone', '#1f2a44'], ['2. Listen when others talk', '#1f2a44'], ['3. Try your best', '#1f2a44'], ['4. It\'s OK to ask for help', '#1f2a44'], ['5. Look after our room', '#1f2a44']];
+  ctx.font = `400 50px ${HAND}`;
+  rules.forEach(([l, c], i) => { ctx.fillStyle = c; ctx.fillText(l, 84, 220 + i * 86); });
+  ctx.strokeStyle = '#d8453a';
+  ctx.lineWidth = 6;
+  rules.forEach((_, i) => { const y = 205 + i * 86; ctx.beginPath(); ctx.moveTo(640, y); ctx.lineTo(658, y + 18); ctx.lineTo(690, y - 20); ctx.stroke(); });
+  ctx.strokeStyle = '#2f9a5c';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  for (let k = 0; k <= 10; k++) { const a = -Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 24 : 56; ctx.lineTo(850 + Math.cos(a) * r, 140 + Math.sin(a) * r); }
+  ctx.stroke();
+  ctx.strokeStyle = '#2f5fc0';
+  ctx.beginPath(); ctx.arc(860, 470, 62, 0, TAU); ctx.stroke();
+  ctx.beginPath(); ctx.arc(860, 480, 36, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  ctx.fillStyle = '#2f5fc0';
+  for (const dx of [-22, 22]) { ctx.beginPath(); ctx.arc(860 + dx, 450, 7, 0, TAU); ctx.fill(); }
+});
 
 const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture => {
   const canvas = document.createElement('canvas');
@@ -958,29 +1163,18 @@ const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext
   return texture;
 };
 
-const carpet = (rng: Rng, wide: number, deep: number): THREE.CanvasTexture => {
-  const N = 512, tile = 128;
+const resinFloor = (rng: Rng, wide: number, deep: number): THREE.CanvasTexture => {
+  const N = 512, tile = 256;
   const texture = canvasTexture(N, N, (ctx) => {
-    const image = ctx.createImageData(N, N);
-    const shade = Array.from({ length: 16 }, () => rng.range(-5, 5));
-    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const t = Math.floor(x / tile) + Math.floor(y / tile) * 4;
-      const grain = (Math.floor(x / tile) + Math.floor(y / tile)) % 2 ? Math.sin(x * 0.9) : Math.sin(y * 0.9);
-      const n = (rng.next() - 0.5) * 26 + grain * 2.5 + shade[t]!;
-      const fleck = rng.chance(0.012) ? rng.range(-30, 24) : 0;
-      const i = (y * N + x) * 4;
-      image.data[i] = 118 + n + fleck;
-      image.data[i + 1] = 126 + n + fleck;
-      image.data[i + 2] = 142 + n * 1.05 + fleck;
-      image.data[i + 3] = 255;
+    ctx.fillStyle = '#c7cad0';
+    ctx.fillRect(0, 0, N, N);
+    for (let i = 0; i < 14000; i++) {
+      ctx.fillStyle = rng.chance(0.5) ? 'rgba(255, 255, 255, 0.035)' : 'rgba(90, 96, 110, 0.035)';
+      const r = rng.range(0.6, 3);
+      ctx.beginPath(); ctx.arc(rng.next() * N, rng.next() * N, r, 0, TAU); ctx.fill();
     }
-    ctx.putImageData(image, 0, 0);
-    ctx.strokeStyle = 'rgba(60, 66, 80, 0.22)';
-    ctx.lineWidth = 1;
-    for (let k = 0; k <= N; k += tile) {
-      ctx.beginPath(); ctx.moveTo(k + 0.5, 0); ctx.lineTo(k + 0.5, N); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, k + 0.5); ctx.lineTo(N, k + 0.5); ctx.stroke();
-    }
+    ctx.fillStyle = 'rgba(120, 126, 140, 0.35)';
+    for (let k = 0; k <= N; k += tile) { ctx.fillRect(k - 1, 0, 2, N); ctx.fillRect(0, k - 1, N, 2); }
   });
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(wide / 2, deep / 2);
