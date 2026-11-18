@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Character } from '../../characters/Character';
 import { CAST, type CastName } from '../../characters/cast';
-import { merge, place, sweep, torus, v3 } from '../../core/geo';
+import { place, sweep, torus, v3 } from '../../core/geo';
 import { Rng, TAU, damp } from '../../core/math';
 import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
@@ -272,10 +272,10 @@ export class ClassroomWorld extends World {
         const [cx, cz] = onTable(t, p.side * TABLE.seatX + (state === 'askew' ? rng.range(-0.12, 0.12) : 0), p.facing * back);
         const turn = (p.facing === 1 ? 180 : 0) + t.yaw + (state === 'askew' ? rng.pick([-1, 1]) * rng.range(10, 22) : rng.range(-4, 4));
         set.chairs.push([cx, 0, cz, turn]);
-        if (used || rng.chance(0.4)) {
-          // a tablet standing up, its screen turned toward the chair
-          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.1);
-          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-8, 8)]);
+        if (used) {
+          // everyone has their own screen of light, floating over the table in front of them
+          const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.08);
+          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-5, 5)]);
         }
         if (p.who) {
           set.colliders.push({ kind: 'circle', cx, cz, r: 0.3 });
@@ -286,10 +286,15 @@ export class ClassroomWorld extends World {
         }
       }
     }
+    // one rounded, floating table per group, with a pool of light on the floor under it
+    for (const [gx, gz, front] of [[-GROUP_X, GROUP_Z[0], true], [GROUP_X, GROUP_Z[0], true], [-GROUP_X, GROUP_Z[1], false], [GROUP_X, GROUP_Z[1], false]] as const) {
+      const set = sets[front ? 0 : 1]!;
+      set.to.add(groupTable(gx, gz));
+    }
     for (const set of sets) {
       set.b.finish(set.to);
       set.to.add(shellChairs(set.chairs, chairRng));
-      set.to.add(tablets(set.slates));
+      set.to.add(holoScreens(set.slates));
       await dress(ctx, set.to, 'backpack', set.bags);
     }
     // the back tables' obstacles stay; the front ones come and go with their tables (see setScene)
@@ -566,9 +571,10 @@ export class ClassroomWorld extends World {
     teacher.placeAt(CLASSROOM.teacher);
     this.colliders.circle(CLASSROOM.teacher.position.x, CLASSROOM.teacher.position.z, 0.4);
     for (const s of SEATING) {
-      // only Jamie is seen close up: everyone else wears the lighter model and casts no shadow map
+      // only Jamie is seen close up; Yusra sits across from the player on Wednesday; everyone else is across the room
       const main = s.who === 'jamie';
-      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who, main ? ctx.quality.shadows : false, !main));
+      const weight = main ? undefined : s.who === 'yusra' ? 'medium' : 'low';
+      const person = this.addPerson(s.who, await Character.create(ctx, CAST[s.who], s.who, main ? ctx.quality.shadows : false, weight));
       person.placeAt(s.seat).setPose(s.pose, { immediate: true, seat: SEAT });
       if (s.who !== 'jamie') person.setLiveliness(0.7);
     }
@@ -967,89 +973,13 @@ const thankYouCard = (): THREE.CanvasTexture => canvasTexture(450, 330, (ctx) =>
   ctx.fillText('Thank you!', 225, 300);
 });
 
-/** A pupil's tablet: a sheet of glass that is all screen, no rim, standing tilted back on a hairline kickstand. */
-const TABLET = { wide: 0.34, tall: 0.24, thick: 0.0045, lean: 24 * RAD, standAt: 0.55, standBack: 0.075 };
-let tabletScreen: THREE.CanvasTexture | null = null;
-
-/** The tablets at a group of desks, one batch each for glass, stand and screen. A spot is the screen's bottom edge, facing +Z. */
-const tablets = (spots: readonly Spot[]): THREE.Group => {
-  const group = new THREE.Group();
-  if (spots.length === 0) return group;
-  const { wide, tall, thick, lean, standAt, standBack } = TABLET;
-  const c = Math.cos(lean), s = Math.sin(lean), lift = 0.002;
-  // the glass leans back: up its face is (0, c, -s), out of the screen is (0, s, c)
-  const along = (a: number, out: number): THREE.Vector3 => new THREE.Vector3(0, lift + a * c + out * s, -a * s + out * c);
-  const glass = place(new THREE.BoxGeometry(wide, tall, thick), along(tall / 2, -thick / 2), [-lean, 0, 0]);
-  const face = place(new THREE.PlaneGeometry(wide, tall), along(tall / 2, 0.0003), [-lean, 0, 0]);
-  const top = along(standAt * tall, -thick), foot = new THREE.Vector3(0, 0.0015, top.z - standBack);
-  const legLength = top.distanceTo(foot);
-  const leg = place(new THREE.BoxGeometry(wide * 0.36, legLength, 0.003), top.clone().add(foot).multiplyScalar(0.5), [Math.atan2(top.z - foot.z, top.y - foot.y), 0, 0]);
-  if (!tabletScreen) tabletScreen = tabletUi();
-  const parts: [THREE.BufferGeometry, THREE.Material, boolean][] = [
-    [glass, new THREE.MeshPhysicalMaterial({ color: 0x101318, roughness: 0.18, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.05 }), true],
-    [leg, new THREE.MeshStandardMaterial({ color: 0xc3c9d1, roughness: 0.3, metalness: 0.9 }), true],
-    [face, new THREE.MeshBasicMaterial({ map: tabletScreen, color: new THREE.Color().setScalar(1.25) }), false],
-  ];
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
-  for (const [geometry, material, shadows] of parts) {
-    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
-    spots.forEach(([x, y, z, yaw = 0], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one)));
-    mesh.castShadow = shadows;
-    mesh.receiveShadow = shadows;
-    mesh.computeBoundingSphere();
-    group.add(mesh);
-  }
-  return group;
-};
-
-/** What the tablets show: a calm lesson screen, deep blue with a few soft cards and a progress ring. */
-const tabletUi = (): THREE.CanvasTexture => {
-  const w = 540, h = 380;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const g = canvas.getContext('2d')!;
-  const bg = g.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, '#0d1b33');
-  bg.addColorStop(1, '#123c4f');
-  g.fillStyle = bg;
-  g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(140, 210, 255, 0.9)';
-  g.font = font(600, 22);
-  g.fillText('Today', 28, 46);
-  g.fillStyle = 'rgba(200, 225, 255, 0.45)';
-  g.fillRect(28, 60, 120, 3);
-  const cards: [number, number, number, number, string][] = [[28, 84, 300, 120, 'rgba(120, 190, 255, 0.16)'], [28, 220, 300, 130, 'rgba(120, 230, 210, 0.14)'], [348, 84, 164, 266, 'rgba(255, 255, 255, 0.07)']];
-  for (const [x, y, cw, ch, fill] of cards) {
-    g.fillStyle = fill;
-    roundRect(g, x, y, cw, ch, 16);
-    g.fill();
-  }
-  g.fillStyle = 'rgba(220, 235, 255, 0.55)';
-  for (const [x, y, lw] of [[48, 116, 200], [48, 140, 240], [48, 164, 150], [48, 252, 220], [48, 276, 180], [48, 300, 240]] as const) g.fillRect(x, y, lw, 8);
-  g.lineWidth = 12;
-  g.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-  g.beginPath(); g.arc(430, 190, 52, 0, TAU); g.stroke();
-  g.strokeStyle = '#6fd3ff';
-  g.lineCap = 'round';
-  g.beginPath(); g.arc(430, 190, 52, -Math.PI / 2, -Math.PI / 2 + TAU * 0.68); g.stroke();
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  return map;
-};
-
-/** A table for two: a white top with softly rounded corners, a hairline of light under each long edge, slim white legs; now and then a few things left on it. */
+/** What is left on a table for two: now and then a sheet of paper, a pencil pot, a few exercise books. The table itself is the group's (see `groupTable`). */
 const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
   const turn = t.yaw * RAD;
   const at = (lx: number, y: number, lz: number): [number, number, number] => {
     const [x, z] = onTable(t, lx, lz);
     return [x, y, z];
   };
-  b.box('satin', 0xf5f6f8, [TABLE.wide - 0.006, 0.026, TABLE.deep - 0.006], at(0, TABLE.top - 0.013, 0), { r: 0.012, rot: [0, turn, 0] });
-  b.box('satin', 0xd7dbe3, [TABLE.wide - 0.06, 0.02, TABLE.deep - 0.06], at(0, TABLE.top - 0.034, 0), { r: 0.006, rot: [0, turn, 0] });
-  for (const lz of [-1, 1]) b.box('glow', 0xbfe0ff, [TABLE.wide - 0.1, 0.004, 0.004], at(0, TABLE.top - 0.046, lz * (TABLE.deep / 2 - 0.035)), { rot: [0, turn, 0] });
-  for (const lx of [-1, 1]) for (const lz of [-1, 1]) b.cyl('satin', 0xeceef2, 0.016, TABLE.top - 0.03, at(lx * (TABLE.wide / 2 - 0.06), 0, lz * (TABLE.deep / 2 - 0.06)), { radial: 12, top: 0.012 });
   // a sheet or two of paper, a pencil pot, a small stack of exercise books
   for (let i = rng.int(0, 2); i > 0; i--) {
     b.box('matte', 0xf7f6f1, [0.21, 0.002, 0.297], at(rng.range(-0.5, 0.5), TABLE.top + 0.001 + i * 0.001, rng.range(-0.12, 0.12)), { rot: [0, turn + rng.range(-0.6, 0.6), 0] });
@@ -1065,66 +995,204 @@ const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
   }
 };
 
+/** A soft glow texture in a rounded-rectangle shape: bright in the middle, fading out to nothing at the edges. */
+const glowPool = (aspect: number): THREE.CanvasTexture => canvasTexture(512, Math.round(512 / aspect), (ctx) => {
+  const w = 512, h = Math.round(512 / aspect);
+  ctx.filter = 'blur(28px)';
+  ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+  roundRect(ctx, 60, 60, w - 120, h - 120, Math.min(w, h) / 2 - 60);
+  ctx.fill();
+});
+
 /**
- * Moulded shell chairs, all batched: one smooth shell (seat and back in one curve) in soft colours on four slim white
- * legs. A spot is the chair's middle on the floor; at yaw 0 its seat faces +Z and its back is toward -Z.
+ * A group's table: one soft, rounded slab with no corners at all (a stadium of white solid surface with a thick
+ * rolled edge), floating at desk height with nothing under it. A thin ring of light runs under its rim, and a pool
+ * of cool light lies on the floor beneath, so it reads as hovering.
+ */
+const groupTable = (cx: number, cz: number): THREE.Group => {
+  const group = new THREE.Group();
+  const wide = TABLE.wide * 2 + 0.04, deep = TABLE.deep * 2 + 0.04, thick = 0.05, round = 0.5;
+  const shape = (w: number, d: number, r: number): THREE.Shape => {
+    const sh = new THREE.Shape(), hw = w / 2, hd = d / 2;
+    sh.moveTo(-hw + r, -hd);
+    sh.lineTo(hw - r, -hd); sh.quadraticCurveTo(hw, -hd, hw, -hd + r);
+    sh.lineTo(hw, hd - r); sh.quadraticCurveTo(hw, hd, hw - r, hd);
+    sh.lineTo(-hw + r, hd); sh.quadraticCurveTo(-hw, hd, -hw, hd - r);
+    sh.lineTo(-hw, -hd + r); sh.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+    return sh;
+  };
+  const bevel = 0.022;
+  const slabGeo = new THREE.ExtrudeGeometry(shape(wide - 2 * bevel, deep - 2 * bevel, round), { depth: thick - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, curveSegments: 32 });
+  slabGeo.rotateX(-Math.PI / 2);
+  slabGeo.translate(0, TABLE.top - thick + bevel, 0);
+  const slab = new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ color: 0xf6f7f9, roughness: 0.28 }));
+  slab.castShadow = slab.receiveShadow = true;
+  // a recessed underside, a little smaller, in pale grey
+  const underGeo = new THREE.ExtrudeGeometry(shape(wide - 0.3, deep - 0.3, round - 0.1), { depth: 0.03, bevelEnabled: false, curveSegments: 32 });
+  underGeo.rotateX(-Math.PI / 2);
+  underGeo.translate(0, TABLE.top - thick - 0.03, 0);
+  const under = new THREE.Mesh(underGeo, new THREE.MeshStandardMaterial({ color: 0xd9dee7, roughness: 0.4 }));
+  // the ring of light under the rim
+  const pts = shape(wide - 0.32, deep - 0.32, round - 0.11).getSpacedPoints(160).map((q) => new THREE.Vector3(q.x, TABLE.top - thick - 0.031, -q.y));
+  const ring = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 240, 0.005, 6, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.88, 1.0).multiplyScalar(2.4) }));
+  // the light it throws on the floor
+  const pool = new THREE.Mesh(new THREE.PlaneGeometry(wide + 0.8, deep + 0.8), new THREE.MeshBasicMaterial({ map: glowPool((wide + 0.8) / (deep + 0.8)), color: new THREE.Color(0.45, 0.62, 0.9).multiplyScalar(0.5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.y = 0.004;
+  group.add(slab, under, ring, pool);
+  group.position.set(cx, 0, cz);
+  return group;
+};
+
+/** What a floating screen shows: a calm lesson card in cyan light on clear glass. */
+const holoUi = (): THREE.CanvasTexture => canvasTexture(512, 340, (g) => {
+  const w = 512, h = 340;
+  const bg = g.createLinearGradient(0, 0, 0, h);
+  bg.addColorStop(0, 'rgba(90, 170, 255, 0.30)');
+  bg.addColorStop(1, 'rgba(60, 130, 230, 0.16)');
+  g.fillStyle = bg;
+  roundRect(g, 6, 6, w - 12, h - 12, 22);
+  g.fill();
+  g.strokeStyle = 'rgba(190, 228, 255, 0.95)';
+  g.lineWidth = 4;
+  g.stroke();
+  g.fillStyle = 'rgba(225, 242, 255, 0.95)';
+  g.font = font(600, 26);
+  g.fillText('Today', 32, 52);
+  g.fillStyle = 'rgba(200, 230, 255, 0.5)';
+  g.fillRect(32, 64, 110, 3);
+  for (const [x, y, cw, ch] of [[32, 88, 290, 100], [32, 204, 290, 110], [342, 88, 138, 226]] as const) {
+    g.fillStyle = 'rgba(160, 215, 255, 0.16)';
+    roundRect(g, x, y, cw, ch, 14);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(225, 242, 255, 0.7)';
+  for (const [x, y, lw] of [[50, 118, 200], [50, 142, 240], [50, 166, 150], [50, 236, 220], [50, 260, 180], [50, 284, 240]] as const) g.fillRect(x, y, lw, 7);
+  g.lineWidth = 11;
+  g.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+  g.beginPath(); g.arc(411, 200, 44, 0, TAU); g.stroke();
+  g.strokeStyle = '#8fe3ff';
+  g.lineCap = 'round';
+  g.beginPath(); g.arc(411, 200, 44, -Math.PI / 2, -Math.PI / 2 + TAU * 0.68); g.stroke();
+});
+
+/**
+ * Everyone's own screen: a pane of light floating over the table in front of them, half see-through, leaning back a
+ * little toward its owner, over a small lit dot on the table where it is projected from. A spot is the dot, facing +Z.
+ */
+const holoScreens = (spots: readonly Spot[]): THREE.Group => {
+  const group = new THREE.Group();
+  if (spots.length === 0) return group;
+  const wide = 0.38, tall = 0.25, lift = 0.24, lean = 14 * RAD;
+  const pane = new THREE.PlaneGeometry(wide, tall);
+  pane.rotateX(-lean);
+  pane.translate(0, lift + tall / 2, 0);
+  const dot = new THREE.CircleGeometry(0.022, 24);
+  dot.rotateX(-Math.PI / 2);
+  dot.translate(0, 0.002, 0.03);
+  const beam = new THREE.CylinderGeometry(wide * 0.42, 0.012, lift, 24, 1, true);
+  beam.translate(0, lift / 2, 0.03);
+  beam.scale(1, 1, 0.35);
+  const parts: [THREE.BufferGeometry, THREE.Material][] = [
+    [pane, new THREE.MeshBasicMaterial({ map: holoUi(), color: new THREE.Color().setScalar(1.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false })],
+    [dot, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.85, 1.0).multiplyScalar(2.4) })],
+    [beam, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.55, 0.9).multiplyScalar(0.18), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })],
+  ];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
+  for (const [geometry, material] of parts) {
+    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+    spots.forEach(([x, y, z, yaw = 0], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one)));
+    mesh.computeBoundingSphere();
+    mesh.renderOrder = 3;
+    group.add(mesh);
+  }
+  return group;
+};
+
+/**
+ * Floating seats, all batched: one thick, smooth moulded shell (seat and back in a single curve) in white or pale
+ * blue, a thin line of light along the top of its back, hovering on a ring of light with nothing under it.
+ * A spot is the chair's middle on the floor; at yaw 0 its seat faces +Z and its back is toward -Z.
  */
 const shellChairs = (spots: readonly Spot[], rng: Rng): THREE.Group => {
   const group = new THREE.Group();
   if (spots.length === 0) return group;
-  // the shell: a seat pan that curls up into the back, built as a swept profile across the chair's width
-  const wide = 0.4, half = wide / 2, N = 24, M = 18;
+  const wide = 0.42, N = 28, M = 20, thick = 0.022;
+  // the profile from the front lip (+z) along the seat, round the bend and up the back (-z), as (z, y)
   const profile: THREE.Vector2[] = [];
-  // from the front lip (+z) along the seat, round the bend and up the back (-z), as (z, y)
   for (let i = 0; i <= N; i++) {
     const t = i / N;
-    if (t < 0.55) {
-      const u = t / 0.55;
-      profile.push(new THREE.Vector2(0.2 - u * 0.33, SEAT - 0.01 * Math.sin(u * Math.PI) + (u < 0.08 ? 0.012 * (1 - u / 0.08) : 0)));
+    if (t < 0.5) {
+      const u = t / 0.5;
+      profile.push(new THREE.Vector2(0.19 - u * 0.31, SEAT - 0.014 * Math.sin(u * Math.PI) - (u < 0.12 ? 0.03 * (1 - u / 0.12) ** 2 : 0)));
     } else {
-      const u = (t - 0.55) / 0.45, a = u * (Math.PI / 2 + 0.22);
-      profile.push(new THREE.Vector2(-0.13 - 0.09 * Math.sin(a), SEAT + 0.09 * (1 - Math.cos(a)) + u * u * 0.26));
+      const u = (t - 0.5) / 0.5, a = u * (Math.PI / 2 + 0.28);
+      profile.push(new THREE.Vector2(-0.12 - 0.1 * Math.sin(a), SEAT + 0.1 * (1 - Math.cos(a)) + u * u * 0.22));
     }
   }
-  const pos: number[] = [], idx: number[] = [];
+  const cols = profile.length;
+  const inner: THREE.Vector3[] = [];
   for (let j = 0; j <= M; j++) {
     const v = j / M, x = (v - 0.5) * wide;
-    // the shell wraps a little round the sitter at the sides
-    const wrapUp = Math.pow(Math.abs(v - 0.5) * 2, 3);
-    for (const p of profile) pos.push(x * (1 - 0.06 * wrapUp), p.y + 0.03 * wrapUp, p.x - 0.02 * wrapUp * (p.y > SEAT + 0.05 ? 1 : 0));
+    // the shell wraps round the sitter at the sides, more so up the back
+    const side = Math.pow(Math.abs(v - 0.5) * 2, 2.5);
+    for (const [k, p] of profile.entries()) {
+      const up = k / (cols - 1);
+      inner.push(new THREE.Vector3(x * (1 - 0.1 * side * up), p.y + 0.035 * side, p.x + 0.03 * side * up));
+    }
   }
-  const cols = profile.length;
+  // give it thickness: a second skin below, joined round the edge
+  const g0 = new THREE.BufferGeometry().setFromPoints(inner);
+  const idx0: number[] = [];
   for (let j = 0; j < M; j++) for (let i = 0; i < cols - 1; i++) {
     const a = j * cols + i, b = a + cols;
-    idx.push(a, b, a + 1, a + 1, b, b + 1);
+    idx0.push(a, b, a + 1, a + 1, b, b + 1);
   }
+  g0.setIndex(idx0);
+  g0.computeVertexNormals();
+  const n0 = g0.attributes.normal as THREE.BufferAttribute;
+  const pos: number[] = [], idx: number[] = [];
+  const count = inner.length;
+  for (const p of inner) pos.push(p.x, p.y, p.z);
+  for (let i = 0; i < count; i++) pos.push(inner[i]!.x - n0.getX(i) * thick, inner[i]!.y - n0.getY(i) * thick, inner[i]!.z - n0.getZ(i) * thick);
+  idx.push(...idx0);
+  for (let t = 0; t < idx0.length; t += 3) idx.push(idx0[t]! + count, idx0[t + 2]! + count, idx0[t + 1]! + count);
+  const edge = (a: number, b: number): void => { idx.push(a, a + count, b, b, a + count, b + count); };
+  for (let i = 0; i < cols - 1; i++) { edge(i + 1, i); edge(M * cols + i, M * cols + i + 1); }
+  for (let j = 0; j < M; j++) { edge(j * cols, (j + 1) * cols); edge((j + 1) * cols + cols - 1, j * cols + cols - 1); }
   const shell = new THREE.BufferGeometry();
   shell.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   shell.setIndex(idx);
   shell.computeVertexNormals();
-  // the legs: four slim tapered rods, splayed a little
-  const legs: THREE.BufferGeometry[] = [];
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const leg = new THREE.CylinderGeometry(0.009, 0.007, SEAT - 0.01, 8);
-    leg.deleteAttribute('uv');
-    leg.rotateZ(sx * 0.08);
-    leg.rotateX(-sz * 0.08);
-    leg.translate(sx * (half - 0.04), (SEAT - 0.01) / 2, sz * 0.14);
-    legs.push(leg);
-  }
-  const frame = merge(legs);
-  const colours = [0xf4f5f8, 0xf4f5f8, 0xa9c7e8, 0x9fd8c4, 0xf3c1a8, 0xc9c2ec];
-  const shellMesh = new THREE.InstancedMesh(shell, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.34, side: THREE.DoubleSide }), spots.length);
-  const legMesh = new THREE.InstancedMesh(frame, new THREE.MeshStandardMaterial({ color: 0xe9ecf1, roughness: 0.3, metalness: 0.2 }), spots.length);
+  // the light along the top of the back
+  const topPts = Array.from({ length: M + 1 }, (_, j) => inner[j * cols + cols - 1]!.clone().add(new THREE.Vector3(0, -0.012, -0.006)));
+  const seam = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(topPts), 40, 0.004, 6);
+  // the hover ring and its glow on the floor
+  const ring = new THREE.TorusGeometry(0.13, 0.008, 8, 48);
+  ring.rotateX(Math.PI / 2);
+  ring.translate(0, 0.07, 0.02);
+  const hub = new THREE.CylinderGeometry(0.1, 0.12, 0.03, 32);
+  hub.translate(0, 0.07, 0.02);
+  const floorGlow = new THREE.PlaneGeometry(0.62, 0.62);
+  floorGlow.rotateX(-Math.PI / 2);
+  floorGlow.translate(0, 0.003, 0.02);
+  const colours = [0xf6f7f9, 0xf6f7f9, 0xcfe2f6, 0xb8d4f2];
+  const cyan = new THREE.Color(0.65, 0.86, 1.0).multiplyScalar(2.4);
+  const parts: [THREE.BufferGeometry, THREE.Material, boolean][] = [
+    [shell, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.26, side: THREE.DoubleSide }), true],
+    [seam, new THREE.MeshBasicMaterial({ color: cyan }), false],
+    [hub, new THREE.MeshStandardMaterial({ color: 0xe9edf3, roughness: 0.3, metalness: 0.3 }), true],
+    [ring, new THREE.MeshBasicMaterial({ color: cyan }), false],
+    [floorGlow, new THREE.MeshBasicMaterial({ map: glowPool(1), color: new THREE.Color(0.45, 0.65, 0.95).multiplyScalar(0.6), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), false],
+  ];
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
-  spots.forEach(([x, y, z, yaw = 0], i) => {
-    m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one);
-    shellMesh.setMatrixAt(i, m);
-    legMesh.setMatrixAt(i, m);
-    shellMesh.setColorAt(i, c.set(rng.pick(colours)));
-  });
-  for (const mesh of [shellMesh, legMesh]) {
-    mesh.castShadow = mesh.receiveShadow = true;
+  for (const [k, [geometry, material, shadows]] of parts.entries()) {
+    const mesh = new THREE.InstancedMesh(geometry, material, spots.length);
+    spots.forEach(([x, y, z, yaw = 0], i) => {
+      mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, yaw * RAD), one));
+      if (k === 0) mesh.setColorAt(i, c.set(rng.pick(colours)));
+    });
+    mesh.castShadow = mesh.receiveShadow = shadows;
     mesh.computeBoundingSphere();
     group.add(mesh);
   }
