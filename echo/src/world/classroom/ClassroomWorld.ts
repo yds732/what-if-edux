@@ -451,19 +451,29 @@ export class ClassroomWorld extends World {
     board.position.set(-0.3, 2.3, D - 0.005);
     board.rotation.y = Math.PI;
     scene.add(board);
-    // a free-standing writing screen in the front corner by the windows: a pane of glass on a slim white stand
+    // a free-standing whiteboard in the front corner by the windows, the class rules written up on it
     const easel = { x: -4.25, z: -3.55, turn: 55 * RAD };
     const ex = (lx: number, lz: number): [number, number] => [easel.x + lx * Math.cos(easel.turn) + lz * Math.sin(easel.turn), easel.z - lx * Math.sin(easel.turn) + lz * Math.cos(easel.turn)];
     {
-      const [fx, fz] = ex(0, 0);
-      b.box('satin', 0xf2f3f6, [0.6, 0.025, 0.36], [fx, 0.0125, fz], { r: 0.01, rot: [0, easel.turn, 0] });
-      b.box('satin', 0xf2f3f6, [0.05, 1.0, 0.04], [fx, 0.52, fz], { r: 0.01, rot: [0, easel.turn, 0] });
+      // two slim white legs on round feet, and the board between them
+      for (const lx of [-0.5, 0.5]) {
+        const [lxw, lzw] = ex(lx, 0);
+        b.box('satin', 0xe9ecf1, [0.04, 1.75, 0.035], [lxw, 0.875, lzw], { r: 0.012, rot: [0, easel.turn, 0] });
+        b.cyl('satin', 0xe9ecf1, 0.12, 0.025, [lxw, 0, lzw], { radial: 24 });
+      }
       const [px, pz] = ex(0, 0.03);
-      b.box('gloss', 0x141824, [0.86, 0.62, 0.02], [px, 1.36, pz], { r: 0.012, rot: [-0.06, easel.turn, 0] });
-      const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.56), new THREE.MeshBasicMaterial({ map: glassNotes(), color: new THREE.Color().setScalar(1.1) }));
-      const [qx, qz] = ex(0, 0.042);
-      pad.position.set(qx, 1.36, qz);
-      pad.rotation.set(-0.06, easel.turn, 0, 'YXZ');
+      b.box('gloss', 0xf4f5f8, [1.08, 0.78, 0.03], [px, 1.28, pz], { r: 0.03, rot: [0, easel.turn, 0] });
+      // a pen tray along the bottom with three markers in it
+      const [tx, tz] = ex(0, 0.07);
+      b.box('satin', 0xe9ecf1, [0.6, 0.02, 0.05], [tx, 0.885, tz], { r: 0.008, rot: [0, easel.turn, 0] });
+      for (const [k, c] of [0x2f5fc0, 0xd8453a, 0x2f9a5c].entries()) {
+        const [mx, mz] = ex(-0.12 + k * 0.1, 0.07);
+        b.box('satin', c, [0.12, 0.018, 0.018], [mx, 0.905, mz], { r: 0.008, rot: [0, easel.turn, 0] });
+      }
+      const pad = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.7), new THREE.MeshStandardMaterial({ map: whiteboardRules(), roughness: 0.25 }));
+      const [qx, qz] = ex(0, 0.047);
+      pad.position.set(qx, 1.28, qz);
+      pad.rotation.set(0, easel.turn, 0, 'YXZ');
       scene.add(pad);
     }
     this.colliders.circle(easel.x, easel.z, 0.42);
@@ -1266,22 +1276,39 @@ const slidingDoor = (b: Builder, wallX: number, z: number): void => {
   b.box('metal', 0xb9bec8, [0.03, 0.55, 0.022], [x - 0.04, 1.05, z + wide * 0.36], { r: 0.008 });
 };
 
-/** What is written on the writing screen in the corner: a few lines in a child's hand, in light. */
-const glassNotes = (): THREE.CanvasTexture => canvasTexture(800, 560, (ctx) => {
-  ctx.fillStyle = '#121725';
-  ctx.fillRect(0, 0, 800, 560);
-  ctx.strokeStyle = 'rgba(160, 210, 255, 0.85)';
-  ctx.fillStyle = 'rgba(220, 238, 255, 0.92)';
-  ctx.font = `600 54px ${HAND}`;
-  ctx.fillText('Our class rules', 60, 100);
-  ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(60, 120); ctx.lineTo(470, 120); ctx.stroke();
-  ctx.font = `400 40px ${HAND}`;
-  ['1. Be kind', '2. Listen to each other', '3. Try your best', '4. Ask for help'].forEach((l, i) => ctx.fillText(l, 70, 200 + i * 78));
-  ctx.fillStyle = 'rgba(255, 210, 120, 0.9)';
+/** The whiteboard in the corner: the class rules in marker, in a teacher's hand, with a few doodles. */
+const whiteboardRules = (): THREE.CanvasTexture => canvasTexture(1000, 700, (ctx) => {
+  ctx.fillStyle = '#fbfcfd';
+  ctx.fillRect(0, 0, 1000, 700);
+  // the ghost of last week's writing, not quite rubbed off
+  ctx.fillStyle = 'rgba(120, 130, 150, 0.06)';
+  ctx.font = `400 46px ${HAND}`;
+  ctx.fillText('fractions  ½  ¼', 560, 640);
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#2f5fc0';
+  ctx.font = `700 76px ${HAND}`;
+  ctx.fillText('Our Class Rules', 70, 110);
+  ctx.strokeStyle = '#2f5fc0';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(70, 132); ctx.quadraticCurveTo(330, 146, 610, 128); ctx.stroke();
+  const rules: [string, string][] = [['1. Be kind to everyone', '#1f2a44'], ['2. Listen when others talk', '#1f2a44'], ['3. Try your best', '#1f2a44'], ['4. It\'s OK to ask for help', '#1f2a44'], ['5. Look after our room', '#1f2a44']];
+  ctx.font = `400 50px ${HAND}`;
+  rules.forEach(([l, c], i) => { ctx.fillStyle = c; ctx.fillText(l, 84, 220 + i * 86); });
+  // a red tick beside each, and a green star and a smiley in the corner
+  ctx.strokeStyle = '#d8453a';
+  ctx.lineWidth = 6;
+  rules.forEach((_, i) => { const y = 205 + i * 86; ctx.beginPath(); ctx.moveTo(640, y); ctx.lineTo(658, y + 18); ctx.lineTo(690, y - 20); ctx.stroke(); });
+  ctx.strokeStyle = '#2f9a5c';
+  ctx.lineWidth = 6;
   ctx.beginPath();
-  for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 18 : 40; ctx.lineTo(680 + Math.cos(a) * r, 120 + Math.sin(a) * r); }
-  ctx.fill();
+  for (let k = 0; k <= 10; k++) { const a = -Math.PI / 2 + (k / 10) * TAU, r = k % 2 ? 24 : 56; ctx.lineTo(850 + Math.cos(a) * r, 140 + Math.sin(a) * r); }
+  ctx.stroke();
+  ctx.strokeStyle = '#2f5fc0';
+  ctx.beginPath(); ctx.arc(860, 470, 62, 0, TAU); ctx.stroke();
+  ctx.beginPath(); ctx.arc(860, 480, 36, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  ctx.fillStyle = '#2f5fc0';
+  for (const dx of [-22, 22]) { ctx.beginPath(); ctx.arc(860 + dx, 450, 7, 0, TAU); ctx.fill(); }
 });
 
 const canvasTexture = (w: number, h: number, paint: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture => {
