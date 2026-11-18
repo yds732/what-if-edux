@@ -67,7 +67,7 @@ export const MONDAY = {
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
     'And these are gemstones! They grow right out of the ground. I love gemstones.',
-    "And that's the Star Bridge! It's not finished yet, but you can already walk on it.",
+    "And that's the Star Bridge! One day it will take us somewhere really special.",
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
   objectiveFree: 'Explore Haven with Lumi.',
