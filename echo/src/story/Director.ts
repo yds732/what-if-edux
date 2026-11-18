@@ -270,11 +270,14 @@ export class Director {
     app.lookOverride = this.blend;
     lerpLook(this.blend, from.look, to.look, 0);
     audio.sfx('wipe');
+    // into Haven the wave can take its time; back into a real room it must not leave Haven's far hills and sky
+    // hanging in the window after the room itself is back, so it races out and is gone in under two seconds
+    const toReal = to.theme !== 'haven';
     try {
-      await this.tween(3.1, (k) => {
+      await this.tween(toReal ? 1.8 : 3.1, (k) => {
         // slow at arm's length, then racing for the horizon
-        wipe.radius = reach * (0.06 * k + 0.94 * k * k * k);
-        lerpLook(this.blend, from.look, to.look, Math.min(1, k * 1.6));
+        wipe.radius = toReal ? reach * (0.1 * k + 0.9 * k * k) : reach * (0.06 * k + 0.94 * k * k * k);
+        lerpLook(this.blend, from.look, to.look, Math.min(1, k * (toReal ? 2.2 : 1.6)));
       }, ease.linear);
     } finally {
       app.wipe = null;
