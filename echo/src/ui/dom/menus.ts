@@ -25,7 +25,7 @@ interface TitleScene {
 
 const DAY_BLURBS: Record<ChapterId, string> = {
   monday: 'The Echo pilot. You volunteer, and see Haven for the first time.',
-  tuesday: 'The Star Bridge, and a message from a classmate.',
+  tuesday: 'After school, a message from a classmate.',
   wednesday: 'A disagreement with Jamie. A companion who agrees with everyone.',
   thursday: 'The Starlight Festival and a rehearsal, on the same evening.',
   friday: 'Other voices, one vote, and a possible future.',

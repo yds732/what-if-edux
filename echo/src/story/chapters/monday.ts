@@ -138,7 +138,7 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
     const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
     if (did === null) break;
     if (did === 'off') {
-      if (await lumiPleads(game, haven, asks++)) continue;
+      await lumiPleads(game, haven, asks++);
       break;
     }
     if (did === 'talk') {
