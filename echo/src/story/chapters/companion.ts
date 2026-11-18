@@ -182,6 +182,37 @@ export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Pr
   }
 };
 
+export const echoTempts = (game: Game): (() => void) => {
+  const { app, headset, audio } = game;
+  const toEcho = new THREE.Vector3(), forward = new THREE.Vector3();
+  let on = true, looked = false, flicker = 0;
+  const glance = (): number => {
+    headset.group.getWorldPosition(toEcho).sub(game.playerEye).normalize();
+    app.camera.getWorldDirection(forward);
+    return forward.angleTo(toEcho);
+  };
+  app.tasks.until((dt) => {
+    if (!on) return true;
+    const angle = glance();
+    if (angle < 0.3) looked = true;
+    else if (looked && angle > 0.6) {
+      looked = false;
+      flicker = 2.6;
+      audio.sfx('notify', { gain: 0.35 });
+    }
+    if (flicker > 0) {
+      flicker -= dt;
+      headset.setPower(Math.sin(app.time * 26) > 0 ? 1 : 0.15);
+      if (flicker <= 0) headset.setPower(0.3);
+    }
+    return false;
+  }).catch(() => undefined);
+  return () => {
+    on = false;
+    headset.setPower(0.25);
+  };
+};
+
 export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
   const { audio, headset, app } = game;
   game.state.pings++;
