@@ -17,6 +17,7 @@ import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
+import { buildBoardFrame, buildHoop } from './minimal';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
 import { Companion } from './companion';
@@ -178,7 +179,7 @@ export class HavenWorld extends World {
       const path = Math.abs(x) < 1.1 && z > -2.2 && z < 4.6 ? 0.5 : 1;
       return { y, scale: path };
     };
-    scene.add(buildGrass(Math.round(26000 * q.density), 13.5, rng.fork(), ground));
+    scene.add(buildGrass(Math.round(36000 * q.density), 13.5, rng.fork(), ground));
     const flowerColors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8a3d)];
     const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
     for (let i = 0; i < 400 && flowers.length < Math.round(110 * q.density); i++) {
@@ -280,7 +281,7 @@ export class HavenWorld extends World {
     this.shootingStars = buildShootingStars(extra.fork());
     scene.add(this.shootingStars.mesh);
 
-    const hoops = await Promise.all([0, 1, 2, 3].map(() => ctx.assets.instance('ring')));
+    const hoops = [0, 1, 2, 3].map(() => buildHoop());
     this.bridge = buildStarBridge(v3(0, 0.14, edgeZ), HAVEN.bridgeEnd, hoops);
     scene.add(this.bridge.group);
     this.bonusRing = new Ring(HAVEN.bonusRing, v3(0, 0, edgeZ), hoops[3]!, 1.2);
@@ -306,13 +307,11 @@ export class HavenWorld extends World {
     for (const m of this.motes) scene.add(m.points);
     scene.add(this.bursts.points);
 
-    const frame = await ctx.assets.instance('board-frame');
+    const frame = buildBoardFrame(BOARD.opening.wide * BOARD.frameScale, BOARD.opening.tall * BOARD.frameScale, BOARD.eye);
     const boardGroup = new THREE.Group();
     const boardY = this.mainIsland.heightAt(BOARD.x, BOARD.z) ?? 0;
     boardGroup.position.set(BOARD.x, boardY, BOARD.z);
     boardGroup.lookAt(0.2, boardY, 1.0);
-    frame.scale.setScalar(BOARD.frameScale);
-    frame.position.y = BOARD.eye - BOARD.opening.y * BOARD.frameScale;
     this.board = new Panel(800, 320, { world: true });
     this.board.mesh.scale.set(BOARD.opening.wide * BOARD.frameScale * 0.97, BOARD.opening.tall * BOARD.frameScale * 0.97, 1);
     this.board.mesh.position.y = BOARD.eye;

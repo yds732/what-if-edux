@@ -43,18 +43,22 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0x07543a), b = new THREE.Color(0x17a86a), glow = new THREE.Color(0x6ff0a8), c = new THREE.Color();
+  const a = new THREE.Color(0x2f9a3c), b = new THREE.Color(0x7fd65a), glow = new THREE.Color(0xa8f07a), c = new THREE.Color();
   let placed = 0;
-  for (let i = 0; i < count * 3 && placed < count; i++) {
+  for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
     const x = Math.cos(ang) * r, z = Math.sin(ang) * r;
     const g = ground(x, z);
     if (!g) continue;
-    const patch = fbm3(x * 0.35, z * 0.35, 3.3, 2) * 0.5 + 0.5;
-    const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.7 + 0.7 * patch) * g.scale;
+    const patch = fbm3(x * 0.22, z * 0.22, 3.3, 3) * 0.5 + 0.5;
+    const tuft = fbm3(x * 1.6, z * 1.6, 7.1, 2) * 0.5 + 0.5;
+    const want = Math.min(1, smoothstep(0.38, 0.46, patch) * (0.45 + 0.8 * smoothstep(0.35, 0.6, tuft)) + 0.025);
+    if (rng.next() > want) continue;
+    const lush = smoothstep(0.5, 0.66, patch);
+    const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
     data.push(x, z, rng.range(0, TAU), h);
     heights.push(g.y);
-    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.06) ? 0.5 : 0);
+    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.1) ? 0.55 : 0);
     tints.push(c.r, c.g, c.b);
     placed++;
   }
@@ -76,7 +80,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${BLADE_VS}`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBladeV;\nvarying vec3 vTint;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = vTint * (0.42 + 0.9 * vBladeV);')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = vTint * (0.62 + 0.55 * vBladeV);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.22;');
   };
   mat.customProgramCacheKey = () => 'echo-grass';
