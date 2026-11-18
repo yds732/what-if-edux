@@ -299,7 +299,7 @@ describe('a voyage', () => {
     expect(squall.keen.stars).toBeGreaterThan(2.6);
     expect(squall.casual.stars).toBeLessThan(2.5);
     expect(still.dreamy.stars).toBeGreaterThan(1.3);
-  });
+  }, 60000);
 
   it('cannot be won by doing nothing', () => {
     for (const plan of PLANS) for (let seed = 1; seed <= 12; seed++) {

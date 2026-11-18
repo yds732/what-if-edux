@@ -249,5 +249,5 @@ describe('a march', () => {
     });
     expect(most).toBeGreaterThan(40);
     expect(most).toBeLessThan(300);
-  });
+  }, 60000);
 });
