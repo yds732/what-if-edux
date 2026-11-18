@@ -5,7 +5,7 @@ import { CLASSROOM, FLOOR_MARK, type ClassroomWorld } from '../../world/classroo
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
 import { MONDAY, TUESDAY } from '../script';
 import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, playRings, stowHeadset, waitHeadsetOff, waitUse } from './shared';
-import { giveGem, holdGem, pickGem, refreshSideTasks } from './spark';
+import { giveGem, holdGem, pickGem, refreshSideTasks } from './companion';
 
 /** Scene 2. The Star Bridge, a message from the real world, and the first decision. */
 export const tuesday = async (game: Game): Promise<void> => {
@@ -13,9 +13,9 @@ export const tuesday = async (game: Game): Promise<void> => {
   app.fx.fade = 1;
   const haven = (await d.enter('haven', HAVEN.spawn)) as HavenWorld;
   haven.setVariant('arrival');
-  haven.showSpark(true, { x: -5.2, z: 0.4, yaw: 2.4 });
-  haven.spark.setLabel(TUESDAY.birthdayLabel);
-  haven.spark.person.lookAtPoint(game.playerEye);
+  haven.showCompanion(true);
+  haven.companion.setLabel(TUESDAY.birthdayLabel);
+  haven.companion.person.lookAtPoint(game.playerEye);
   // a gem carried over from Monday waits until there is a free hand for it
   holdGem(game, false);
   refreshSideTasks(game);
@@ -166,40 +166,40 @@ const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   // the bridge stands finished from the morning
   haven.bridge.setSections(3, true);
   haven.bridge.rings.forEach((ring) => ring.setState('lit', true));
-  const spark = haven.spark;
-  haven.showSpark(true, { x: 0.6, z: 1.6, yaw: Math.PI });
-  spark.setLabel(TUESDAY.birthdayLabel);
-  spark.mode = 'still';
+  const guide = haven.companion;
+  haven.showCompanion(true, { x: 0.6, z: 1.6, yaw: Math.PI });
+  guide.setLabel(TUESDAY.birthdayLabel);
+  guide.mode = 'still';
   player.canMove = true;
-  game.reach('tuesday.spark');
-  spark.person.lookAtPoint(game.playerEye);
-  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 1.0);
+  game.reach('tuesday.lumi');
+  guide.person.lookAtPoint(game.playerEye);
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);
-  spark.mode = 'roam';
+  guide.mode = 'roam';
 
-  // ---- Spark's present ----
-  if (state.sparkGift === 'none') {
+  // ---- Lumi's present ----
+  if (state.lumiGift === 'none') {
     await d.play(TUESDAY.stay.ask);
-    state.sparkGift = 'asked';
+    state.lumiGift = 'asked';
   }
-  if (state.sparkGift === 'asked') {
+  if (state.lumiGift === 'asked') {
     refreshSideTasks(game);
     d.objective(MONDAY.objectiveGem);
     await pickGem(game, haven);
     d.objective(null);
   }
-  if (state.sparkGift === 'carrying') {
+  if (state.lumiGift === 'carrying') {
     holdGem(game, true);
     refreshSideTasks(game);
     d.objective(MONDAY.sideGive);
-    await waitUse(game, { position: spark.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive });
+    await waitUse(game, { position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive });
     d.objective(null);
     await giveGem(game, haven);
   } else {
     await d.play(TUESDAY.stay.given);
   }
-  spark.mode = 'still';
-  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 0.6);
+  guide.mode = 'still';
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
   haven.fireworks(8, 3);
   audio.sfx('cheer');
   await d.play(TUESDAY.stay.cheers);

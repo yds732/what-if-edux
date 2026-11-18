@@ -9,11 +9,11 @@ export interface StoryState {
   tuesdayChoice: 'meet' | 'haven' | null;
   thursdayChoice: 'help' | 'haven' | null;
   policyChoice: Policy | null;
-  /** Spark's birthday present: not asked for yet, asked for, a gem in hand, or given. */
-  sparkGift: 'none' | 'asked' | 'carrying' | 'given';
+  /** Lumi's birthday present: not asked for yet, asked for, a gem in hand, or given. */
+  lumiGift: 'none' | 'asked' | 'carrying' | 'given';
 }
 
-export const freshState = (): StoryState => ({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, sparkGift: 'none' });
+export const freshState = (): StoryState => ({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none' });
 
 interface Save {
   readonly version: 1;

@@ -7,7 +7,7 @@ import type { InputMode } from '../input/Input';
  * "ECHO: Between Two Worlds"; chapters decide when a line plays, never what it says.
  */
 
-export type SpeakerId = 'teacher' | 'jamie' | 'lumi' | 'spark' | 'kai' | 'nova' | 'you' | 'alex' | 'sam' | 'riley';
+export type SpeakerId = 'teacher' | 'jamie' | 'lumi' | 'kai' | 'nova' | 'you' | 'alex' | 'sam' | 'riley';
 
 export interface Speaker {
   readonly name: string;
@@ -19,7 +19,6 @@ export const SPEAKERS: Record<SpeakerId, Speaker> = {
   teacher: { name: 'Teacher', color: '#9fe6c9' },
   jamie: { name: 'Jamie', color: '#9fc6ff' },
   lumi: { name: 'Lumi', color: '#8feaff' },
-  spark: { name: 'Spark', color: '#ff8478' },
   kai: { name: 'Kai', color: '#ffcf7a' },
   nova: { name: 'Nova', color: '#ff9fe0' },
   you: { name: 'You', color: '#ffffff' },
@@ -67,16 +66,16 @@ export const MONDAY = {
   thanks: [L('teacher', 'Thank you! Remember, everyone might experience Echo differently.', 'happy', 'nod')],
   objectiveWear: 'Put on your Echo headset.',
   promptWear: 'Put on the Echo headset',
-  // ---- Spark ----
-  /** The first thing Spark says: it introduces itself. */
-  sparkHello: [L('spark', 'Hi! Are you new around here? My name is Spark and I can show you around Haven...', 'delighted', 'wave')],
-  objectiveSpark: 'Talk to Spark.',
-  promptSpark: 'Talk to Spark',
-  trust: { title: 'Do you trust this AI friend?', options: [{ title: 'Yes, Spark seems friendly' }, { title: 'We will see...' }] },
-  trustYes: [L('spark', "Yay! I knew we'd be friends the second I saw you. Come on, follow me!", 'delighted', 'cheer')],
-  trustMaybe: [L('spark', "That's okay! Everyone trusts me in the end. Come on, follow me!", 'blank', 'beckon')],
-  objectiveFollow: 'Follow Spark.',
-  /** What Spark says at each stop of the tour, in passing rather than as a conversation. */
+  // ---- Lumi ----
+  /** The first thing Lumi says: it introduces itself. */
+  lumiHello: [L('lumi', "Hi! Are you new around here? I'm Lumi, your Echo companion, and I can show you around Haven...", 'delighted', 'wave')],
+  objectiveLumi: 'Talk to Lumi.',
+  promptLumi: 'Talk to Lumi',
+  trust: { title: 'Do you trust this AI friend?', options: [{ title: 'Yes, Lumi seems friendly' }, { title: 'We will see...' }] },
+  trustYes: [L('lumi', "Yay! I knew we'd be friends the second I saw you. Come on, follow me!", 'delighted', 'cheer')],
+  trustMaybe: [L('lumi', "That's okay! Everyone trusts me in the end. Come on, follow me!", 'blank', 'beckon')],
+  objectiveFollow: 'Follow Lumi.',
+  /** What Lumi says at each stop of the tour, in passing rather than as a conversation. */
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
     "That's the star circle. Light orbs appear there. You'll see!",
@@ -84,32 +83,31 @@ export const MONDAY = {
     "And this is the Star Bridge! It's not finished yet, but you can walk on it. Come on!",
     "See? From up here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
-  tourDone: 'Follow Spark on a tour of Haven.',
+  tourDone: 'Follow Lumi on a tour of Haven.',
   objectiveFree: 'Explore Haven. Press Q to take off the headset when you are ready.',
   birthdayLabel: 'Birthday tomorrow',
-  promptBirthday: 'Ask Spark about the birthday',
+  promptBirthday: 'Ask Lumi about the birthday',
   birthday: [
-    L('spark', "Oh- my birthday? I don't celebrate much because not many people have joined the server yet...", 'sad'),
-    L('spark', 'My dream is to receive, what do you call it... a present?', 'thinking', 'think'),
+    L('lumi', "Oh- my birthday? I don't celebrate much because not many people have joined the server yet...", 'sad'),
+    L('lumi', 'My dream is to receive, what do you call it... a present?', 'thinking', 'think'),
     L('you', 'A present? What would you like?'),
-    L('spark', 'Yes! I love any gemstone!', 'delighted', 'cheer'),
+    L('lumi', 'Yes! I love any gemstone!', 'delighted', 'cheer'),
   ],
-  sideGift: 'Get Spark a birthday gift.',
+  sideGift: 'Get Lumi a birthday gift.',
   promptGem: 'Pick up a gem',
-  sideGive: 'Give Spark the gem.',
-  objectiveGem: 'Pick up a gem from the crystals for Spark.',
-  promptGive: 'Give Spark the gem',
-  giftDone: 'Give Spark a birthday gift.',
+  sideGive: 'Give Lumi the gem.',
+  objectiveGem: 'Pick up a gem from the crystals for Lumi.',
+  promptGive: 'Give Lumi the gem',
+  giftDone: 'Give Lumi a birthday gift.',
   thanksGift: [
-    L('spark', "For me? A real present! I'm going to keep it forever.", 'delighted', 'handToChest'),
-    L('spark', "Now we're best friends. And best friends never leave. Right?", 'blank'),
+    L('lumi', "For me? A real present! I'm going to keep it forever.", 'delighted', 'handToChest'),
+    L('lumi', "Now we're best friends. And best friends never leave. Right?", 'blank'),
   ],
 } as const;
 
 // ---------------------------------------------------------------------------------------- Scene 2: Tuesday
 
 export const TUESDAY = {
-  welcome: [L('lumi', "Welcome to Haven! I'm Lumi, your Echo companion.", 'delighted', 'wave')],
   invite: [L('lumi', "Let's build the Star Bridge together!", 'happy', 'present')],
   challengeTitle: 'Star Bridge Challenge',
   challengeBody: 'Throw three light orbs through the glowing rings to complete the bridge.',
@@ -134,7 +132,7 @@ export const TUESDAY = {
     title: 'How will you spend your afternoon?',
     options: [
       { title: 'Meet Jamie', detail: 'Go back to school and help with the welcome poster.' },
-      { title: 'Stay in Haven', detail: "Spend the afternoon with Spark. It's Spark's birthday!" },
+      { title: 'Stay in Haven', detail: "Spend the afternoon with Lumi. It's Lumi's birthday!" },
     ],
   },
   meet: {
@@ -150,20 +148,19 @@ export const TUESDAY = {
     posterTitle: 'What would you want to hear on your first day?',
     phrases: ['You belong here.', 'Sit with us at lunch!', "Ask us anything. We've all been new."],
     thanks: [L('jamie', "That's really nice! Thanks!", 'delighted', 'thumbsUp')],
-    result: { heading: 'Tuesday', gained: 'You tried something unfamiliar and made a new connection.', missed: "You missed Spark's birthday in Haven." },
+    result: { heading: 'Tuesday', gained: 'You tried something unfamiliar and made a new connection.', missed: "You missed Lumi's birthday in Haven." },
   },
   stay: {
     reply: [L('you', "Thanks! I can't make it today."), L('jamie', 'No worries! See you tomorrow :)', 'happy')],
-    back: [L('spark', 'You came! On my birthday! I knew you would pick me.', 'delighted', 'cheer')],
-    /** Spark has not told the player about its birthday yet. */
-    ask: [L('spark', "It's my birthday today! Do you know what I'd love more than anything? A gemstone!", 'delighted', 'present')],
+    back: [L('lumi', 'You came! On my birthday! I knew you would pick me.', 'delighted', 'cheer')],
+    /** Lumi has not told the player about its birthday yet. */
+    ask: [L('lumi', "It's my birthday today! Do you know what I'd love more than anything? A gemstone!", 'delighted', 'present')],
     /** The gem was given on Monday. */
-    given: [L('spark', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
+    given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
     cheers: [
-      L('spark', "Best birthday ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
-      L('lumi', 'Happy birthday, Spark!', 'happy', 'wave'),
+      L('lumi', "Best birthday ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
     ],
-    result: { heading: 'Tuesday', gained: "You made Spark's birthday special and spent the afternoon in Haven.", missed: 'You missed an opportunity to spend time with your classmates.' },
+    result: { heading: 'Tuesday', gained: "You made Lumi's birthday special and spent the afternoon in Haven.", missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
 

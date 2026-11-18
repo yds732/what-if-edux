@@ -7,8 +7,8 @@ import { glowScreenEdges } from '../../ui/dom/taskGlow';
 import { MONDAY, SPEAKERS } from '../script';
 
 /**
- * Spark's part of the story: the tour of Haven, its birthday, and the gem it asks for. Shared by Monday (where it
- * all starts) and Tuesday (Spark's birthday, if the player chooses to spend it in Haven).
+ * Lumi's part of the story: the tour of Haven, its birthday, and the gem it asks for. Shared by Monday (where it
+ * all starts) and Tuesday (Lumi's birthday, if the player chooses to spend it in Haven).
  */
 
 let heldGem: THREE.Mesh | null = null;
@@ -29,33 +29,33 @@ export const holdGem = (game: Game, on: boolean): void => {
 
 /** Lists the side tasks the story state calls for under the objective. */
 export const refreshSideTasks = (game: Game): void => {
-  const gift = game.state.sparkGift;
+  const gift = game.state.lumiGift;
   game.hud.setSideTasks(gift === 'asked' ? [MONDAY.sideGift] : gift === 'carrying' ? [MONDAY.sideGive] : []);
 };
 
-/** Spark says something in passing: the words type out under the screen and clear by themselves. */
+/** Lumi says something in passing: the words type out under the screen and clear by themselves. */
 export const bark = async (game: Game, haven: HavenWorld, text: string, linger = 1.8): Promise<void> => {
   const { hud, audio, director: d } = game;
-  const speaker = SPEAKERS.spark;
+  const speaker = SPEAKERS.lumi;
   hud.setSubtitle({ speaker: speaker.name, color: speaker.color, text });
-  haven.spark.person.setTalking(1);
+  haven.companion.person.setTalking(1);
   let shown = 0, voiced = 0;
   await d.until((dt) => {
     shown = Math.min(text.length, shown + dt * 46);
     while (voiced < Math.floor(shown)) {
       const ch = text[voiced] ?? ' ';
-      if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice('spark', ch);
+      if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice('lumi', ch);
       voiced++;
     }
     hud.setSubtitleProgress(shown, false);
     return shown >= text.length;
   });
-  haven.spark.person.setTalking(0);
+  haven.companion.person.setTalking(0);
   await d.wait(linger + text.length * 0.02);
   hud.setSubtitle(null);
 };
 
-/** Where the tour stops, what Spark shows at each, and what it says. */
+/** Where the tour stops, what Lumi shows at each, and what it says. */
 const tourStops = (haven: HavenWorld): { x: number; z: number; show: THREE.Vector3 }[] => {
   const path = haven.bridge.path;
   const onDeck = path.getPointAt(0.06), start = path.getPointAt(0.0), far = path.getPointAt(0.45);
@@ -68,25 +68,25 @@ const tourStops = (haven: HavenWorld): { x: number; z: number; show: THREE.Vecto
   ];
 };
 
-/** Spark leads the player round Haven: it goes ahead, waits, and once the player is with it, shows them something. */
-export const sparkTour = async (game: Game, haven: HavenWorld): Promise<void> => {
+/** Lumi leads the player round Haven: it goes ahead, waits, and once the player is with it, shows them something. */
+export const lumiTour = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
-  const spark = haven.spark;
+  const guide = haven.companion;
   d.objective(MONDAY.objectiveFollow);
   const stops = tourStops(haven);
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i]!;
-    spark.leadTo(stop.x, stop.z, stop.show);
+    guide.leadTo(stop.x, stop.z, stop.show);
     // a scripted run simply arrives alongside
     if (game.autopilot.enabled) player.position.set(stop.x + 1.2, player.position.y, stop.z + 1.2);
-    await d.until(() => spark.arrived);
-    await d.until(() => spark.followed);
-    // the cue: the ring at Spark's feet lights up, a chime, and Spark points
+    await d.until(() => guide.arrived);
+    await d.until(() => guide.followed);
+    // the cue: the ring at Lumi's feet lights up, a chime, and Lumi points
     audio.sfx('ringRim');
-    spark.person.play('point');
+    guide.person.play('point');
     await bark(game, haven, MONDAY.tour[i]!);
   }
-  spark.mode = 'roam';
+  guide.mode = 'roam';
   await d.complete(MONDAY.tourDone);
 };
 
@@ -115,26 +115,26 @@ export const takeGem = (game: Game): void => {
   game.audio.sfx('orbTake');
   glowScreenEdges('130, 220, 255');
   holdGem(game, true);
-  game.state.sparkGift = 'carrying';
+  game.state.lumiGift = 'carrying';
   refreshSideTasks(game);
 };
 
-/** Hands Spark the gem: a burst of light, Spark's thanks, and the task ticked off. */
+/** Hands Lumi the gem: a burst of light, Lumi's thanks, and the task ticked off. */
 export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
-  const spark = haven.spark;
+  const guide = haven.companion;
   player.canMove = false;
-  spark.mode = 'still';
-  player.faceToward(spark.person.headWorld(new THREE.Vector3()), 0.6);
+  guide.mode = 'still';
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
   game.hands.pose('offer', 'rest');
   await d.wait(0.5);
   holdGem(game, false);
   audio.sfx('reveal');
-  haven.bursts.emit(spark.chest, { count: 70, color: new THREE.Color(0.5, 0.9, 1), color2: new THREE.Color(1, 0.5, 0.45), speed: 2.6, life: 1, size: 0.13, gravity: -0.5 });
-  game.state.sparkGift = 'given';
+  haven.bursts.emit(guide.chest, { count: 70, color: new THREE.Color(0.5, 0.9, 1), color2: new THREE.Color(1, 0.5, 0.45), speed: 2.6, life: 1, size: 0.13, gravity: -0.5 });
+  game.state.lumiGift = 'given';
   refreshSideTasks(game);
   await d.complete(MONDAY.giftDone);
   await d.play(MONDAY.thanksGift);
-  spark.mode = 'roam';
+  guide.mode = 'roam';
   player.canMove = true;
 };

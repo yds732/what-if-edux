@@ -42,7 +42,8 @@ const WARDROBE = { x: 1.7, z: 2.29 }, BEANBAG = { x: 1.62, z: 0.8 }, BAG = { x: 
 const TOP = { y: 0.74, slab: 0.03, deep: 0.62, start: -0.15, ret: 1.3, retDeep: 0.6, bend: 0.24, end: 0.07 };
 const OAK = 0xd6b58e, STEEL_WHITE = 0xeef0f3, SLATE_BLUE = 0x51627e;
 /** The room's accents: warm wall lights beside the window, cool LED strips tucked out of sight. */
-const SCONCE_COLOR = 0xffc48a, LED_COLOR = 0xffc890;
+// the same plain light as the classroom pendants: nothing cosy about it
+const SCONCE_COLOR = 0xfff1e0, LED_COLOR = 0xfff1e0;
 /** The wall shelf model's platform: its underside above the shelf's base, and how far its front lip stands from the shelf's middle. */
 const SHELF = { under: 0.18, front: 0.13 };
 /** The mattress's top, where something left on the bed lies. */
@@ -88,8 +89,9 @@ export class BedroomWorld extends World {
     this.near = 0.05;
     this.far = 1200;
     Object.assign(this.look, makeLook({
-      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 1.02, contrast: 0.2, vignette: 0.3, grain: 0.006, chroma: 0, dof: 0, streak: 0.3,
-      shadowTint: new THREE.Color(0.0, 0.006, 0.02), highlightTint: new THREE.Color(0.02, 0.008, -0.01),
+      // desaturated, neutral grade (main) with no depth-of-field or colour fringing, so the room stays sharp from the back
+      exposure: 1.0, bloom: 0.07, ao: 1.0, saturation: 0.65, contrast: 0.2, vignette: 0.3, grain: 0.006, chroma: 0, dof: 0, streak: 0.3,
+      shadowTint: new THREE.Color(0.0, 0.006, 0.02), highlightTint: new THREE.Color(0, 0, 0),
     }));
     this.clearColor.set(0x0b0d16);
     // the light is whatever is beyond the glass: further off than the room is long
@@ -266,7 +268,7 @@ export class BedroomWorld extends World {
 
     // ---- light ----
     this.skyFill = new THREE.HemisphereLight(0x7f8fd0, 0x3a3040, 0.5);
-    this.sun = new THREE.DirectionalLight(0xffc89a, 2.5);
+    this.sun = new THREE.DirectionalLight(0xfff4e6, 2.5);
     this.sun.position.set(-2.2, 3.4, -9);
     this.sun.target.position.set(0.6, 0.6, 0.6);
     this.sun.castShadow = ctx.quality.shadows;
@@ -276,9 +278,9 @@ export class BedroomWorld extends World {
     this.sun.shadow.bias = -0.0006;
     this.sun.shadow.normalBias = 0.03;
     this.sun.shadow.radius = 6;
-    this.lamp = new THREE.PointLight(0xffb070, 2.6, 6.5, 1.7);
+    this.lamp = new THREE.PointLight(SCONCE_COLOR, 2.6, 6.5, 1.7);
     this.lamp.position.set(LAMP.x, 0.86, LAMP.z + 0.04);
-    const lampGlow = makeHalo(0xffb070, 1.5, 0.3);
+    const lampGlow = makeHalo(0xfff1e0, 1.5, 0.3);
     lampGlow.position.set(LAMP.x, 0.82, LAMP.z);
     // a strip of cool light in the cove above the window
     this.cove = new THREE.Mesh(new THREE.BoxGeometry(WX1 - WX0, 0.02, 0.03), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 0.72, 1.0).multiplyScalar(1.8) }));
@@ -303,7 +305,7 @@ export class BedroomWorld extends World {
       fx.add('glow', 0x9c8a72, place(bowl, at));
       const cut = new THREE.CircleGeometry(SCONCE_R, 32, out[0] < 0 ? Math.PI / 2 : Math.PI, Math.PI).rotateX(-Math.PI / 2);
       cut.deleteAttribute('uv');
-      fx.add('glow', 0xffe2c0, place(cut, [at[0], at[1] + 0.001, at[2]]));
+      fx.add('glow', 0xffffff, place(cut, [at[0], at[1] + 0.001, at[2]]));
       const up = new THREE.PointLight(SCONCE_COLOR, 1.2, 4, 1.8);
       up.position.set(at[0] + out[0] * 0.12, at[1] + 0.2, at[2] + out[1] * 0.12);
       const down = new THREE.PointLight(SCONCE_COLOR, 0.35, 3, 2);
@@ -327,11 +329,25 @@ export class BedroomWorld extends World {
     strip([1.0, 0.006, 0.008], [WARDROBE.x, 1.905, D - 0.04], [WARDROBE.x, 2.1, D - 0.12], 0.8, 2.4);
     // on each shelf, a strip along the front edge of the platform itself, under its lip, lighting the shelf below and the wall
     for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3);
+    // a lit frame all round the routine screen, just clear of its edges, with a soft wash on the wall behind it
+    {
+      const wide = 1.25 + 0.016, tall = H * 0.65 + 0.016, cy = H / 2, cz = 1.2, gap = 0.022, t = 0.008, x = -W + 0.006;
+      const outerZ = wide / 2 + gap + t / 2, outerY = tall / 2 + gap + t / 2, spanZ = wide + 2 * (gap + t), spanY = tall + 2 * gap;
+      strips.box('glow', LED_COLOR, [0.008, t, spanZ], [x, cy + outerY, cz]);
+      strips.box('glow', LED_COLOR, [0.008, t, spanZ], [x, cy - outerY, cz]);
+      strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz + outerZ]);
+      strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz - outerZ]);
+      const halo = new THREE.PointLight(LED_COLOR, 0.35, 1.8, 2);
+      halo.position.set(-W + 0.25, cy, cz);
+      halo.userData.power = 0.35;
+      this.leds.push(halo);
+      scene.add(halo);
+    }
     // and one you can see: a thin warm line along the desk's front edge
     strips.box('glow', LED_COLOR, [W - TOP.retDeep - TOP.bend - TOP.start - 0.06, 0.008, 0.006], [(TOP.start + W - TOP.retDeep - TOP.bend) / 2, TOP.y - TOP.slab - 0.004, -D + TOP.deep + 0.002]);
     this.ledGlow = strips.finish(scene, { glow: 2.2, shadows: false }).glow!;
 
-    this.dust = buildMotes(Math.round(60 * ctx.quality.density), v3(LAMP.x + 0.3, 0.4, LAMP.z + 0.5), v3(1.0, 1.1, 0.9), rng.fork(), this.clock, { a: 0xffc890, b: 0xffe9c8, size: 0.015, gain: 0.7 });
+    this.dust = buildMotes(Math.round(60 * ctx.quality.density), v3(LAMP.x + 0.3, 0.4, LAMP.z + 0.5), v3(1.0, 1.1, 0.9), rng.fork(), this.clock, { a: 0xe8ecf2, b: 0xf4f6fa, size: 0.015, gain: 0.7 });
     scene.add(this.dust.points);
 
     // ---- phone, dock light, hologram ----
@@ -919,7 +935,7 @@ const buildBedside = (x: number, z: number): { group: THREE.Group; shade: THREE.
   base.position.y = topY + 0.064;
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xc9a77a, roughness: 0.3, metalness: 0.8 }));
   neck.position.y = topY + 0.18;
-  const shade = new THREE.MeshStandardMaterial({ color: 0xfff1df, emissive: 0xffb877, emissiveIntensity: 1.6, roughness: 0.8, side: THREE.DoubleSide });
+  const shade = new THREE.MeshStandardMaterial({ color: 0xfff1df, emissive: 0xfff1e0, emissiveIntensity: 1.6, roughness: 0.8, side: THREE.DoubleSide });
   const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.15, 48, 1, true), shade);
   drum.position.y = topY + 0.29;
   // a couple of books on the shelf below
@@ -969,7 +985,7 @@ const buildGlassPlanet = (): THREE.Group => {
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.004, 8, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(2.6) }));
   ring.position.y = 0.11;
   ring.rotation.set(Math.PI / 2 - 0.3, 0.2, 0);
-  const halo = makeHalo(0xffd2a0, 0.28, 0.35);
+  const halo = makeHalo(0xfff1e0, 0.28, 0.35);
   halo.position.y = 0.11;
   g.add(foot, glassBall, planet, ring, halo);
   return g;

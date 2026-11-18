@@ -19,7 +19,7 @@ import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './
 import { buildIsland, type Island } from './islands';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
-import { Spark } from './spark';
+import { Companion } from './companion';
 
 /** Where things stand in Haven. The player arrives facing -Z: plaza, bridge, gateway, planet. */
 export const HAVEN = {
@@ -68,9 +68,9 @@ export class HavenWorld extends World {
   readonly theme = 'haven' as const;
   mainIsland!: Island;
   bridge!: StarBridge;
-  /** The other companion, in the red cap: hidden until the story brings it out. */
-  spark!: Spark;
-  /** Blossom, flowers and crystals Spark wanders off to look at. */
+  /** Lumi when the story lets it walk: leading the tour, or keeping near the player. */
+  companion!: Companion;
+  /** Blossom, flowers and crystals Lumi wanders off to look at. */
   private readonly curiosities: THREE.Vector3[] = [];
   /** Crystal clusters on the island where a gem can be picked up: the point to aim at. */
   readonly gems: THREE.Vector3[] = [];
@@ -375,14 +375,9 @@ export class HavenWorld extends World {
       c.root.add(aura);
     }
 
-    // Spark: Lumi's figure under a red cap
+    // Lumi can also walk about: lead the tour, or wander near the player looking at things
     this.curiosities.push(v3(HAVEN.tree.x, 2.6, HAVEN.tree.z), v3(HAVEN.tree.x + 1.4, 2.2, HAVEN.tree.z + 0.8), v3(4.9, 0.5, -7.0), v3(7.6, 0.4, -1.6), v3(-8.3, 0.5, 5.9));
-    const sparkFigure = this.addPerson('spark', await Character.create(ctx, CAST.spark, 'lumi'));
-    sparkFigure.setPose('standOpen', { immediate: true });
-    const sparkAura = makeHalo(CAST.spark.aura, 2.3, 0.2);
-    sparkAura.position.set(0, 0.95, -0.15);
-    sparkFigure.root.add(sparkAura);
-    this.spark = new Spark(sparkFigure, this.curiosities, (x, z) => this.colliders.groundAt(x, z, 0.3) ?? this.mainIsland.heightAt(x, z) ?? 0, this.colliders);
+    this.companion = new Companion(this.cast.lumi!, this.curiosities, (x, z) => this.colliders.groundAt(x, z, 0.3) ?? this.mainIsland.heightAt(x, z) ?? 0, this.colliders);
 
     await this.buildFestival(ctx, rng.fork(), edgeZ);
     this.colliders.bounds = { kind: 'circle', cx: 0, cz: -0.6, r: 9.4 };
@@ -437,12 +432,12 @@ export class HavenWorld extends World {
     who.root.position.y = this.mainIsland.heightAt(at.position.x, at.position.z) ?? 0;
   }
 
-  /** Brings Spark out (standing at `at`, or where it was) or puts it away. Shown, it is still until `spark.active`. */
-  showSpark(on: boolean, at?: { x: number; z: number; yaw: number }): void {
-    this.spark.person.root.visible = on;
-    this.spark.mode = 'still';
-    this.spark.setAlert(false);
-    if (at) this.spark.placeAt(at.x, at.z, at.yaw);
+  /** Hands Lumi to the walking companion, standing at `at` (or where it is); off gives Lumi back to the story. */
+  showCompanion(on: boolean, at?: { x: number; z: number; yaw: number }): void {
+    this.companion.mode = 'still';
+    this.companion.setAlert(false);
+    if (!on) this.companion.setLabel(null);
+    if (at) this.companion.placeAt(at.x, at.z, at.yaw);
   }
 
   /** Arranges Haven for a moment of the story. `title` is the finished bridge with only Lumi about. */
@@ -450,7 +445,7 @@ export class HavenWorld extends World {
     const { lumi, kai, nova } = this.cast;
     const friends = variant === 'bonus' || variant === 'festival';
     kai!.root.visible = nova!.root.visible = friends;
-    this.showSpark(false);
+    this.showCompanion(false);
     lumi!.placeAt(variant === 'evening' ? HAVEN.lumiNear : HAVEN.lumi);
     this.festivalTarget = variant === 'festival' ? 1 : 0;
     this.festival.visible = variant === 'festival';
@@ -531,7 +526,7 @@ export class HavenWorld extends World {
     this.floating.update(time, frame.pixelHeight);
     this.shootingStars.update(dt, frame.camera);
     this.bridge.update(dt, time);
-    if (this.spark.person.root.visible) this.spark.update(dt, _player.set(frame.camera.position.x, 0, frame.camera.position.z), frame.camera.position, frame.camera);
+    if (this.companion.person.root.visible) this.companion.update(dt, _player.set(frame.camera.position.x, 0, frame.camera.position.z), frame.camera.position, frame.camera);
     this.gateway.update(dt, time);
     if (this.bonusRing.group.visible) {
       // the bonus ring drifts from side to side: a moving target
