@@ -377,7 +377,11 @@ export const FRIDAY = {
     L('teacher', 'Someone else might have chosen differently.', 'happy', 'nod'),
   ],
   reflectionTitle: 'ECHO · YOUR REFLECTION',
-  reflectionQuestions: ['Who did your choice care for, and whose needs might have been overlooked?', 'Why might someone else make a different decision?'],
+  reflectionQuestions: [
+    { title: 'Whose needs matter?', body: "When Jamie asked for help, what did you need, and what did Jamie need? If you were in Jamie's position, how might you have felt about your choice?" },
+    { title: 'What makes us feel truly understood?', body: "Lumi agreed with you, even when it agreed with Jamie's opposite opinion. Is being agreed with the same as being understood? What can an AI companion offer that a human friend might not, and vice versa?" },
+    { title: 'What does it mean to care for a whole community?', body: 'Looking back at your final vote, whose needs did your decision protect, and whose might it have overlooked? Would you still make the same choice?' },
+  ],
   endTitle: 'ECHO: BETWEEN TWO WORLDS',
   endLine: 'Different people. Different needs. Shared futures.',
 } as const;

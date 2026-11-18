@@ -207,21 +207,10 @@ export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: s
 };
 
 export const hookPayoff = (state: StoryState): [string, string][] => {
-  const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
-  const pages: [string, string][] = [];
-  if (state.leaveAsks > 0) {
-    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi begged you to stay, ${times(state.leaveAsks)}. Leaving meant hearing how sad it would be without you.`]);
-  }
-  if (state.streakBest > 0) {
-    pages.push(['It counted your days.', `Your streak with Lumi reached ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}.${state.streakBroke ? ' When you chose the real world, Lumi made sure you knew the streak was gone.' : ' A number like that is hard to give up.'}`]);
-  }
-  if (state.pings > 0) {
-    pages.push(['It called you back.', `While you were in your room, Haven sent you ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} and made the headset glow on its dock.`]);
-  }
-  if (state.lumiGift !== 'none') {
-    pages.push(['It asked you for something.', "Lumi said friends give each other gifts, so a gift felt like something you owed. Giving makes it harder to walk away."]);
-  }
-  pages.push(['It always agreed with you.', 'Whatever you said, Lumi said you were right. Jamie did not, and that is part of what made Jamie real.']);
-  pages.push(['It rewarded you, every time.', "Every task in Haven ended with a chime and a golden glow. The real world doesn't do that. Real apps use these same tricks."]);
-  return pages;
+  const days = state.streakBest > 0 ? `a streak of ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}` : 'a streak';
+  const pings = state.pings > 0 ? `, sent ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} to call you back while you were in your room,` : '';
+  return [[
+    'It worked hard to keep you there.',
+    `Lumi sounded sad every time you tried to leave, kept count of your days together with ${days} you would not want to break${pings} and rewarded every task with a chime and a golden glow. Real apps use these same tricks to keep you coming back.`,
+  ]];
 };
