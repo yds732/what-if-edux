@@ -115,7 +115,8 @@ const PETAL_VS = `
 }
 `;
 
-export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
+export const buildBlossomTree = (rng: Rng, petalCount: number, palette: 'gold' | 'pink' = 'gold'): Tree => {
+  const pinkTree = palette === 'pink';
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
@@ -156,11 +157,11 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const pinkA = new THREE.Color(0xffd65c), pinkB = new THREE.Color(0xfff4c8), lilac = new THREE.Color(0xe8b23e);
-  const rose = new THREE.Color(0xf7c443);
+  const pinkA = new THREE.Color(pinkTree ? 0xeeb0c6 : 0xffd65c), pinkB = new THREE.Color(pinkTree ? 0xfff0e6 : 0xfff4c8), lilac = new THREE.Color(pinkTree ? 0x7c6fa8 : 0xe8b23e);
+  const rose = new THREE.Color(pinkTree ? 0xd6337f : 0xf7c443);
   const masses: THREE.BufferGeometry[] = [];
   const puffs: { p: THREE.Vector3; r: number }[] = [];
-  const dark = new THREE.Color(0xc79a35);
+  const dark = new THREE.Color(pinkTree ? 0x6f5a8e : 0xc79a35);
   for (const tip of tips) {
     const n = 3 + Math.round(tip.r * 3);
     for (let i = 0; i < n; i++) {
@@ -176,7 +177,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
       masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.35 + 0.35 * normal.y)));
     }
   }
-  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffd27a, emissiveIntensity: 0.1 }));
+  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: pinkTree ? 0xffb4a0 : 0xffd27a, emissiveIntensity: pinkTree ? 0.06 : 0.1 }));
   massMesh.castShadow = true;
   group.add(massMesh);
 

@@ -9,6 +9,7 @@ interface Recolour {
   readonly keepBlossom?: boolean;
   readonly green?: Shift;
   readonly gold?: { readonly keepAbove?: number };
+  readonly pinkBlossom?: boolean;
 }
 
 const COBALT: Shift = [0.615, 0.72, 0.78];
@@ -33,7 +34,7 @@ const RECOLOURS: Record<string, Recolour> = {
 const EDGE_LIGHT = new THREE.Color(1.0, 0.78, 0.34);
 
 const GLSL = `
-uniform vec3 uHvPink, uHvGreen, uHvEdge; uniform float uHvPinkOn, uHvAll, uHvKeepBlossom, uHvGreenOn, uHvGoldOn, uHvGoldKeep;
+uniform vec3 uHvPink, uHvGreen, uHvEdge; uniform float uHvPinkOn, uHvAll, uHvKeepBlossom, uHvBlossomGold, uHvGreenOn, uHvGoldOn, uHvGoldKeep;
 vec3 hvHsv(vec3 c){
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
   vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -64,7 +65,7 @@ float hvLine = 0.0;
   vec3 o = s;
   o = mix(o, hvShift(hsv, uHvPink), pink);
   o = mix(o, hvShift(hsv, uHvGreen), green * (1.0 - pink));
-  o = mix(o, hvShift(hsv, vec3(0.12, 0.72, 1.05)), blossom * sat);
+  o = mix(o, hvShift(hsv, vec3(0.12, 0.72, 1.05)), blossom * sat * uHvBlossomGold);
   // gold: a pale, faintly blue alloy, brighter where it catches the light; its brightest edges carry a line of light
   float luma = dot(s, vec3(0.299, 0.587, 0.114));
   vec3 alloy = vec3(luma) * vec3(1.18, 0.95, 0.52) * 1.15;
@@ -80,7 +81,7 @@ const patch = (material: THREE.MeshStandardMaterial, r: Recolour): void => {
   if (patched.has(material)) return;
   patched.add(material);
   const uniforms = {
-    uHvPink: { value: new THREE.Vector3(...(r.pink ?? [0, 1, 1])) }, uHvPinkOn: { value: r.pink ? 1 : 0 }, uHvAll: { value: r.all ? 1 : 0 }, uHvKeepBlossom: { value: r.keepBlossom ? 1 : 0 },
+    uHvPink: { value: new THREE.Vector3(...(r.pink ?? [0, 1, 1])) }, uHvPinkOn: { value: r.pink ? 1 : 0 }, uHvAll: { value: r.all ? 1 : 0 }, uHvKeepBlossom: { value: r.keepBlossom ? 1 : 0 }, uHvBlossomGold: { value: r.pinkBlossom ? 0 : 1 },
     uHvGreen: { value: new THREE.Vector3(...(r.green ?? [0, 1, 1])) }, uHvGreenOn: { value: r.green ? 1 : 0 },
     uHvGoldOn: { value: r.gold ? 1 : 0 }, uHvGoldKeep: { value: r.gold?.keepAbove ?? 2 }, uHvEdge: { value: EDGE_LIGHT },
   };
