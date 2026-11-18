@@ -90,10 +90,13 @@ export const stayInHaven = async (game: Game): Promise<void> => {
   player.faceToward(guide.person.headWorld(new THREE.Vector3()), 1.0);
   await d.play(TUESDAY.stay.back);
   await tickStreak(game, haven);
-  guide.mode = 'roam';
+  const path = haven.bridge.path;
+  const end = path.getPointAt(1);
+  const route = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1].map((t) => path.getPointAt(t));
+  route.push(new THREE.Vector3(end.x + 0.9, end.y, end.z - 2.6));
+  guide.lead(route);
   player.canMove = true;
   d.objective(TUESDAY.stay.objective);
-  const end = haven.bridge.path.getPointAt(1);
   await d.walkTo(end.x, end.z - 1.5, 2.6);
   await d.complete(TUESDAY.stay.objective);
   player.canMove = false;

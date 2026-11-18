@@ -136,9 +136,9 @@ export const TUESDAY = {
     reply: [L('you', "Thanks, but I can't make it."), L('jamie', 'No worries! Next time :)', 'happy')],
     back: [
       L('lumi', 'You came back! I knew you would pick me.', 'delighted', 'cheer'),
-      L('lumi', "Come on, I want to show you something. Let's cross the Star Bridge together!", 'happy', 'beckon'),
+      L('lumi', "Come on, I want to show you something. Follow me across the Star Bridge!", 'happy', 'beckon'),
     ],
-    objective: 'Cross the Star Bridge with Lumi.',
+    objective: 'Follow Lumi across the Star Bridge.',
     portal: [
       L('you', "Lumi... what's behind that glowing portal?"),
       L('lumi', "Hmm... it's a secret. Spend a few more days with me, and you'll find out.", 'blank', 'handToChest'),

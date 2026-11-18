@@ -64,7 +64,7 @@ const FAR = 4.6;
 const SPEED = 1.5;
 const RADIUS = 0.3;
 
-export type CompanionMode = 'still' | 'roam';
+export type CompanionMode = 'still' | 'roam' | 'lead';
 
 export class Companion {
   readonly person: Character;
@@ -78,6 +78,8 @@ export class Companion {
   private readonly goal = new THREE.Vector3();
   private readonly gaze = new THREE.Vector3();
   private curiosity: THREE.Vector3 | null = null;
+  private route: THREE.Vector3[] = [];
+  private stop = 0;
   private linger = 0;
   private yaw = 0;
   private time = 0;
@@ -111,6 +113,12 @@ export class Companion {
     this.person.place(this.pos.x, this.pos.y, this.pos.z, yaw);
   }
 
+  lead(route: readonly THREE.Vector3[]): void {
+    this.route = route.map((r) => r.clone());
+    this.stop = 0;
+    this.mode = 'lead';
+  }
+
   update(dt: number, player: THREE.Vector3, eye: THREE.Vector3, camera: THREE.Camera): void {
     this.time += dt;
     const p = this.person;
@@ -135,7 +143,18 @@ export class Companion {
 
     let look: THREE.Vector3 | null = null;
     const goal: THREE.Vector3 = this.goal;
-    if (toPlayer < NEAR) {
+    if (this.mode === 'lead') {
+      let next = this.route[this.stop];
+      while (next && this.stop < this.route.length - 1 && Math.hypot(next.x - this.pos.x, next.z - this.pos.z) < 0.45) next = this.route[++this.stop];
+      const ahead = next ? Math.hypot(next.x - player.x, next.z - player.z) - Math.hypot(next.x - this.pos.x, next.z - this.pos.z) : 0;
+      if (!next || (toPlayer > FAR && ahead > 0)) {
+        this.goal.copy(this.pos);
+        look = eye;
+      } else {
+        this.goal.set(next.x, 0, next.z);
+        look = this.stop >= this.route.length - 1 ? eye : null;
+      }
+    } else if (toPlayer < NEAR) {
       this.goal.copy(this.pos);
       this.curiosity = null;
       this.linger = 0;
