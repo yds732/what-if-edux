@@ -194,7 +194,8 @@ const open = async (query) => {
   const { page } = t;
   await t.beat('thursday.oneMore');
   // the day's last lines play out first: Q counts once the story asks for the headset to come off
-  await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 }).catch(() => undefined);
+  await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 })
+    .then(() => check('Thursday: a prompt asks for the headset to come off, naming the key', true), () => check('Thursday: a prompt asks for the headset to come off, naming the key', false));
   await page.keyboard.press('KeyQ');
   // Lumi asks for one more minute: 2 picks Leave
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
