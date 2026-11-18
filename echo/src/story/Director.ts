@@ -238,17 +238,14 @@ export class Director {
     lerpLook(this.blend, from.look, to.look, 0);
     audio.sfx('wipe');
     const toReal = to.theme !== 'haven';
-    app.setLoadScale(0.72);
     try {
       await this.tween(toReal ? 1.8 : 3.1, (k) => {
         wipe.radius = toReal ? reach * (0.1 * k + 0.9 * k * k) : reach * (0.06 * k + 0.94 * k * k * k);
         lerpLook(this.blend, from.look, to.look, Math.min(1, k * (toReal ? 2.2 : 1.6)));
       }, ease.linear);
     } finally {
-      app.setLoadScale(1);
       app.wipe = null;
       app.lookOverride = null;
-      app.post.releaseWipe();
       from.scene.rotation.y = 0;
       from.scene.position.set(0, 0, 0);
       from.scene.updateMatrixWorld(true);
