@@ -91,12 +91,9 @@ export const friday = async (game: Game): Promise<void> => {
     await d.wait(0.5);
   }
   game.reach('friday.reflection');
-  for (const [i, q] of FRIDAY.reflectionQuestions.entries()) {
-    hud.setReflection([FRIDAY.reflectionTitle, '', `${i + 1}. ${q.title}`, '', q.body]);
-    await holdToRead(game, 7, 60);
-    hud.setReflection(null);
-    await d.wait(0.6);
-  }
+  hud.setReflection([FRIDAY.reflectionTitle, '', ...FRIDAY.reflectionQuestions.flatMap((q, i) => (i ? ['', q] : [q]))]);
+  await holdToRead(game, 9, 60);
+  hud.setReflection(null);
   await d.wait(1.6);
   hud.setCard('Echo', 'Between Two Worlds');
   await d.wait(3.0);

@@ -65,7 +65,7 @@ export class Hud {
   private sub: { line: SubtitleLine; lines: string[]; chars: number; total: number; waiting: boolean } | null = null;
   private cardText = { title: '', subtitle: '' };
   private resultData: { heading: string; gained: string; missed: string } = { heading: '', gained: '', missed: '' };
-  private toastData: { title: string; body: string; icon?: 'mail' | 'speaker' } = { title: '', body: '' };
+  private toastData = { title: '', body: '' };
   private reflectionLines: string[] = [];
   private counterData = { label: '', value: 0, total: 3, pulse: 0 };
   private hints: Hints | null = null;
@@ -289,7 +289,7 @@ export class Hud {
     this.result.widget.visible = true;
   }
 
-  setToast(data: { title: string; body: string; icon?: 'mail' | 'speaker' } | null): void {
+  setToast(data: { title: string; body: string } | null): void {
     if (data === null) {
       this.toast.widget.visible = false;
       return;
@@ -758,36 +758,17 @@ export class Hud {
       const ix = PAD + 24, iy = PAD + 26;
       ctx.strokeStyle = this.theme.accent;
       ctx.lineWidth = 2;
-      if (this.toastData.icon === 'speaker') {
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(ix + 2, iy + 10);
-        ctx.lineTo(ix + 10, iy + 10);
-        ctx.lineTo(ix + 20, iy + 1);
-        ctx.lineTo(ix + 20, iy + 29);
-        ctx.lineTo(ix + 10, iy + 20);
-        ctx.lineTo(ix + 2, iy + 20);
-        ctx.closePath();
-        ctx.stroke();
-        ctx.lineCap = 'round';
-        for (const r of [7, 13, 19]) {
-          ctx.beginPath();
-          ctx.arc(ix + 21, iy + 15, r, -0.75, 0.75);
-          ctx.stroke();
-        }
-      } else {
-        roundRect(ctx, ix, iy, 40, 30, 5);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(ix + 2, iy + 3);
-        ctx.lineTo(ix + 20, iy + 17);
-        ctx.lineTo(ix + 38, iy + 3);
-        ctx.stroke();
-        ctx.fillStyle = '#ff6b8a';
-        ctx.beginPath();
-        ctx.arc(ix + 40, iy, 7, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      roundRect(ctx, ix, iy, 40, 30, 5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ix + 2, iy + 3);
+      ctx.lineTo(ix + 20, iy + 17);
+      ctx.lineTo(ix + 38, iy + 3);
+      ctx.stroke();
+      ctx.fillStyle = '#ff6b8a';
+      ctx.beginPath();
+      ctx.arc(ix + 40, iy, 7, 0, Math.PI * 2);
+      ctx.fill();
       ctx.textBaseline = 'middle';
       ctx.fillStyle = this.theme.text;
       ctx.font = font(600, 18);

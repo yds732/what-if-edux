@@ -271,13 +271,14 @@ export class BedroomWorld extends World {
       fx.add('glow', 0xffffff, place(cut, [at[0], at[1] + 0.001, at[2]]));
       const up = new THREE.PointLight(SCONCE_COLOR, 1.2, 4, 1.8);
       up.position.set(at[0] + out[0] * 0.12, at[1] + 0.2, at[2] + out[1] * 0.12);
-      scene.add(up);
+      const down = new THREE.PointLight(SCONCE_COLOR, 0.35, 3, 2);
+      down.position.set(at[0] + out[0] * 0.3, at[1] - 0.15, at[2] + out[1] * 0.3);
+      scene.add(up, down);
     }
     fx.finish(scene, { glow: 2.4, shadows: false });
     const strips = new Builder();
-    const strip = (size: [number, number, number], at: [number, number, number], light: [number, number, number], power: number, reach: number, lit = true): void => {
+    const strip = (size: [number, number, number], at: [number, number, number], light: [number, number, number], power: number, reach: number): void => {
       strips.box('glow', LED_COLOR, size, at);
-      if (!lit) return;
       const led = new THREE.PointLight(LED_COLOR, power, reach, 2);
       led.position.set(...light);
       led.userData.power = power;
@@ -286,9 +287,9 @@ export class BedroomWorld extends World {
     };
     const under = TOP.y - TOP.slab - 0.006;
     strip([W - TOP.start - 0.1, 0.006, 0.008], [(TOP.start + W) / 2, under, -D + 0.03], [0.9, 0.45, -D + 0.15], 0.9, 2.6);
-    strip([0.008, 0.006, TOP.ret - 0.12], [W - 0.03, under, -D + TOP.ret / 2], [W - 0.32, 0.5, -1.85], 0.22, 1.6, false);
+    strip([0.008, 0.006, TOP.ret - 0.12], [W - 0.03, under, -D + TOP.ret / 2], [W - 0.32, 0.5, -1.85], 0.22, 1.6);
     strip([1.0, 0.006, 0.008], [WARDROBE.x, 1.905, D - 0.04], [WARDROBE.x, 2.1, D - 0.12], 0.8, 2.4);
-    for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3, false);
+    for (const [y, z] of [[1.02, -0.72], [1.6, -0.3]] as const) strip([0.008, 0.005, 1.12], [W - 0.16 - SHELF.front, y + SHELF.under - 0.003, z], [W - 0.2, y + SHELF.under - 0.12, z], 0.3, 1.3);
     {
       const wide = 1.25 + 0.016, tall = H * 0.65 + 0.016, cy = H / 2, cz = 1.2, gap = 0.022, t = 0.008, x = -W + 0.006;
       const outerZ = wide / 2 + gap + t / 2, outerY = tall / 2 + gap + t / 2, spanZ = wide + 2 * (gap + t), spanY = tall + 2 * gap;
@@ -296,6 +297,11 @@ export class BedroomWorld extends World {
       strips.box('glow', LED_COLOR, [0.008, t, spanZ], [x, cy - outerY, cz]);
       strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz + outerZ]);
       strips.box('glow', LED_COLOR, [0.008, spanY, t], [x, cy, cz - outerZ]);
+      const halo = new THREE.PointLight(LED_COLOR, 0.35, 1.8, 2);
+      halo.position.set(-W + 0.25, cy, cz);
+      halo.userData.power = 0.35;
+      this.leds.push(halo);
+      scene.add(halo);
     }
     strips.box('glow', LED_COLOR, [W - TOP.retDeep - TOP.bend - TOP.start - 0.06, 0.008, 0.006], [(TOP.start + W - TOP.retDeep - TOP.bend) / 2, TOP.y - TOP.slab - 0.004, -D + TOP.deep + 0.002]);
     this.ledGlow = strips.finish(scene, { glow: 2.2, shadows: false }).glow!;
@@ -1086,6 +1092,7 @@ const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group
   float.add(planet);
   const light = new THREE.PointLight(0x7fb0ff, 0.9, 1.8, 2);
   light.position.set(0, 0.42, 0.2);
+  group.add(light);
   group.position.set(x, y, z);
   group.rotation.y = -0.22;
   return {
@@ -1114,7 +1121,9 @@ const buildOrb = (x: number, y: number, z: number): THREE.Group => {
   core.position.y = 0.09;
   const halo = makeHalo(SCONCE_COLOR, 0.32, 0.5);
   halo.position.y = 0.1;
-  group.add(foot, glassBall, core, halo);
+  const light = new THREE.PointLight(SCONCE_COLOR, 0.5, 1.4, 2);
+  light.position.y = 0.12;
+  group.add(foot, glassBall, core, halo, light);
   group.position.set(x, y, z);
   return group;
 };
@@ -1291,6 +1300,8 @@ const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group
     s.position.set(dx, 0.097, dz);
     group.add(s);
   }
+  const under = new THREE.PointLight(SCONCE_COLOR, 0.25, 1.4, 2);
+  under.position.set(0.35, 0.06, 0);
   const mw = wide - 0.06, ml = long - 0.06, mTop = 0.5;
   const mattress = new THREE.Mesh(roundBox(mw, 0.2, ml, 0.07, 6), sheet);
   mattress.position.set(0, mTop - 0.1, 0);
@@ -1316,7 +1327,7 @@ const buildBed = (x: number, z: number, wide: number, long: number): THREE.Group
   const plush = new THREE.Mesh(new THREE.ExtrudeGeometry(star, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.022, bevelSegments: 5 }), new THREE.MeshStandardMaterial({ color: 0xf0c03a, roughness: 0.95 }));
   plush.position.set(0.2, mTop + 0.15, -long / 2 + 0.3);
   plush.rotation.set(-0.9, 0.25, 0.2);
-  group.add(plinth, base, ring(0.297), ring(0.103), mattress, duvet, turn, blanket, front, plush);
+  group.add(plinth, base, ring(0.297), ring(0.103), under, mattress, duvet, turn, blanket, front, plush);
   group.traverse((o) => { if (o instanceof THREE.Mesh && o.material !== glowMat) o.castShadow = o.receiveShadow = true; });
   group.position.set(x, 0, z);
   return group;
@@ -1362,6 +1373,9 @@ const buildWardrobe = (x: number, z: number): THREE.Group => {
     led.position.set(nx, y - 0.013, front + 0.04);
     group.add(led);
   }
+  const shelfLight = new THREE.PointLight(SCONCE_COLOR, 0.35, 1.2, 2);
+  shelfLight.position.set(nx, 1.1, front + 0.1);
+  group.add(shelfLight);
   const fold = (w: number, hh: number, color: number, px: number, py: number): void => slab(w, hh, 0.3, px, py + hh / 2, 0.02, new THREE.MeshStandardMaterial({ color, roughness: 0.95 }));
   let y = levels[0]! + 0.01;
   for (const c of [0x4a5a7c, 0xd9d6cf, 0x8a95ab]) { fold(0.24, 0.045, c, nx, y); y += 0.045; }
