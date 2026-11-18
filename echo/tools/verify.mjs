@@ -4,7 +4,7 @@
 //
 //   node tools/verify.mjs            every step
 //   node tools/verify.mjs touch vr   only the steps whose name contains one of these words
-import { spawnSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { createServer } from 'vite';
 
 const BASE = 'http://127.0.0.1:5173/';
@@ -36,7 +36,8 @@ const server = running ? null : await (await createServer({ server: { hmr: false
 let failed = 0;
 for (const [name, command] of steps) {
   const t0 = Date.now();
-  const run = spawnSync(command, { shell: true, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  // not spawnSync: that would stop this process, and the server it may be running, until the step ends
+  const run = await new Promise((resolve) => exec(command, { maxBuffer: 64 * 1024 * 1024 }, (error, stdout, stderr) => resolve({ status: error ? 1 : 0, stdout, stderr })));
   const ok = run.status === 0;
   if (!ok) failed++;
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
