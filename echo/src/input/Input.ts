@@ -8,6 +8,8 @@ export type InputMode = 'mouse' | 'touch' | 'xr';
 const KEY_ACTIONS: Record<string, Action> = {
   KeyE: 'interact', KeyF: 'interact', Space: 'advance', Enter: 'advance', Digit1: 'choice1', Digit2: 'choice2', Digit3: 'choice3',
   Numpad1: 'choice1', Numpad2: 'choice2', Numpad3: 'choice3', KeyQ: 'headset', KeyP: 'pause', KeyK: 'controls',
+  // with the mouse captured the browser keeps Escape for itself (and the game pauses as the mouse is let go); with a free cursor it arrives here
+  Escape: 'pause',
 };
 export const ACTION_LABELS: Record<InputMode, Record<'interact' | 'headset', string>> = {
   mouse: { interact: 'E', headset: 'Q' },
@@ -38,6 +40,8 @@ export class Input {
   tap: { x: number; y: number } | null = null;
   mode: InputMode = 'mouse';
   wantsLock = false;
+  /** On a touch screen the left of the picture is a walking stick. Off, a finger anywhere is the pointer: a game played by pointing. */
+  sticks = true;
   sensitivity = 1;
   readonly onModeChange = new Signal<InputMode>();
   readonly onLockLost = new Signal();
@@ -177,7 +181,7 @@ export class Input {
     for (const t of Array.from(e.changedTouches)) {
       const p = this.canvasPoint(t.clientX, t.clientY);
       if (e.type === 'touchstart') {
-        if (p.x < w * 0.42 && this.stickId === null) {
+        if (this.sticks && p.x < w * 0.42 && this.stickId === null) {
           this.stickId = t.identifier;
           this.stickOrigin.set(p.x, p.y);
           this.stickLast.set(p.x, p.y);

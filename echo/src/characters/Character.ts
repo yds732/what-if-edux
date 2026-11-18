@@ -73,6 +73,11 @@ export class Character {
   private hover = 0;
   private liveliness = 1;
   private seatHeight = 0.36;
+  /**
+   * Called each frame with the skeleton as posed, before the figure is fitted to it: the place to put a hand
+   * exactly on something (a bat on a ball), which no stored gesture can do.
+   */
+  onPose: ((bones: Rig['bones']) => void) | null = null;
 
   constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {
     this.spec = spec;
@@ -279,6 +284,7 @@ export class Character {
     hips.position.y = lerp(hips.position.y, targetY, k);
     hips.position.x = lerp(hips.position.x, sway * 0.006 * (this.pose === 'stand' ? 1 : 0), k);
     hips.position.z = lerp(hips.position.z, base.hipsZ, k);
+    this.onPose?.(bones);
     this.body.retarget();
   }
 }

@@ -1,5 +1,6 @@
 import type { Rng } from '../core/math';
 import type { SfxName } from './GameAudio';
+import { ARCADE_SFX } from './arcadeSfx';
 import { bell, choir, formants, padChord, shape, sparkle, thump, tick } from './instruments';
 import type { Space } from './mixer';
 import { SLACK, dB, glide, mtof, notes, pentatonic, swell, swellEnd, type Patch } from './synth';
@@ -73,6 +74,7 @@ const makeCrackle = (ctx: BaseAudioContext, rng: Rng): AudioBuffer => {
 };
 
 export const SFX: Record<SfxName, SfxSpec> = {
+  ...ARCADE_SFX,
 
   uiHover: {
     bus: 'ui',

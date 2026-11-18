@@ -37,6 +37,26 @@ refreshes what the manifest says about each asset (its glow, where a face sits) 
 To see a result: `node tools/assets/inspect.mjs <file.glb> [--textures] [--joints] [--rig]`, or in the game's
 studio, `?shot=studio&subject=model&url=assets/models/<id>.high.glb&h=<height>`.
 
+## What a catalog entry can ask for
+
+Most entries are a `kind`, a `world`, a `brief` and a `fit`. The arcade's props needed a little more, all of it read
+by the same three tools:
+
+| Field | What it does |
+|---|---|
+| `only: 'medium'` | One weight of the model is made, not three: the game falls back to it on every tier. |
+| `budget: [triangles, edge]` | That weight's triangle count and texture size, where the tier's own would be too much or too little (a jewel drawn forty-nine times; a lighthouse seen once). |
+| `views: 4` | The sheet is a four-view turnaround and the model is made from all four: for a creature, whose back matters. |
+| `sprite: true` / `gloom: true` | With `views: 4`: drawn to the rules for Haven's sprites, or for the gloom's creatures (which stand in place of the world's palette). |
+| `refs`, `refNote` | Other assets' sheets shown to the image model alongside the style key, and what to take from them. |
+| `raw: '<id>'` | No sheet or model of its own: a second, lighter cut of another asset's model (a flock of a hundred). |
+| `flat: true` | Laid flat before it is fitted: a thing modelled leaning. |
+| `pale: true` | Meant to be nearly white: not failed for coming back without colour. |
+| `fit: ['box', [x, null, z]]` | A box fit with an axis left open keeps the thing's own proportion along it. |
+
+`node tools/assets/profile.mjs <file.glb>` measures the opening through a model (to hang a film of light in a gate);
+with `--top=16` it prints a map of the highest surface over each part of its footprint (to stand someone on a jetty).
+
 ## What the tools take care of
 
 - **One look.** Every sheet is drawn with its world's style key as a reference image.

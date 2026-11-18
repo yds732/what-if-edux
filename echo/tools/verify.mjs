@@ -18,6 +18,8 @@ const STEPS = [
   ['touch', 'node tools/touch-test.mjs'],
   ['vr controllers', 'node tools/xr-test.mjs'],
   ['menus at desktop, tablet and phone sizes', 'node tools/ui-shots.mjs'],
+  ['arcade: the isle and each game, played with mouse and touch', 'node tools/arcade-test.mjs'],
+  ['arcade in an emulated headset: each game with a vr controller', 'node tools/arcade-xr-test.mjs'],
 ];
 
 const only = process.argv.slice(2).map((w) => w.toLowerCase());

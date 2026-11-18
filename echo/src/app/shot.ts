@@ -4,6 +4,11 @@ import { BedroomWorld } from '../world/bedroom/BedroomWorld';
 import { ClassroomWorld } from '../world/classroom/ClassroomWorld';
 import { HavenWorld } from '../world/haven/HavenWorld';
 import { StudioWorld } from '../world/studio/StudioWorld';
+import { RallyWorld } from '../arcade/rally/RallyWorld';
+import { SpriteWorld } from '../arcade/sprites/SpriteWorld';
+import { DriftWorld } from '../arcade/drift/DriftWorld';
+import { DuskWorld } from '../arcade/dusk/DuskWorld';
+import { LanternWorld } from '../arcade/lanterns/LanternWorld';
 import { AssetLibrary } from '../assets/AssetLibrary';
 import { App } from './App';
 import { numberParam } from './params';
@@ -16,6 +21,12 @@ export const SHOT_WORLDS: Record<string, WorldFactory> = {
   haven: () => new HavenWorld(),
   bedroom: () => new BedroomWorld(),
   classroom: () => new ClassroomWorld(),
+  // the arcade's worlds, as built: nobody is playing in them
+  rally: () => new RallyWorld(),
+  sprites: () => new SpriteWorld(),
+  lanterns: () => new LanternWorld(),
+  drift: () => new DriftWorld(),
+  duskbreak: () => new DuskWorld(),
 };
 
 const vec = (text: string | null, fallback: [number, number, number]): THREE.Vector3 => {

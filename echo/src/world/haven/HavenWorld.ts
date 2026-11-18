@@ -21,6 +21,7 @@ import { buildBoardFrame, buildHoop } from './minimal';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
 import { Companion } from './companion';
+import { buildArcadeIsle, type ArcadeIsle } from './arcadeIsle';
 
 export const HAVEN = {
   spawn: anchor(0, 0, 4.2, 0),
@@ -42,7 +43,8 @@ export const HAVEN = {
   lumiTitle: anchorToward(-10.25, 0, -1.8, -10.9, 4.4),
 } as const satisfies Record<string, Anchor | THREE.Vector3 | number | readonly THREE.Vector3[]>;
 
-export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title';
+/** `arcade` is the festival's Haven with the arcade isle open: a bridge of light out to it, and its portals awake. */
+export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title' | 'arcade';
 
 const ISLANDS = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;
 const BOARD = { x: -3.7, z: -5.6, eye: 1.75, frameScale: 2.4, opening: { wide: 1.04, tall: 0.42, y: 1.4365 } };
@@ -60,6 +62,7 @@ export class HavenWorld extends World {
   mainIsland!: Island;
   bridge!: StarBridge;
   companion!: Companion;
+  arcade!: ArcadeIsle;
   private readonly curiosities: THREE.Vector3[] = [];
   readonly gems: THREE.Vector3[] = [];
   gateway!: Gateway;
@@ -334,6 +337,7 @@ export class HavenWorld extends World {
     this.companion = new Companion(this.cast.lumi!, this.curiosities, (x, z) => this.colliders.groundAt(x, z, 0.3) ?? this.mainIsland.heightAt(x, z) ?? 0, this.colliders);
 
     await this.buildFestival(ctx, rng.fork(), edgeZ);
+    this.arcade = await buildArcadeIsle(ctx, scene, this.colliders, this.mainIsland, this.time);
     this.colliders.bounds = { kind: 'circle', cx: 0, cz: -0.6, r: 9.4 };
     this.colliders.walkways.push(this.bridge.walkway, this.bridge.landing);
     this.setVariant('arrival');
@@ -391,12 +395,16 @@ export class HavenWorld extends World {
 
   setVariant(variant: HavenVariant): void {
     const { lumi, kai, nova } = this.cast;
-    const friends = variant === 'bonus' || variant === 'festival';
+    const festive = variant === 'festival' || variant === 'arcade';
+    const friends = variant === 'bonus' || festive;
     kai!.root.visible = nova!.root.visible = friends;
     this.showCompanion(false);
     lumi!.placeAt(variant === 'evening' ? HAVEN.lumiNear : HAVEN.lumi);
-    this.festivalTarget = variant === 'festival' ? 1 : 0;
-    this.festival.visible = variant === 'festival';
+    kai!.placeAt(HAVEN.kai);
+    nova!.placeAt(HAVEN.nova);
+    this.arcade.setOpen(variant === 'arcade', true);
+    this.festivalTarget = festive ? 1 : 0;
+    this.festival.visible = festive;
     this.bridge.setSections(variant === 'arrival' ? 0 : 3, true);
     this.bonusRing.group.visible = variant === 'bonus';
     this.bonusRing.setState(variant === 'bonus' ? 'target' : 'dormant', true);
@@ -473,6 +481,7 @@ export class HavenWorld extends World {
       this.companion.update(dt, _player.set(_eye.x, 0, _eye.z), _eye, frame.camera);
     }
     this.gateway.update(dt, time);
+    this.arcade.update(dt, time, frame.camera);
     if (this.bonusRing.group.visible) {
       const p = HAVEN.bonusRing;
       this.bonusRing.moveTo(_p.set(p.x + Math.sin(time * 0.55) * 3.2, p.y + Math.sin(time * 0.8) * 0.5, p.z));

@@ -7,6 +7,7 @@ import { CHAPTERS, clearProgress, freshState, loadProgress, type ChapterId, type
 import { XRRig } from '../../input/XRRig';
 import type { Character } from '../../characters/Character';
 import { HAVEN, type HavenWorld } from '../../world/haven/HavenWorld';
+import { MINIGAMES } from '../../arcade/registry';
 
 const TITLE_VIEWS = {
   wide: { at: HAVEN.titleWide, pitch: 0.105, lumi: HAVEN.lumiTitle },
@@ -117,7 +118,10 @@ class Menus {
     this.applySettings();
     game.onLoading = (label, bytes) => {
       const arrived = bytes ? ` · ${(bytes / 1e6).toFixed(1)} MB` : '';
-      this.loading.innerHTML = label ? `Building ${label === 'haven' ? 'Haven' : `the ${label}`}${arrived}<i></i>` : '';
+      // a world is named by its id; a game of the arcade by its title
+      const what = !label ? '' : label === 'haven' ? 'Building Haven' : /^[A-Z]/.test(label) ? `Opening ${label}` : `Building the ${label}`;
+      this.loading.textContent = what + arrived;
+      if (label) this.loading.append(el('i'));
       this.loading.style.opacity = label ? '1' : '0';
     };
     game.input.onLockLost.on(() => this.pause());
@@ -203,6 +207,7 @@ class Menus {
         void this.game.xr.enter().then(() => this.begin('monday', freshState()), (e: unknown) => console.warn('Could not start VR:', e));
       }));
     }
+    buttons.append(button('Haven Arcade', '', () => this.beginArcade()));
     const utility = el('nav', 'utility');
     utility.setAttribute('aria-label', 'More');
     const chapters = button('Chapters', 'btn--utility', () => this.showChapters());
@@ -256,6 +261,20 @@ class Menus {
     game.hands.pose('rest');
     game.input.capturePointer();
     void game.run(chapter, state);
+  }
+
+  /** Leaves the title for the arcade isle. */
+  private beginArcade(): void {
+    const game = this.game;
+    this.title = null;
+    this.close();
+    game.audio.unlock();
+    game.hud.setReticleVisible(true);
+    game.interaction.enabled = true;
+    game.player.canLook = true;
+    game.hands.pose('rest');
+    game.input.capturePointer();
+    void game.runArcade();
   }
 
   private showChapters(): void {
@@ -359,16 +378,32 @@ class Menus {
     const menu = el('div', 'menu menu--veil menu--light');
     const card = el('div', 'card card--pause');
     card.append(el('h2', '', 'Paused'));
+    const playing = game.arcade.active;
     if (game.chapter) card.append(el('p', 'day-name', game.chapter));
+    else card.append(el('p', 'day-name', playing ? MINIGAMES[playing.id].title : 'Haven Arcade'));
     const buttons = el('div', 'buttons');
     buttons.style.width = '100%';
-    buttons.append(
-      button('Resume', 'btn--primary', () => this.resume()),
-      button('Restart this day', '', () => {
+    buttons.append(button('Resume', 'btn--primary', () => this.resume()));
+    if (playing) {
+      // a game of the arcade: begin it again, or go back out through its portal
+      buttons.append(
+        button('Restart game', '', () => {
+          this.resume(false);
+          game.arcade.restart();
+        }),
+        button('Leave game', '', () => {
+          this.resume(false);
+          game.arcade.leave();
+        }),
+      );
+    } else if (game.chapter) {
+      buttons.append(button('Restart this day', '', () => {
         const chapter = game.chapter ?? 'monday';
         this.resume(false);
         void game.run(chapter, { ...game.state });
-      }),
+      }));
+    }
+    buttons.append(
       button('Settings', '', () => this.showSettings(() => {
         this.paused = false;
         this.pause();
@@ -390,7 +425,8 @@ class Menus {
     game.input.flush();
     game.app.paused = false;
     game.audio.setPaused(false);
-    if (capture && !game.hud.choosing) game.input.capturePointer();
+    // in a game of the arcade the cursor stays free: it is what the game is played with
+    if (capture && !game.hud.choosing && !game.arcade.active) game.input.capturePointer();
   }
 
   private showEnd(): void {
@@ -415,7 +451,7 @@ class Menus {
     const questions = el('ol', 'questions');
     for (const q of FRIDAY.reflectionQuestions) questions.append(el('li', '', q));
     const buttons = el('div', 'buttons buttons--row');
-    buttons.append(button('Play the week again', 'btn--primary', () => this.begin('monday', freshState())), button('Back to title', '', () => void this.showTitle()));
+    buttons.append(button('Play the week again', 'btn--primary', () => this.begin('monday', freshState())), button('Haven Arcade', '', () => this.beginArcade()), button('Back to title', '', () => void this.showTitle()));
     card.append(week, questions, buttons);
     menu.append(card, el('p', 'fine', FRIDAY.endLine));
     this.show(menu);
@@ -429,11 +465,11 @@ class Menus {
     pause.type = 'button';
     pause.setAttribute('aria-label', 'Pause');
     pause.addEventListener('click', () => this.pause());
-    pause.hidden = game.input.mode !== 'touch';
     layer.append(stick, knob, pause);
     this.root.append(layer);
-    game.input.onModeChange.on((mode) => (pause.hidden = mode !== 'touch'));
     game.addSystem(() => {
+      // a touch screen has no key to pause with; nor has a mouse that a game of the arcade has left free
+      pause.hidden = !(game.input.mode === 'touch' || (game.input.mode === 'mouse' && !!game.arcade.active));
       const v = game.input.stickView;
       stick.style.opacity = knob.style.opacity = v ? '1' : '0';
       if (!v) return;
