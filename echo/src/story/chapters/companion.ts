@@ -52,7 +52,6 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
 
 const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
   new THREE.Vector3(-6.4, 2.4, -1.6),
-  new THREE.Vector3(0, 0.3, -4.5),
   new THREE.Vector3(4.9, 0.5, -7.0),
   haven.bridge.path.getPointAt(0.45),
   new THREE.Vector3(0, 7, -50),

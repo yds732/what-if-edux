@@ -8,20 +8,18 @@ interface Recolour {
   readonly all?: boolean;
   readonly keepBlossom?: boolean;
   readonly green?: Shift;
-  readonly gold?: { readonly keepAbove?: number };
+  readonly gold?: { readonly keepAbove?: number; readonly mute?: number };
 }
 
 const COBALT: Shift = [0.615, 0.72, 0.78];
 const DEEP_COBALT: Shift = [0.63, 0.6, 0.62];
-const EMERALD: Shift = [0.42, 0.78, 0.72];
+const VIOLET: Shift = [0.72, 0.55, 0.85];
 const REGAL: Shift = [0.74, 0.55, 0.55];
 
 const RECOLOURS: Record<string, Recolour> = {
   'stepping-stone': { pink: COBALT, all: true, gold: {} },
   dais: { pink: COBALT, all: true, gold: {} },
-  'island-a': { pink: DEEP_COBALT, keepBlossom: true, green: EMERALD, gold: {} },
-  'island-b': { pink: DEEP_COBALT, keepBlossom: true, green: EMERALD, gold: {} },
-  'crystals-a': { pink: EMERALD, green: EMERALD, gold: {} },
+  'crystals-a': { pink: VIOLET, green: VIOLET, gold: {} },
   'crystals-b': { pink: DEEP_COBALT, gold: {} },
   'board-frame': { pink: COBALT, gold: {} },
   'lamp-post': { pink: COBALT, gold: { keepAbove: 0.88 } },
@@ -29,10 +27,10 @@ const RECOLOURS: Record<string, Recolour> = {
   ring: { pink: COBALT, gold: {} },
 };
 
-const EDGE_LIGHT = new THREE.Color(0.25, 0.85, 1.0);
+const EDGE_LIGHT = new THREE.Color(1.0, 0.72, 0.3);
 
 const GLSL = `
-uniform vec3 uHvPink, uHvGreen, uHvEdge; uniform float uHvPinkOn, uHvAll, uHvKeepBlossom, uHvGreenOn, uHvGoldOn, uHvGoldKeep;
+uniform vec3 uHvPink, uHvGreen, uHvEdge; uniform float uHvPinkOn, uHvAll, uHvKeepBlossom, uHvGreenOn, uHvGoldOn, uHvGoldKeep, uHvGoldMute;
 vec3 hvHsv(vec3 c){
   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
   vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
@@ -64,9 +62,9 @@ float hvLine = 0.0;
   o = mix(o, hvShift(hsv, uHvGreen), green * (1.0 - pink));
   // gold: a pale, faintly blue alloy, brighter where it catches the light; its brightest edges carry a line of light
   float luma = dot(s, vec3(0.299, 0.587, 0.114));
-  vec3 alloy = vec3(luma) * vec3(0.86, 0.95, 1.08) * 1.12;
-  o = mix(o, alloy, gold);
-  hvLine = gold * smoothstep(0.42, 0.72, luma);
+  vec3 alloy = vec3(luma) * vec3(1.2, 0.92, 0.5) * 1.15;
+  o = mix(o, mix(alloy, hvShift(hsv, uHvPink), uHvGoldMute), gold);
+  hvLine = gold * smoothstep(0.5, 0.78, luma) * (1.0 - uHvGoldMute * 0.85);
   diffuseColor.rgb = pow(o, vec3(2.2));
 }
 `;
@@ -79,7 +77,7 @@ const patch = (material: THREE.MeshStandardMaterial, r: Recolour): void => {
   const uniforms = {
     uHvPink: { value: new THREE.Vector3(...(r.pink ?? [0, 1, 1])) }, uHvPinkOn: { value: r.pink ? 1 : 0 }, uHvAll: { value: r.all ? 1 : 0 }, uHvKeepBlossom: { value: r.keepBlossom ? 1 : 0 },
     uHvGreen: { value: new THREE.Vector3(...(r.green ?? [0, 1, 1])) }, uHvGreenOn: { value: r.green ? 1 : 0 },
-    uHvGoldOn: { value: r.gold ? 1 : 0 }, uHvGoldKeep: { value: r.gold?.keepAbove ?? 2 }, uHvEdge: { value: EDGE_LIGHT },
+    uHvGoldOn: { value: r.gold ? 1 : 0 }, uHvGoldKeep: { value: r.gold?.keepAbove ?? 2 }, uHvGoldMute: { value: r.gold?.mute ?? 0 }, uHvEdge: { value: EDGE_LIGHT },
   };
   const before = material.onBeforeCompile.bind(material);
   material.onBeforeCompile = (shader, renderer) => {

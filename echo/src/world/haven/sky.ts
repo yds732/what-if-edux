@@ -182,9 +182,9 @@ export const buildSky = (starCount: number): HavenSky => {
     mesh.renderOrder = -998;
     group.add(mesh);
   };
-  curtain(1500, -1.3, 0.35, 330, 520, 0x38ffb4, 0x3d6bff, 1.1);
-  curtain(1900, 0.1, 1.5, 420, 560, 0x4ce0ff, 0xa070ff, 0.85);
-  curtain(1300, 1.9, 3.6, 280, 440, 0x5affc8, 0x5b3fc4, 0.7);
+  curtain(1500, -1.3, 0.35, 330, 520, 0x8f8cff, 0x3d6bff, 0.6);
+  curtain(1900, 0.1, 1.5, 420, 560, 0xa8b4ff, 0xa070ff, 0.5);
+  curtain(1300, 1.9, 3.6, 280, 440, 0x9a8cff, 0x5b3fc4, 0.45);
 
   return {
     group, envScene,

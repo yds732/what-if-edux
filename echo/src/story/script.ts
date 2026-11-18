@@ -66,12 +66,11 @@ export const MONDAY = {
   objectiveTour: 'Let Lumi show you around Haven.',
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
-    "That's the star circle. Light orbs appear there. You'll see!",
     'And these are gemstones! They grow right out of the ground. I love gemstones.',
     "And that's the Star Bridge! It's not finished yet, but you can already walk on it.",
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
-  objectiveFree: 'Explore Haven. Press Q to take off the headset when you are ready.',
+  objectiveFree: 'Explore Haven with Lumi.',
   objectiveJamie: 'You have a new message from Jamie. Press Q to take off the headset and read it.',
   promptTalk: 'Talk to Lumi',
   askGift: [

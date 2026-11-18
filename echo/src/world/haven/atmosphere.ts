@@ -161,7 +161,7 @@ export const buildFallingPetals = (count: number, sources: readonly THREE.Vector
   g.instanceCount = count;
   const mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({
     vertexShader: PETAL_VS, fragmentShader: PETAL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    uniforms: { uTime: timeUniform, uFloor: { value: floor }, uColor: { value: new THREE.Color(1.5, 0.9, 1.2) } },
+    uniforms: { uTime: timeUniform, uFloor: { value: floor }, uColor: { value: new THREE.Color(1.6, 1.15, 0.45) } },
   }));
   mesh.frustumCulled = false;
   return mesh;

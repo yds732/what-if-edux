@@ -17,6 +17,7 @@ import { buildCloudSea, buildFallingPetals, buildMotes, buildWaterfall, makeHalo
 import { RING_POINTS, Ring, buildGateway, buildStarBridge, type Gateway, type StarBridge } from './bridge';
 import { buildBlossomTree, buildGlowFlowers, buildGrass, windUniforms } from './flora';
 import { buildIsland, type Island } from './islands';
+import { buildCastle } from './castle';
 import { buildBoardFrame, buildHoop } from './minimal';
 import { recolourHavenProps } from './recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from './sky';
@@ -44,7 +45,6 @@ export const HAVEN = {
 
 export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title';
 
-const ISLANDS = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;
 const BOARD = { x: -3.7, z: -5.6, eye: 1.75, frameScale: 2.4, opening: { wide: 1.04, tall: 0.42, y: 1.4365 } };
 const FIREWORK_HUES = [0xffd27a, 0xff6f61, 0x4fd8ff, 0x9a6bff, 0x3fe8a0, 0xffffff];
 
@@ -124,7 +124,7 @@ export class HavenWorld extends World {
     key.shadow.radius = 5;
     const rim = new THREE.DirectionalLight(0x78a6ff, 1.7);
     rim.position.copy(PLANET_DIR).multiplyScalar(60);
-    scene.add(key, key.target, rim, new THREE.HemisphereLight(0x9cc4e8, 0x2a6a4a, 1.1));
+    scene.add(key, key.target, rim, new THREE.HemisphereLight(0xb4c0f0, 0x4a3f86, 1.1));
 
     const rock = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 });
     this.mainIsland = buildIsland({ radius: 13.5, depth: 20, seed: 1, lump: 0.1, hills: 0.9, flat: 0.72 });
@@ -140,24 +140,27 @@ export class HavenWorld extends World {
       [-26, -6, -18, 4.5, 8], [30, -4, 6, 5, 9], [110, 34, -200, 22, 34], [-130, 40, -230, 26, 40], [150, 60, -330, 30, 44],
       [-60, 12, 30, 9, 15], [70, 20, 44, 11, 18], [-210, 70, -420, 40, 60],
     ];
-    for (const [i, [x, y, z, radius]] of far.entries()) {
-      const kind = ISLANDS[i === 0 ? 0 : i % ISLANDS.length]!;
-      const island = await ctx.assets.instance(kind.id);
-      const scale = (radius * 2) / (await sizeOf(ctx, kind.id))[0];
-      island.scale.setScalar(scale);
-      island.rotation.y = i === 0 ? 5.2 : i * 1.7;
-      const baseY = y - kind.turf * scale;
-      island.position.set(x, baseY, z);
+    for (const [i, [x, y, z, radius, depth]] of far.entries()) {
+      const shape = buildIsland({ radius, depth, seed: i + 2, lump: 0.16, hills: 0.55, flat: 0.62, detail: i < 6 ? 0.8 : 0.5 });
+      const island = new THREE.Group();
+      island.add(new THREE.Mesh(shape.geometry, rock));
+      island.rotation.y = i === 0 ? 0 : i * 1.7;
+      island.position.set(x, y, z);
       if (i === 0) {
-        island.updateMatrixWorld(true);
-        const hit = new THREE.Raycaster(v3(x, y + 40, HAVEN.bridgeEnd.z - 2), v3(0, -1, 0)).intersectObject(island, true)[0];
-        if (hit) island.position.y += gatewayDrop = HAVEN.bridgeEnd.y - 0.04 - hit.point.y;
+        const top = shape.heightAt(0, HAVEN.bridgeEnd.z - 2 - z) ?? 0;
+        island.position.y += gatewayDrop = HAVEN.bridgeEnd.y - 0.04 - (y + top);
+        const castle = buildCastle();
+        castle.position.set(0, (shape.heightAt(0, -4) ?? 0) - 0.3, -4);
+        island.add(castle);
+      } else if (i < 6) {
+        const tree = buildBlossomTree(rng.fork(), Math.round(2600 * q.density));
+        const tx = radius * 0.25, tz = -radius * 0.2;
+        tree.group.position.set(tx, shape.heightAt(tx, tz) ?? 0, tz);
+        tree.group.scale.setScalar(Math.min(1.1, radius / 7));
+        island.add(tree.group);
       }
-      island.traverse((o) => {
-        o.castShadow = o.receiveShadow = false;
-      });
       scene.add(island);
-      if (i > 0) this.drifting.push({ object: island, baseY, phase: i * 2.1, amp: 0.4 + (i % 3) * 0.25 });
+      if (i > 0) this.drifting.push({ object: island, baseY: island.position.y, phase: i * 2.1, amp: 0.4 + (i % 3) * 0.25 });
     }
     await ctx.step('haven: far islands');
 
@@ -180,7 +183,7 @@ export class HavenWorld extends World {
       return { y, scale: path };
     };
     scene.add(buildGrass(Math.round(36000 * q.density), 13.5, rng.fork(), ground));
-    const flowerColors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8a3d)];
+    const flowerColors = [new THREE.Color(0xffd36b), new THREE.Color(0xffe9a8), new THREE.Color(0xffc04d), new THREE.Color(0xffb347)];
     const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
     for (let i = 0; i < 400 && flowers.length < Math.round(110 * q.density); i++) {
       const a = rng.range(0, TAU), r = rng.range(3.4, 12);
@@ -201,7 +204,7 @@ export class HavenWorld extends World {
       if (Math.hypot(x, z + 0.6) < 9.2) this.gems.push(v3(x, y + 0.45 * scale, z));
       if (color === 0x59d8ff) crystals['crystals-b'].push([x, y, z, rng.range(0, 360), scale * 0.8]);
       else crystals['crystals-a'].push([x, y, z, rng.range(0, 360), scale * 0.95]);
-      const halo = makeHalo(color, scale * 3.2, 0.5);
+      const halo = makeHalo(color === 0x59d8ff ? 0x8fb8ff : 0xb49cff, scale * 3.2, 0.5);
       halo.position.set(x, y + scale * 0.6, z);
       scene.add(halo);
       this.colliders.circle(x, z, scale * 0.5);

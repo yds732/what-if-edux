@@ -35,7 +35,6 @@ export const meetJamie = async (game: Game): Promise<void> => {
   game.hands.setStyle('real', true);
   player.canMove = false;
   audio.setSoundscape('classroomWarm', 1.5);
-  await d.card('mondaySchool');
   game.reach('monday.poster');
   const jamie = room.cast.jamie!;
   jamie.lookAtPoint(game.playerEye);
