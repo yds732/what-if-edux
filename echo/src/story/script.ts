@@ -393,7 +393,7 @@ export const KEYBINDS: Hints = {
   ...CONTROLS,
   mouse: [
     ['WASD', 'Walk'], ['MOUSE', 'Look around'], ['E', 'Use what you are looking at'], ['SPACE', 'Next line'],
-    ['1 2 3', 'Pick an answer'], ['Q', 'Put the headset on or off'], ['P', 'Pause'], ['K', 'Hide these controls'],
+    ['1 2 3', 'Pick an answer'], ['P', 'Pause'], ['K', 'Hide these controls'],
   ],
 };
 
