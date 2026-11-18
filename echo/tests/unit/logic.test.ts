@@ -206,8 +206,8 @@ describe('story state', () => {
     expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none',
       streak: 0, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0 });
   });
-  it('knows the five days in order', () => {
-    expect(CHAPTERS).toEqual(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
+  it('knows the four days in order', () => {
+    expect(CHAPTERS).toEqual(['monday', 'wednesday', 'thursday', 'friday']);
     expect(isChapter('wednesday')).toBe(true);
     expect(isChapter('saturday')).toBe(false);
     expect(isChapter(null)).toBe(false);

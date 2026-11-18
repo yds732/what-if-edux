@@ -25,7 +25,6 @@ interface TitleScene {
 
 const DAY_BLURBS: Record<ChapterId, string> = {
   monday: 'The Echo pilot. You volunteer, and see Haven for the first time.',
-  tuesday: 'The Star Bridge, and a message from a classmate.',
   wednesday: 'A disagreement with Jamie. A companion who agrees with everyone.',
   thursday: 'The Starlight Festival and a rehearsal, on the same evening.',
   friday: 'Other voices, one vote, and a possible future.',
@@ -410,7 +409,7 @@ class Menus {
       r.append(el('b', '', day), el('span', '', text));
       week.append(r);
     };
-    if (s.tuesdayChoice) line('Tuesday', s.tuesdayChoice === 'meet' ? TUESDAY.meet.result.gained : TUESDAY.stay.result.gained);
+    if (s.tuesdayChoice) line('Monday', s.tuesdayChoice === 'meet' ? TUESDAY.meet.result.gained : TUESDAY.stay.result.gained);
     if (s.thursdayChoice) line('Thursday', s.thursdayChoice === 'help' ? THURSDAY.help.result.gained : THURSDAY.haven.result.gained);
     if (s.policyChoice) line('Friday', `You recommended: ${FRIDAY.futures[s.policyChoice].title.toLowerCase()}. ${FRIDAY.futures[s.policyChoice].question}`);
     const questions = el('ol', 'questions');

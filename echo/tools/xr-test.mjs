@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-// Plays stretches of Tuesday inside an emulated Quest 3 with its controllers, no autopilot once it hands over:
-//   1. left stick walks; the right controller points at the orb and its trigger takes it; holding the trigger
-//      draws a throw back and letting go throws it;
+// Plays stretches of the week inside an emulated Quest 3 with its controllers, no autopilot once it hands over:
 //   2. B takes the headset off; A moves dialogue on;
 //   3. pointing at a choice card and pulling the trigger chooses it;
 //   4. ending the session (taking the headset off) pauses, and the game carries on on the flat screen.
@@ -23,7 +21,7 @@ const open = async (beat) => {
   const page = await context.newPage();
   page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text().slice(0, 400)); });
   page.on('pageerror', (e) => problems.push(String(e.stack ?? e).slice(0, 800)));
-  await page.goto(`${base}?chapter=tuesday&auto=1&speed=6&handover=${beat}&xr=emulate&q=low&dpr=1`, { waitUntil: 'load' });
+  await page.goto(`${base}?chapter=${beat.split('.')[0]}&auto=1&speed=6&handover=${beat}&xr=emulate&q=low&dpr=1`, { waitUntil: 'load' });
   await page.waitForFunction((n) => (window.__BEATS ?? []).includes(n), beat, { timeout: 120000 });
   const t = {
     page,
@@ -62,102 +60,35 @@ const open = async (beat) => {
   return t;
 };
 
-// ------------------------------------------------------------------------------------------- 1. the orb
-{
-  const t = await open('tuesday.challenge');
-  const { page } = t;
-  const mode = await page.evaluate(() => ({ presenting: window.__game.app.renderer.xr.isPresenting, mode: window.__game.input.mode }));
-  check('a headset session is running and the controllers are the input', mode.presenting && mode.mode === 'xr', JSON.stringify(mode));
-  await page.evaluate(() => {
-    const d = window.__xrDevice;
-    d.controllers.right.position.set(0.22, 1.15, -0.3);
-    d.controllers.left.position.set(-0.22, 1.05, -0.25);
-    window.__thrown = 0;
-    window.__game.star.onThrow.on(() => window.__thrown++);
-  });
-
-  const z0 = await page.evaluate(() => window.__game.player.position.z);
-  await t.stick('left', 0, -1);
-  await page.waitForTimeout(2900);
-  await t.stick('left', 0, 0);
-  await page.waitForTimeout(300);
-  const z1 = await page.evaluate(() => window.__game.player.position.z);
-  check('pushing the left stick forward walks', z0 - z1 > 4, `z ${z0.toFixed(2)} -> ${z1.toFixed(2)}`);
-
-  const yaw0 = await page.evaluate(() => window.__game.player.yaw);
-  await t.stick('right', 1, 0);
-  await page.waitForTimeout(200);
-  await t.stick('right', 0, 0);
-  await page.waitForTimeout(200);
-  const yaw1 = await page.evaluate(() => window.__game.player.yaw);
-  check('flicking the right stick turns one step', Math.abs(Math.abs(yaw1 - yaw0) - Math.PI / 6) < 0.05, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
-  await t.stick('right', -1, 0);
-  await page.waitForTimeout(200);
-  await t.stick('right', 0, 0);
-  await page.waitForTimeout(200);
-
-  const orb = await page.evaluate(() => { const p = window.__game.star.pedestalItem.position; return [p.x, p.y, p.z]; });
-  const off = await t.point(orb);
-  await page.waitForTimeout(200);
-  await t.shot('1_point');
-  check('the controller can be pointed at the orb', off < 1 && (await page.evaluate(() => window.__game.interaction.focus !== null)), `${off.toFixed(2)} degrees off`);
-  await t.press('right', 'trigger');
-  await page.waitForTimeout(1200);
-  check('the trigger takes the orb', await page.evaluate(() => window.__game.star.holding));
-
-  let lit = 0, peak = 0;
-  const LIFTS = [2.6, 2.0, 3.2, 1.5, 3.8, 2.3, 2.9, 1.0];
-  for (let i = 0; i < LIFTS.length && lit < 1; i++) {
-    await page.waitForFunction(() => window.__game.star.holding, undefined, { timeout: 8000 }).catch(() => undefined);
-    const c = await page.evaluate(() => {
-      const ring = window.__game.worlds.haven.bridge.rings.find((r) => r.state !== 'lit');
-      return [ring.center.x, ring.center.y, ring.center.z];
-    });
-    await t.point([c[0], c[1] + LIFTS[i], c[2]]);
-    await t.button('right', 'trigger', 1);
-    await page.waitForTimeout(900);
-    peak = Math.max(peak, await page.evaluate(() => window.__game.star.chargeLevel));
-    if (i === 0) await t.shot('2_draw');
-    await t.button('right', 'trigger', 0);
-    await page.waitForTimeout(2600);
-    lit = await page.evaluate(() => window.__game.worlds.haven.bridge.rings.filter((r) => r.state === 'lit').length);
-  }
-  check('holding the trigger draws the throw back', peak > 0.6, `charge ${peak.toFixed(2)}`);
-  check('letting go throws along the controller', (await page.evaluate(() => window.__thrown)) >= 1);
-  check('a thrown orb goes through a ring', lit >= 1, `rings lit: ${lit}`);
-  await t.shot('3_hit');
-  await t.close();
-}
-
 // ------------------------------------------------------------------------------------------- 2. headset off
 {
-  const t = await open('tuesday.notify');
+  const t = await open('thursday.oneMore');
   await t.page.waitForTimeout(600);
   await t.shot('4_notify');
   await t.press('right', 'b-button');
-  await t.page.waitForFunction(() => (window.__BEATS ?? []).includes('tuesday.bedroom'), undefined, { timeout: 20000 })
+  await t.page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 30000 })
     .then(() => check('B takes the Echo headset off', true), () => check('B takes the Echo headset off', false));
   await t.close();
 }
 
 // ------------------------------------------------------------------------------------------- 2b. next line
 {
-  const t = await open('tuesday.haven');
+  const t = await open('friday.class');
   const { page } = t;
   await page.evaluate(() => (window.__game.director.autoAdvance = false));
   await page.waitForTimeout(3500);
-  const waited = !(await page.evaluate(() => window.__BEATS.includes('tuesday.challenge')));
-  for (let i = 0; i < 6 && !(await page.evaluate(() => window.__BEATS.includes('tuesday.challenge'))); i++) {
+  const waited = !(await page.evaluate(() => window.__BEATS.includes('friday.voices')));
+  for (let i = 0; i < 8 && !(await page.evaluate(() => window.__BEATS.includes('friday.voices'))); i++) {
     await t.press('right', 'a-button');
     await page.waitForTimeout(500);
   }
-  check('A moves dialogue on when lines are set to wait', waited && (await page.evaluate(() => window.__BEATS.includes('tuesday.challenge'))));
+  check('A moves dialogue on when lines are set to wait', waited && (await page.evaluate(() => window.__BEATS.includes('friday.voices'))));
   await t.close();
 }
 
 // ------------------------------------------------------------------------------------------- 3. a choice
 {
-  const t = await open('tuesday.decision');
+  const t = await open('monday.decision');
   const { page } = t;
   await page.evaluate(() => window.__xrDevice.controllers.right.position.set(0.22, 1.15, -0.3));
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 10000 }).catch(() => undefined);
@@ -178,7 +109,7 @@ const open = async (beat) => {
 
 // ------------------------------------------------------------------------------------------- 4. leaving the headset
 {
-  const t = await open('tuesday.challenge');
+  const t = await open('thursday.festival');
   const { page } = t;
   await page.evaluate(() => window.__game.app.renderer.xr.getSession().end());
   await page.waitForSelector('.menu--veil.show', { timeout: 8000 })

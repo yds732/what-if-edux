@@ -162,10 +162,8 @@ export const breakStreak = (state: StoryState): void => {
 };
 
 export const leaveWhenLumiLets = async (game: Game, haven: HavenWorld, prompt: string): Promise<void> => {
-  for (let ask = 0; ; ask++) {
-    await waitHeadsetOff(game, prompt);
-    if (!(await lumiPleads(game, haven, ask))) return;
-  }
+  await waitHeadsetOff(game, prompt);
+  await lumiPleads(game, haven, 0);
 };
 
 export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Promise<boolean> => {
@@ -174,16 +172,21 @@ export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Pr
   const could = player.canMove;
   player.canMove = false;
   try {
-    const plea = HOOKS.leave.asks[ask];
-    if (!plea) {
-      await d.play(HOOKS.leave.letGo);
-      return false;
-    }
+    const plea = HOOKS.leave.asks[Math.min(ask, HOOKS.leave.asks.length - 1)]!;
     state.leaveAsks++;
     await d.play(plea);
     const pick = await d.choose(HOOKS.leave.title, [{ title: HOOKS.leave.stay, emphasis: 'loud' }, { title: HOOKS.leave.go, emphasis: 'quiet' }]);
-    if (pick === 0) state.stayedOn++;
-    return pick === 0;
+    if (pick === 0) {
+      state.stayedOn++;
+      await d.play(HOOKS.leave.stayed);
+      haven.fireworks(3, 1.5);
+      haven.cast.lumi!.lookAtPoint(game.playerEye);
+      await d.wait(3.5);
+      await d.play(HOOKS.leave.afterStay);
+    } else {
+      await d.play(HOOKS.leave.letGo);
+    }
+    return false;
   } finally {
     player.canMove = could;
   }

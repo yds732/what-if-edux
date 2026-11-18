@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { CONTROLS, HOOKS, MONDAY } from '../script';
+import { CONTROLS, HOOKS, MONDAY, TUESDAY } from '../script';
 import type { Interactable } from '../../player/Interaction';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
-import { enterHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { enterHaven, leaveHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { jamieAsks, meetJamie, stayInHaven } from './afterSchool';
 import { giveGem, havenCalls, holdGem, labelLumi, lumiPleads, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
 
 export const monday = async (game: Game): Promise<void> => {
@@ -105,6 +106,20 @@ export const monday = async (game: Game): Promise<void> => {
   await lumiTour(game, haven);
 
   await havenFreeTime(game, haven);
+  player.canMove = false;
+  const home = await leaveHaven(game, 0.9);
+  player.canMove = true;
+  audio.sfx('notify');
+  hud.setToast(TUESDAY.notification);
+  game.reach('monday.message');
+  await jamieAsks(game, home);
+  hud.setToast(null);
+  if (game.state.tuesdayChoice === 'meet') {
+    await d.fadeOut(1.0);
+    await meetJamie(game);
+  } else {
+    await stayInHaven(game);
+  }
   await d.fadeOut(1.4);
 };
 
@@ -113,7 +128,7 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
   const guide = haven.companion;
   let asks = 0;
   for (;;) {
-    d.objective(MONDAY.objectiveFree);
+    d.objective(state.lumiGift === 'given' ? MONDAY.objectiveJamie : MONDAY.objectiveFree);
     let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
     const items: Interactable[] = [];
     if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptTalk, enabled: true, use: () => (action = 'talk') });
@@ -138,7 +153,7 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
     const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
     if (did === null) break;
     if (did === 'off') {
-      if (await lumiPleads(game, haven, asks++)) continue;
+      await lumiPleads(game, haven, asks++);
       break;
     }
     if (did === 'talk') {
@@ -154,6 +169,9 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       takeGem(game);
     } else {
       await giveGem(game, haven);
+      await d.wait(1.2);
+      game.audio.sfx('notify');
+      game.hud.setToast(TUESDAY.notification);
     }
   }
   d.objective(null);

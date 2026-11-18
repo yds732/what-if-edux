@@ -71,7 +71,7 @@ for (const [name, w, h, touch] of [['end', 1600, 900, false], ['end_tall', 390, 
 }
 // progress: a week left part-way is offered again on the title, with its choices intact
 {
-  const { page, close } = await open(1280, 720, '?chapter=tuesday&auto=1&speed=8&tue=haven&q=low&dpr=1');
+  const { page, close } = await open(1280, 720, '?chapter=monday&auto=1&speed=8&tue=haven&q=low&dpr=1');
   await page.waitForFunction(() => (window.__BEATS ?? []).includes('wednesday.class'), undefined, { timeout: 240000 });
   await page.goto(`${base}?q=low&dpr=1`, { waitUntil: 'load' });
   await page.waitForSelector('.menu--title.show', { timeout: 90000 });

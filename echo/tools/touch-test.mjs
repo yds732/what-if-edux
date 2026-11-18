@@ -75,15 +75,15 @@ const open = async (query) => {
 
 // ---------------------------------------------------------------- 1. phone, chat, choices, walking
 {
-  const t = await open('?chapter=tuesday&auto=1&speed=6&handover=tuesday.bedroom&q=low&dpr=1');
-  await t.beat('tuesday.bedroom');
+  const t = await open('?chapter=monday&auto=1&speed=6&handover=monday.message&q=low&dpr=1');
+  await t.beat('monday.message');
   await t.page.waitForTimeout(2500);
   const phone = await t.target();
   check('the phone is on screen to be tapped', !!phone && phone.x > 0 && phone.x < W && phone.y > 0 && phone.y < H, JSON.stringify(phone));
   await t.shot('1_phone');
   if (phone) await t.tap(phone.x, phone.y);
   // taps on the LEFT half must count too: that is where a thumb rests
-  check('taps on the left half advance the chat', await t.tapUntil('tuesday.decision', 150, 200));
+  check('taps on the left half advance the chat', await t.tapUntil('monday.decision', 150, 200));
   await t.page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 8000 }).catch(() => undefined);
   await t.page.waitForTimeout(900);
   const two = await t.cards();
@@ -95,7 +95,7 @@ const open = async (query) => {
     await t.page.waitForTimeout(700);
   }
   check('tapping the left card chooses it', (await t.page.evaluate(() => window.__game.state.tuesdayChoice)) === 'meet');
-  check('taps carry the story to the poster scene', await t.tapUntil('tuesday.poster', 700, 120));
+  check('taps carry the story to the poster scene', await t.tapUntil('monday.poster', 700, 120));
   await t.page.waitForTimeout(2600);
   await t.tap(700, 120); // "Hey! Glad you came!"
   await t.page.waitForTimeout(700);
@@ -128,73 +128,7 @@ const open = async (query) => {
   await t.shot('4_poster');
   check('three poster phrases are offered', three.length === 3, JSON.stringify(three));
   if (three.length === 3) await t.tap(three[1].x, three[1].y);
-  await t.beat('tuesday.posterDone', 8000).then(() => check('tapping the middle card writes the poster', true), () => check('tapping the middle card writes the poster', false));
-  await t.close();
-}
-
-// ---------------------------------------------------------------- 2. the orb: walk, take, hold, throw
-{
-  const t = await open('?chapter=tuesday&auto=1&speed=6&handover=tuesday.challenge&q=low&dpr=1');
-  await t.beat('tuesday.challenge');
-  await t.page.waitForTimeout(1200);
-  await t.page.evaluate(() => {
-    const g = window.__game;
-    window.__thrown = 0;
-    g.star.onThrow.on(() => window.__thrown++);
-  });
-  await t.face(0, 1.3, -30);
-  const z0 = await t.page.evaluate(() => window.__game.player.position.z);
-  await t.walk(2900);
-  const z1 = await t.page.evaluate(() => window.__game.player.position.z);
-  check('the stick walks to the star circle', z0 - z1 > 5, `z ${z0.toFixed(2)} -> ${z1.toFixed(2)}`);
-  await t.page.evaluate(() => {
-    const g = window.__game, o = g.star.pedestalItem.position, pl = g.player;
-    const dx = o.x - pl.position.x, dz = o.z - pl.position.z;
-    pl.yaw = Math.atan2(-dx, -dz);
-    pl.pitch = Math.atan2(o.y - pl.eyeHeight, Math.hypot(dx, dz));
-  });
-  await t.page.waitForTimeout(400);
-  const orb = await t.target();
-  await t.shot('5_orb');
-  if (orb) await t.tap(orb.x, orb.y);
-  await t.page.waitForTimeout(1200);
-  check('tapping the orb takes it', await t.page.evaluate(() => window.__game.star.holding), JSON.stringify(orb));
-
-  // a drag on the right turns the view
-  const yaw0 = await t.page.evaluate(() => window.__game.player.yaw);
-  await t.send('touchStart', [[620, 200]]);
-  for (let i = 1; i <= 6; i++) await t.send('touchMove', [[620 + i * 14, 200]]);
-  const charging = await t.page.evaluate(() => window.__game.star.chargeLevel);
-  await t.page.waitForTimeout(60);
-  const yaw1 = await t.page.evaluate(() => window.__game.player.yaw);
-  check('dragging on the right turns the view', Math.abs(yaw1 - yaw0) > 0.15, `yaw ${yaw0.toFixed(2)} -> ${yaw1.toFixed(2)}`);
-  void charging;
-  await t.send('touchEnd', []);
-  await t.page.waitForTimeout(2600);
-
-  let lit = 0;
-  const LIFTS = [2.6, 2.0, 3.2, 1.5, 3.8, 2.3, 2.9, 1.0];
-  let peak = 0;
-  for (let i = 0; i < LIFTS.length && lit < 1; i++) {
-    await t.page.waitForFunction(() => window.__game.star.holding, undefined, { timeout: 8000 }).catch(() => undefined);
-    const c = await t.page.evaluate(() => {
-      const ring = window.__game.worlds.haven.bridge.rings.find((r) => r.state !== 'lit');
-      return [ring.center.x, ring.center.y, ring.center.z];
-    });
-    await t.face(c[0], c[1] + LIFTS[i], c[2]);
-    await t.page.waitForTimeout(300);
-    await t.send('touchStart', [[620, 200]]);
-    await t.page.waitForTimeout(900);
-    peak = Math.max(peak, await t.page.evaluate(() => window.__game.star.chargeLevel));
-    if (i === 0) await t.shot('6_charge');
-    await t.send('touchEnd', []);
-    await t.page.waitForTimeout(2600);
-    lit = await t.page.evaluate(() => window.__game.worlds.haven.bridge.rings.filter((r) => r.state === 'lit').length);
-  }
-  check('holding on the right draws the throw back', peak > 0.6, `charge ${peak.toFixed(2)}`);
-  check('letting go throws the orb', (await t.page.evaluate(() => window.__thrown)) >= 1);
-  check('a held throw goes through a ring', lit >= 1, `rings lit: ${lit}`);
-  await t.shot('7_hit');
+  await t.beat('monday.posterDone', 8000).then(() => check('tapping the middle card writes the poster', true), () => check('tapping the middle card writes the poster', false));
   await t.close();
 }
 
