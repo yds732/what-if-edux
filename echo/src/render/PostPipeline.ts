@@ -413,7 +413,7 @@ export class PostPipeline {
       u.tAltDepth.value = alt.depthTexture;
       u.uWave.value = f.wipe.radius;
       u.uWaveSoft.value = f.wipe.softness;
-      u.uWaveMax.value = Math.min(camera.far * 0.9, 90);
+      u.uWaveMax.value = Math.min(camera.far * 0.9, 6);
       u.uTime.value = f.time;
       u.uWaveColor.value.copy(f.wipe.color);
       u.uCamWorld.value.copy(camera.matrixWorld);

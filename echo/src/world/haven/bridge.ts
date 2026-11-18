@@ -120,7 +120,7 @@ export class Ring {
     hoop.position.y = -opening.centreY * scale;
     let material: THREE.MeshStandardMaterial | null = null, paint: { value: number } | null = null;
     hoop.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
+      if (!(o instanceof THREE.Mesh) || o.userData.glow) return;
       if (!material) {
         material = (o.material as THREE.MeshStandardMaterial).clone();
         recolourMaterial(material, 'ring');
