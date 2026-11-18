@@ -46,6 +46,7 @@ export const RALLY = {
   ],
   harder: [L('kai', 'You were too good for me. I will try a little harder this time. Only a little.', 'happy', 'nod')],
   again: [L('kai', 'Again? Good. I was hoping you would say that.', 'happy', 'nod')],
+  resume: [L('kai', 'You came back! Where were we? Your serve, I think.', 'delighted', 'wave')],
   controls: {
     mouse: [['MOVE', 'Move the mouse to move your bat'], ['PUSH', 'Push forward through the ball to hit harder'], ['CLICK', 'Click to serve']],
     touch: [['DRAG', 'Drag a finger to move your bat'], ['FLICK', 'Flick forward through the ball to hit harder'], ['TAP', 'Tap to serve']],

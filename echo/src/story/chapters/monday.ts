@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import type { Game } from '../../app/Game';
 import { BEDROOM, type BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { CLASSROOM, EYE_SEATED, FLOOR_MARK, type ClassroomWorld } from '../../world/classroom/ClassroomWorld';
-import { CONTROLS, HOOKS, MONDAY, TUESDAY } from '../script';
+import { CONTROLS, HOOKS, MONDAY, THURSDAY, TUESDAY } from '../script';
 import type { Interactable } from '../../player/Interaction';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
-import { enterHaven, leaveHaven, liftHeadset, restHeadset, stowHeadset, waitUse } from './shared';
+import { enterHaven, leaveHaven, liftHeadset, restHeadset, stowHeadset, waitHeadsetOff, waitUse } from './shared';
 import { jamieAsks, meetJamie, stayInHaven } from './afterSchool';
-import { giveGem, havenCalls, holdGem, labelLumi, lumiPleads, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
+import { giveGem, havenCalls, holdGem, labelLumi, lumiTour, refreshSideTasks, takeGem, tickStreak } from './companion';
 
 export const monday = async (game: Game): Promise<void> => {
   const { director: d, player, hud, audio, app, headset } = game;
@@ -124,12 +124,16 @@ export const monday = async (game: Game): Promise<void> => {
 };
 
 const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
-  const { director: d, player, input, state } = game;
+  const { director: d, player, state } = game;
   const guide = haven.companion;
-  let asks = 0;
   for (;;) {
-    d.objective(state.lumiGift === 'given' ? MONDAY.objectiveJamie : MONDAY.objectiveFree);
-    let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
+    if (state.lumiGift === 'given') {
+      d.objective(MONDAY.objectiveJamie);
+      await waitHeadsetOff(game, THURSDAY.promptRemove);
+      break;
+    }
+    d.objective(MONDAY.objectiveFree);
+    let action: 'talk' | 'gem' | 'give' | null = null;
     const items: Interactable[] = [];
     if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptTalk, enabled: true, use: () => (action = 'talk') });
     if (state.lumiGift === 'carrying') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive, enabled: true, use: () => (action = 'give') });
@@ -141,21 +145,15 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
         held += dt;
         if (action) return true;
         if (game.autopilot.enabled && held > 0.6) {
-          action = ({ none: 'talk', asked: 'gem', carrying: 'give', given: 'off' } as const)[state.lumiGift];
-          return true;
+          action = ({ none: 'talk', asked: 'gem', carrying: 'give', given: null } as const)[state.lumiGift];
         }
-        if (input.pressed.has('headset')) action = 'off';
         return action !== null;
       });
     } finally {
       for (const item of items) game.interaction.remove(item);
     }
-    const did = action as 'talk' | 'gem' | 'give' | 'off' | null;
+    const did = action as 'talk' | 'gem' | 'give' | null;
     if (did === null) break;
-    if (did === 'off') {
-      await lumiPleads(game, haven, asks++);
-      break;
-    }
     if (did === 'talk') {
       player.canMove = false;
       guide.mode = 'still';
@@ -172,6 +170,13 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       await d.wait(1.2);
       game.audio.sfx('notify');
       game.hud.setToast(TUESDAY.notification);
+      player.canMove = false;
+      guide.mode = 'still';
+      guide.person.lookAtPoint(game.playerEye);
+      player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
+      await d.play(MONDAY.lumiSad);
+      guide.mode = 'roam';
+      player.canMove = true;
     }
   }
   d.objective(null);

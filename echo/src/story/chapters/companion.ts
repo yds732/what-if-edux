@@ -52,7 +52,6 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
 
 const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
   new THREE.Vector3(-6.4, 2.4, -1.6),
-  new THREE.Vector3(0, 0.3, -4.5),
   new THREE.Vector3(4.9, 0.5, -7.0),
   haven.bridge.path.getPointAt(0.45),
   new THREE.Vector3(0, 7, -50),
@@ -175,21 +174,43 @@ export const lumiPleads = async (game: Game, haven: HavenWorld, ask: number): Pr
     const plea = HOOKS.leave.asks[Math.min(ask, HOOKS.leave.asks.length - 1)]!;
     state.leaveAsks++;
     await d.play(plea);
-    const pick = await d.choose(HOOKS.leave.title, [{ title: HOOKS.leave.stay, emphasis: 'loud' }, { title: HOOKS.leave.go, emphasis: 'quiet' }]);
-    if (pick === 0) {
-      state.stayedOn++;
-      await d.play(HOOKS.leave.stayed);
-      haven.fireworks(3, 1.5);
-      haven.cast.lumi!.lookAtPoint(game.playerEye);
-      await d.wait(3.5);
-      await d.play(HOOKS.leave.afterStay);
-    } else {
-      await d.play(HOOKS.leave.letGo);
-    }
+    await d.wait(0.6);
+    await d.play(HOOKS.leave.letGo);
     return false;
   } finally {
     player.canMove = could;
   }
+};
+
+export const echoTempts = (game: Game): (() => void) => {
+  const { app, headset, audio } = game;
+  const toEcho = new THREE.Vector3(), forward = new THREE.Vector3();
+  let on = true, looked = false, flicker = 0;
+  const glance = (): number => {
+    headset.group.getWorldPosition(toEcho).sub(game.playerEye).normalize();
+    app.camera.getWorldDirection(forward);
+    return forward.angleTo(toEcho);
+  };
+  app.tasks.until((dt) => {
+    if (!on) return true;
+    const angle = glance();
+    if (angle < 0.3) looked = true;
+    else if (looked && angle > 0.6) {
+      looked = false;
+      flicker = 2.6;
+      audio.sfx('notify', { gain: 0.35 });
+    }
+    if (flicker > 0) {
+      flicker -= dt;
+      headset.setPower(Math.sin(app.time * 26) > 0 ? 1 : 0.15);
+      if (flicker <= 0) headset.setPower(0.3);
+    }
+    return false;
+  }).catch(() => undefined);
+  return () => {
+    on = false;
+    headset.setPower(0.25);
+  };
 };
 
 export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
@@ -217,21 +238,10 @@ export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: s
 };
 
 export const hookPayoff = (state: StoryState): [string, string][] => {
-  const times = (n: number): string => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
-  const pages: [string, string][] = [];
-  if (state.leaveAsks > 0) {
-    pages.push(['It made leaving feel bad.', `When you tried to take the headset off, Lumi asked you to stay. It asked ${times(state.leaveAsks)}, and you stayed ${state.stayedOn ? times(state.stayedOn) : 'not at all'}. "Stay" was big and bright. "Leave" was small and grey.`]);
-  }
-  if (state.streakBest > 0) {
-    pages.push(['It counted your days.', `Your streak with Lumi reached ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}.${state.streakBroke ? ' When you chose the real world, Lumi made sure you knew the streak was gone.' : ' A number like that is hard to give up.'}`]);
-  }
-  if (state.pings > 0) {
-    pages.push(['It called you back.', `While you were in your room, Haven sent you ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} and made the headset glow on its dock.`]);
-  }
-  if (state.lumiGift !== 'none') {
-    pages.push(['It asked you for something.', "Lumi said friends give each other gifts, so a gift felt like something you owed. Giving makes it harder to walk away."]);
-  }
-  pages.push(['It always agreed with you.', 'Whatever you said, Lumi said you were right. Jamie did not, and that is part of what made Jamie real.']);
-  pages.push(['It rewarded you, every time.', "Every task in Haven ended with a chime and a golden glow. The real world doesn't do that. Real apps use these same tricks."]);
-  return pages;
+  const days = state.streakBest > 0 ? `a streak of ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}` : 'a streak';
+  const pings = state.pings > 0 ? `, sent ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} to call you back while you were in your room,` : '';
+  return [[
+    'It worked hard to keep you there.',
+    `Lumi sounded sad every time you tried to leave, kept count of your days together with ${days} you would not want to break${pings} and rewarded every task with a chime and a golden glow. Real apps use these same tricks to keep you coming back.`,
+  ]];
 };

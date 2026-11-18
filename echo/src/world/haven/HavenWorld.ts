@@ -81,6 +81,7 @@ export class HavenWorld extends World {
   private board!: Panel;
   private boardData: { title: string; body: string; value: number; total: number } | null = null;
   private boardShown = 0;
+  private boardGroup!: THREE.Group;
   private festivalK = 0;
   private festivalTarget = 0;
   private readonly rng = new Rng(77);
@@ -321,6 +322,8 @@ export class HavenWorld extends World {
     this.board.mesh.material.depthWrite = true;
     this.board.mesh.material.alphaTest = 0.02;
     boardGroup.add(frame, this.board.mesh);
+    boardGroup.visible = false;
+    this.boardGroup = boardGroup;
     scene.add(boardGroup);
     this.colliders.circle(BOARD.x, BOARD.z, 0.3);
 
@@ -411,7 +414,9 @@ export class HavenWorld extends World {
     this.bridge.rings.forEach((ring, i) => {
       ring.moveTo(variant === 'festival' ? HAVEN.festivalRings[i]! : RING_POINTS[i]!);
       ring.setState(variant === 'arrival' || variant === 'festival' ? 'dormant' : 'lit', true);
+      ring.group.visible = false;
     });
+    this.bonusRing.group.visible = false;
     this.look.exposure = variant === 'evening' ? 0.88 : 1.0;
     this.setBoard(null);
   }
@@ -512,6 +517,7 @@ export class HavenWorld extends World {
     }
     this.boardShown = damp(this.boardShown, this.boardData ? 1 : 0, 5, dt);
     this.board.opacity = this.boardShown;
+    this.boardGroup.visible = this.boardShown > 0.01;
     this.board.mesh.position.y = BOARD.eye + Math.sin(time * 0.9) * 0.012;
   }
 }

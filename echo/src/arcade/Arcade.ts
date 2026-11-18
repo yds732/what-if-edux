@@ -206,6 +206,10 @@ export class Arcade {
     return pending;
   }
 
+  prepare(id: MinigameId): Promise<Minigame> {
+    return this.load(id, MINIGAMES[id]);
+  }
+
   async play(id: MinigameId, back: Anchor, scape: Soundscape): Promise<void> {
     const game = this.game, { director: d, app, player, hud, input, audio, interaction, hands } = game;
     const info = MINIGAMES[id];
@@ -245,6 +249,10 @@ export class Arcade {
           world.cam.cut();
           this.fade(0, 0.9, session.signal).catch(() => undefined);
           const outcome = await world.play();
+          if ((world as { interrupted?: boolean }).interrupted) {
+            this.last = null;
+            continue;
+          }
           this.last = outcome;
           this.plays[id] = (this.plays[id] ?? 0) + 1;
           this.record(id, outcome);

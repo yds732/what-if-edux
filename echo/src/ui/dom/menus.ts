@@ -445,7 +445,7 @@ class Menus {
     if (s.thursdayChoice) line('Thursday', s.thursdayChoice === 'help' ? THURSDAY.help.result.gained : THURSDAY.haven.result.gained);
     if (s.policyChoice) line('Friday', `You recommended: ${FRIDAY.futures[s.policyChoice].title.toLowerCase()}. ${FRIDAY.futures[s.policyChoice].question}`);
     const questions = el('ol', 'questions');
-    for (const q of FRIDAY.reflectionQuestions) questions.append(el('li', '', q));
+    for (const q of FRIDAY.reflectionQuestions) questions.append(el('li', '', `${q.title} ${q.body}`));
     const buttons = el('div', 'buttons buttons--row');
     buttons.append(button('Play the week again', 'btn--primary', () => this.begin('monday', freshState())), button('Haven Arcade', '', () => this.beginArcade()), button('Back to title', '', () => void this.showTitle()));
     card.append(week, questions, buttons);
