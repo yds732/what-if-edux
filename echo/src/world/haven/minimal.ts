@@ -3,8 +3,8 @@ import { TAU } from '../../core/math';
 import { merge, place, tint } from '../../core/geo';
 import { recolourMaterial } from './recolour';
 
-const BODY = new THREE.Color(0x4a6aa8);
-const GLOW = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.9, 0.68).multiplyScalar(1.8), toneMapped: false });
+const BODY = new THREE.Color().setHSL(0.86, 0.55, 0.42);
+const GLOW = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.55, 0.95, 1.0).multiplyScalar(2.4), toneMapped: false });
 const INLAY = new THREE.Color(1, 1, 1);
 
 const glowing = (parts: THREE.BufferGeometry[]): THREE.Mesh => {

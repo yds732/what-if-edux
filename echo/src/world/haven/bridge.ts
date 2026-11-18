@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { buildPortalRing } from './castle';
 import { addGlow } from '../../assets/glow';
 import { merge, place, v3 } from '../../core/geo';
 import { TAU, damp } from '../../core/math';
@@ -12,7 +11,7 @@ export const RING_RADIUS = 1.25;
 
 const TILES = 40;
 const STUB = 4;
-const GOLD = new THREE.Color(1.0, 0.88, 0.64);
+const GOLD = new THREE.Color(0.45, 0.84, 1.0);
 
 const TILE_VS = `
 attribute float aTile; attribute vec3 aCenter;
@@ -146,7 +145,7 @@ export class Ring {
       const a = (i / 16) * TAU;
       dashGeo.push(place(new THREE.BoxGeometry(0.22, 0.035, 0.02), [Math.cos(a) * (radius + 0.42), Math.sin(a) * (radius + 0.42), 0], [0, 0, a + Math.PI / 2]));
     }
-    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.92, 0.72).multiplyScalar(1.8), transparent: true, opacity: 0, depthWrite: false });
+    const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.75, 0.92, 1.0).multiplyScalar(2.2), transparent: true, opacity: 0, depthWrite: false });
     this.dashes = new THREE.Mesh(merge(dashGeo.map((g) => { g.deleteAttribute('uv'); return g; })), dashMat);
     this.group.add(this.dashes);
   }
@@ -302,20 +301,14 @@ export const buildGateway = (model: THREE.Object3D): Gateway => {
 
   const portalU = { uTime: { value: 0 }, uOpen: { value: 0 }, uColor: { value: new THREE.Color(0.55, 0.75, 1.0) } };
   const wide = ARCH.halfWidth * 2 * GATEWAY_SCALE * 1.12, tall = (ARCH.top - ARCH.floor) * GATEWAY_SCALE * 1.04;
-  model.visible = false;
-  const radius = tall * 0.5;
-  const ring = buildPortalRing(radius);
-  ring.position.set(0, ARCH.floor * GATEWAY_SCALE + tall / 2, 0);
-  group.add(ring);
-  void wide;
-  const portal = new THREE.Mesh(new THREE.CircleGeometry(radius * 0.86, 64), new THREE.ShaderMaterial({
+  const portal = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), new THREE.ShaderMaterial({
     vertexShader: FILM_VS, fragmentShader: PORTAL_FS, uniforms: portalU, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   }));
   portal.position.set(0, ARCH.floor * GATEWAY_SCALE + tall / 2, 0);
   group.add(portal);
 
   const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.85, 0.5).multiplyScalar(3) }));
-  star.position.set(0, ARCH.floor * GATEWAY_SCALE + tall + 0.9, 0);
+  star.position.set(0, 6.2 * GATEWAY_SCALE + 0.7, 0);
   star.scale.set(0.7, 1.4, 0.7);
   group.add(star);
 

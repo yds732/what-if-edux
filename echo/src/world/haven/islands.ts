@@ -17,8 +17,8 @@ export interface Island {
   heightAt(x: number, z: number): number | null;
 }
 
-const GRASS_A = new THREE.Color(0x9c8c6a), GRASS_B = new THREE.Color(0xbcab84), MOSS = new THREE.Color(0xd4c49c);
-const ROCK_A = new THREE.Color(0x34488a), ROCK_B = new THREE.Color(0x141c3e), ROCK_WARM = new THREE.Color(0x46448e);
+const GRASS_A = new THREE.Color(0xeee59a), GRASS_B = new THREE.Color(0xf8f2bf), MOSS = new THREE.Color(0xfffbdc);
+const ROCK_A = new THREE.Color(0x4a5aa8), ROCK_B = new THREE.Color(0x1a2050), ROCK_WARM = new THREE.Color(0x4f72c0);
 
 export const buildIsland = (spec: IslandSpec): Island => {
   const { radius, depth, seed } = spec;

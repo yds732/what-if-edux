@@ -27,8 +27,6 @@ const BLADE_VS = `
 }
 `;
 
-const GRASS_TONES = [0xc49c58, 0xd6b06a, 0xe4c488, 0xeed6a2, 0xf4e4bc].map((c) => new THREE.Color(c));
-
 export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null): THREE.Mesh => {
   const blade = new THREE.BufferGeometry();
   const w = 0.028;
@@ -45,7 +43,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const b = new THREE.Color(0xf3e2b8), glow = new THREE.Color(0xa898d8), c = new THREE.Color();
+  const a = new THREE.Color(0xf6dc5e), b = new THREE.Color(0xfff29e), glow = new THREE.Color(0xfffad6), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -60,8 +58,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
     data.push(x, z, rng.range(0, TAU), h);
     heights.push(g.y);
-    c.copy(GRASS_TONES[Math.min(GRASS_TONES.length - 1, Math.floor((patch * 0.75 + rng.next() * 0.25) * GRASS_TONES.length))]!).lerp(b, rng.range(0, 0.15));
-    if (rng.chance(0.025)) c.lerp(glow, 0.75);
+    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.1) ? 0.55 : 0);
     tints.push(c.r, c.g, c.b);
     placed++;
   }
@@ -84,7 +81,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBladeV;\nvarying vec3 vTint;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = vTint * (0.62 + 0.55 * vBladeV);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.22;');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.42;');
   };
   mat.customProgramCacheKey = () => 'echo-grass';
   const mesh = new THREE.Mesh(geo, mat);
@@ -122,7 +119,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
-  const barkA = new THREE.Color(0x1e2438), barkB = new THREE.Color(0x46506a);
+  const barkA = new THREE.Color(0x1e1a2a), barkB = new THREE.Color(0x3e3450);
 
   const branch = (from: THREE.Vector3, dir: THREE.Vector3, length: number, radius: number, depth: number): void => {
     const bend = v3(rng.range(-0.8, 0.8), rng.range(-0.1, 0.5), rng.range(-0.8, 0.8));
@@ -159,11 +156,11 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
   trunk.receiveShadow = true;
   group.add(trunk);
 
-  const pinkA = new THREE.Color(0xffcf5a), pinkB = new THREE.Color(0xfff0c0), lilac = new THREE.Color(0xd8952e);
-  const rose = new THREE.Color(0xf2b640);
+  const pinkA = new THREE.Color(0xffd65c), pinkB = new THREE.Color(0xfff4c8), lilac = new THREE.Color(0xe8b23e);
+  const rose = new THREE.Color(0xf7c443);
   const masses: THREE.BufferGeometry[] = [];
   const puffs: { p: THREE.Vector3; r: number }[] = [];
-  const dark = new THREE.Color(0xa86f22);
+  const dark = new THREE.Color(0xc79a35);
   for (const tip of tips) {
     const n = 3 + Math.round(tip.r * 3);
     for (let i = 0; i < n; i++) {
@@ -179,7 +176,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
       masses.push(tintBy(g, (_q, out, normal) => void out.copy(dark).lerp(pinkA, 0.35 + 0.35 * normal.y)));
     }
   }
-  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffc060, emissiveIntensity: 0.08 }));
+  const massMesh = new THREE.Mesh(merge(masses), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, emissive: 0xffd27a, emissiveIntensity: 0.1 }));
   massMesh.castShadow = true;
   group.add(massMesh);
 
@@ -246,7 +243,7 @@ export const buildGlowFlowers = (spots: readonly { x: number; y: number; z: numb
   for (const s of spots) {
     const lean = v3(Math.sin(s.x * 7.1) * 0.08, 0, Math.cos(s.z * 5.3) * 0.08);
     const top = v3(s.x + lean.x * s.h * 2, s.y + s.h, s.z + lean.z * s.h * 2);
-    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x6a5a9a));
+    stems.push(tint(sweep([v3(s.x, s.y - 0.03, s.z), v3(s.x + lean.x * s.h, s.y + s.h * 0.55, s.z + lean.z * s.h), top], (t) => 0.011 * (1 - 0.5 * t), { radial: 5, steps: 6 }), 0x1f8a70));
     const b = blob(0.03 * (0.7 + s.h), 0.042 * (0.7 + s.h), 0.03 * (0.7 + s.h), 2, (p) => { if (p.y > 0) p.multiplyScalar(1 - 0.25 * p.y); });
     bulbs.push(tint(place(b, top), s.color));
   }
