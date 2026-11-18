@@ -291,6 +291,56 @@ export const FRIDAY = {
     L('teacher', "Our city has a limited budget, so it can't do everything at once."),
     L('teacher', 'Which option should the Youth Council recommend?', 'happy', 'present'),
   ],
+  previewIntro: [
+    L('teacher', "Before you vote, let's look at where each choice could lead.", 'thinking'),
+    L('teacher', 'For each option, the best that could happen, and the worst.', 'happy', 'present'),
+  ],
+  previewNote: 'A possible future, not a prediction.',
+  previews: [
+    {
+      option: 'Option 1 · Expand Echo widely',
+      intro: [L('teacher', "Let's imagine the Youth Council chooses option one: Echo for every young person who wants it.", 'happy', 'present')],
+      best: {
+        scene: 'expand-best', title: 'No one has to be lonely',
+        caption: 'Everyone who wants a companion has one. Children who sat alone now have support, and many find the courage to talk to each other.',
+        lines: [L('teacher', 'In the best case, everyone who needs a friend has one.', 'happy'), L('teacher', 'Children who used to sit alone have someone to talk to, and some find the confidence to make real friends.', 'happy')],
+      },
+      worst: {
+        scene: 'expand-worst', title: 'Together, but apart',
+        caption: 'Everyone wears a headset, all the time. The streets are busy, but nobody talks. Real friendships slowly fade.',
+        lines: [L('teacher', 'In the worst case, everyone is with Echo, all the time.', 'worried'), L('teacher', "The streets are full of people, but no one is really talking to each other.", 'sad')],
+      },
+    },
+    {
+      option: 'Option 2 · Expand slowly, with in-person clubs',
+      intro: [L('teacher', 'Now imagine we choose option two: Echo for fewer students, alongside clubs where people meet face to face.', 'happy', 'present')],
+      best: {
+        scene: 'combined-best', title: 'Practise, then meet',
+        caption: 'Students practise with Echo, then join clubs to make friends in person. AI support and human friendship grow together.',
+        lines: [L('teacher', 'In the best case, Echo becomes a stepping stone.', 'happy'), L('teacher', 'Students practise with it, then go and meet real friends at the clubs.', 'happy')],
+      },
+      worst: {
+        scene: 'combined-worst', title: 'The waiting list',
+        caption: 'There are not enough places. Long queues form, and the students who need help most are left waiting outside.',
+        lines: [L('teacher', "In the worst case, there aren't enough places.", 'worried'), L('teacher', 'And the children who need help most could be the ones left waiting.', 'sad')],
+      },
+    },
+    {
+      option: 'Option 3 · Wait and investigate',
+      intro: [L('teacher', 'And if we choose option three: we keep the trial small, and study Echo carefully before going any further.', 'thinking', 'present')],
+      best: {
+        scene: 'investigate-best', title: 'Safe by design',
+        caption: 'Researchers find the risks and fix them first. When Echo arrives it is safer, and children still play together outside.',
+        lines: [L('teacher', "In the best case, we learn what's risky and fix it first.", 'happy'), L('teacher', "When Echo finally arrives, it's safer for everyone.", 'happy')],
+      },
+      worst: {
+        scene: 'investigate-worst', title: 'Still waiting',
+        caption: 'Years pass while the study goes on. Lonely children who could have been helped are left on their own.',
+        lines: [L('teacher', 'In the worst case, the study takes years.', 'worried'), L('teacher', 'And children who are lonely right now get no help at all.', 'sad')],
+      },
+    },
+  ],
+  previewOutro: [L('teacher', "Now you've seen the best and the worst of each choice.", 'thinking'), L('teacher', "It's your turn. Cast your vote.", 'happy', 'present')],
   vote: {
     title: 'Your recommendation to the Youth Council',
     options: [

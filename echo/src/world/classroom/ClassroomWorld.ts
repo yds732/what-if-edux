@@ -34,12 +34,16 @@ export const CLASSROOM = {
   stage: new THREE.Vector3(0.2, 0.16, -4.6),
 } as const satisfies Record<string, Anchor | THREE.Vector3>;
 
+export type FutureSceneId = 'expand-best' | 'expand-worst' | 'combined-best' | 'combined-worst' | 'investigate-best' | 'investigate-worst';
+const FUTURE_SCENES: readonly FutureSceneId[] = ['expand-best', 'expand-worst', 'combined-best', 'combined-worst', 'investigate-best', 'investigate-worst'];
+
 export type ClassroomVariant = 'morning' | 'golden' | 'viewer';
 const INK = { accent: '#1f5fb8', text: '#142645', body: '#22375c', dim: 'rgba(34, 55, 92, 0.75)' };
 export type ScreenContent =
   | { kind: 'title'; eyebrow: string; title: string; body: string }
   | { kind: 'voice'; name: string; line: string }
-  | { kind: 'future'; heading: string; note: string; future: Future };
+  | { kind: 'future'; heading: string; note: string; future: Future }
+  | { kind: 'scene'; scene: FutureSceneId };
 
 const W = 5, D = 6, H = 3.4;
 export const FLOOR_MARK = 0.02;
@@ -136,6 +140,8 @@ export class ClassroomWorld extends World {
   private sceneColliders: Obstacle[] = [];
   private frontColliders: Obstacle[] = [];
 
+  private readonly sceneImages = new Map<FutureSceneId, HTMLImageElement>();
+
   constructor() {
     super();
     this.near = 0.05;
@@ -150,6 +156,11 @@ export class ClassroomWorld extends World {
   async build(ctx: BuildContext): Promise<void> {
     const scene = this.scene;
     const rng = new Rng(2080);
+    await Promise.all(FUTURE_SCENES.map(async (id) => {
+      const image = new Image();
+      image.src = `${import.meta.env.BASE_URL}assets/pictures/friday-${id}.webp`;
+      await image.decode().then(() => this.sceneImages.set(id, image), () => undefined);
+    }));
     scene.environment = bakeRoomEnvironment(ctx.renderer);
     scene.environmentIntensity = 0.6;
 
@@ -236,17 +247,7 @@ export class ClassroomWorld extends World {
     scene.add(this.frontRow);
     await ctx.step('classroom: desks');
 
-    const [, plinthTall] = await sizeOf(ctx, 'plinth');
-    const plinth = await dress(ctx, scene, 'plinth', [[CLASSROOM.plinth.x, 0, CLASSROOM.plinth.z]]);
-    plinth.scale.y = CLASSROOM.plinth.y / plinthTall;
-    plinth.traverse((o) => {
-      if (!(o instanceof THREE.Mesh)) return;
-      const m = (o.material as THREE.MeshStandardMaterial).clone();
-      m.map = null;
-      m.color.set(0xf3f4f7);
-      m.roughness = 0.3;
-      o.material = m;
-    });
+    scene.add(buildPedestal(CLASSROOM.plinth.x, CLASSROOM.plinth.z, CLASSROOM.plinth.y));
     {
       const c = Math.cos(DESK.yaw), s = Math.sin(DESK.yaw);
       const at = (lx: number, y: number, lz: number): [number, number, number] =>
@@ -623,7 +624,19 @@ export class ClassroomWorld extends World {
         ctx.stroke();
       }
       ctx.textBaseline = 'middle';
-      if (content.kind === 'title') {
+      if (content.kind === 'scene') {
+        const image = this.sceneImages.get(content.scene);
+        if (image) {
+          const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+          const iw = image.naturalWidth * scale, ih = image.naturalHeight * scale;
+          ctx.save();
+          roundRect(ctx, 0, 0, w, h, 34);
+          ctx.clip();
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(image, (w - iw) / 2, (h - ih) / 2, iw, ih);
+          ctx.restore();
+        }
+      } else if (content.kind === 'title') {
         ctx.fillStyle = INK.accent;
         ctx.font = font(600, 34);
         spaced(ctx, content.eyebrow.toUpperCase(), 130, 190, 10);
@@ -886,6 +899,28 @@ const buildTable = (b: Builder, t: TableSpec, rng: Rng): void => {
     const lx = rng.range(-0.45, 0.45), lz = rng.range(-0.1, 0.1), spin = turn + rng.range(-0.4, 0.4);
     for (let k = 0; k < rng.int(1, 3); k++) b.box('satin', rng.pick([0x2f6fbf, 0xd9473a, 0x39a35b, 0x8a5cc2, 0xf0a830]), [0.17, 0.008, 0.235], at(lx + rng.range(-0.01, 0.01), TABLE.top + 0.004 + k * 0.009, lz), { rot: [0, spin + rng.range(-0.15, 0.15), 0] });
   }
+};
+
+const buildPedestal = (x: number, z: number, top: number): THREE.Group => {
+  const group = new THREE.Group();
+  const profile = [
+    [0, 0], [0.26, 0], [0.27, 0.012], [0.26, 0.03], [0.2, 0.045], [0.11, 0.09], [0.085, 0.2],
+    [0.08, top - 0.24], [0.1, top - 0.12], [0.2, top - 0.05], [0.25, top - 0.02], [0.25, top], [0, top],
+  ].map(([r, y]) => new THREE.Vector2(r!, y!));
+  const body = new THREE.Mesh(new THREE.LatheGeometry(profile, 64), new THREE.MeshStandardMaterial({ color: 0xf6f7f9, roughness: 0.22, metalness: 0.05 }));
+  body.castShadow = body.receiveShadow = true;
+  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.85, 1.0).multiplyScalar(2.4) });
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.235, 0.005, 8, 96), glow);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = top + 0.002;
+  const foot = new THREE.Mesh(new THREE.TorusGeometry(0.255, 0.004, 8, 96), glow);
+  foot.rotation.x = Math.PI / 2;
+  foot.position.y = 0.04;
+  const pad = new THREE.Mesh(new THREE.CircleGeometry(0.2, 48).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5f6675, roughness: 1 }));
+  pad.position.y = top + 0.001;
+  group.add(body, rim, foot, pad);
+  group.position.set(x, 0, z);
+  return group;
 };
 
 const glowPool = (aspect: number): THREE.CanvasTexture => canvasTexture(512, Math.round(512 / aspect), (ctx) => {
