@@ -47,25 +47,34 @@ export const friday = async (game: Game): Promise<void> => {
   room.setScreen({ kind: 'title', eyebrow: FRIDAY.screenTitle, title: 'Same technology. Different experiences.', body: 'Which option should the Youth Council recommend?' });
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 1.0);
   await d.play(FRIDAY.framing);
+  await d.play(FRIDAY.previewIntro);
+
+  room.setVariant('viewer');
+  player.faceToward(new THREE.Vector3(0.2, 2.0, -5.9), 1.2);
+  void d.tween(1.8, (k) => (app.zoom = 24 * k)).catch(() => undefined);
+  game.reach('friday.future');
+  for (const preview of FRIDAY.previews) {
+    audio.sfx('reveal');
+    room.setScreen({ kind: 'scene', scene: preview.best.scene });
+    await d.wait(0.6);
+    await d.play([...preview.intro, ...preview.best.lines]);
+    audio.sfx('reveal');
+    room.setScreen({ kind: 'scene', scene: preview.worst.scene });
+    await d.wait(0.6);
+    await d.play(preview.worst.lines);
+  }
+  void d.tween(1.4, (k) => (app.zoom = 24 * (1 - k))).catch(() => undefined);
+  room.setVariant('morning');
+  room.setScreen({ kind: 'title', eyebrow: FRIDAY.screenTitle, title: 'Time to vote', body: FRIDAY.vote.title });
+  player.faceToward(teacher.headWorld(new THREE.Vector3()), 1.0);
+  await d.play(FRIDAY.previewOutro);
 
   game.reach('friday.vote');
   const pick = await d.choose(FRIDAY.vote.title, FRIDAY.vote.options);
   const policy = FRIDAY.vote.policies[pick] ?? 'combined';
   state.policyChoice = policy;
   audio.sfx('vote');
-
-  room.setVariant('viewer');
-  player.faceToward(new THREE.Vector3(0.2, 2.0, -5.9), 1.2);
-  void d.tween(1.8, (k) => (app.zoom = 27 * k)).catch(() => undefined);
-  await d.wait(1.0);
-  audio.sfx('reveal');
-  room.setScreen({ kind: 'future', heading: FRIDAY.viewerTitle, note: FRIDAY.viewerNote, future: FRIDAY.futures[policy] });
-  hud.setObjective(FRIDAY.viewerBody);
-  game.reach('friday.future');
-  await holdToRead(game, 9, 40);
-  hud.setObjective(null);
-  void d.tween(1.4, (k) => (app.zoom = 27 * (1 - k))).catch(() => undefined);
-  room.setVariant('morning');
+  await d.wait(0.8);
   room.setScreen({ kind: 'title', eyebrow: FRIDAY.screenTitle, title: 'Thank you.', body: 'Your recommendation has been sent to the Youth Council.' });
   await d.wait(1.6);
   player.faceToward(teacher.headWorld(new THREE.Vector3()), 1.0);
