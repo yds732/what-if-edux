@@ -45,7 +45,7 @@ export const CLASSROOM = {
 
 export type ClassroomVariant = 'morning' | 'golden' | 'viewer';
 /** The display's inks: dark navy on its pale blue. */
-const INK = { accent: '#3a7bd0', text: '#1c2f52', body: '#3a4d70', dim: 'rgba(58, 77, 112, 0.7)' };
+const INK = { accent: '#1f5fb8', text: '#142645', body: '#22375c', dim: 'rgba(34, 55, 92, 0.75)' };
 export type ScreenContent =
   | { kind: 'title'; eyebrow: string; title: string; body: string }
   | { kind: 'voice'; name: string; line: string }
@@ -711,16 +711,20 @@ export class ClassroomWorld extends World {
   /** What the front display shows. */
   setScreen(content: ScreenContent): void {
     this.screenPulse = 1;
+    // never a blank screen: with nothing to show it greets the class
+    if (content.kind === 'title' && !content.title && !content.eyebrow && !content.body) {
+      content = { kind: 'title', eyebrow: 'Harbour District School · Class 1', title: 'Good morning!', body: 'Find your seat and say hello to your group.' };
+    }
     this.screen.paint((ctx, w, h) => {
       // a pale sky-blue screen with rounded corners, to sit quietly in a white room
       const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, '#e6f1fd');
-      g.addColorStop(1, '#bfd9f5');
+      g.addColorStop(0, '#bcd9f8');
+      g.addColorStop(1, '#7eaee6');
       ctx.fillStyle = g;
       roundRect(ctx, 0, 0, w, h, 34);
       ctx.fill();
       // faint concentric rings: the Echo mark
-      ctx.strokeStyle = 'rgba(70, 140, 220, 0.18)';
+      ctx.strokeStyle = 'rgba(60, 130, 215, 0.26)';
       ctx.lineWidth = 3;
       for (let i = 1; i <= 6; i++) {
         ctx.beginPath();
@@ -733,7 +737,7 @@ export class ClassroomWorld extends World {
         ctx.font = font(600, 34);
         spaced(ctx, content.eyebrow.toUpperCase(), 130, 190, 10);
         ctx.fillStyle = INK.text;
-        ctx.font = font(300, 118);
+        ctx.font = font(500, 118);
         wrap(ctx, content.title, w - 520).forEach((l, i) => ctx.fillText(l, 124, 330 + i * 128));
         const n = wrap(ctx, content.title, w - 520).length;
         ctx.fillStyle = INK.body;
