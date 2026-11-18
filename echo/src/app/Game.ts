@@ -98,7 +98,7 @@ export class Game {
     app.senses.push({ update: (dt) => this.xr.update(dt) }, { update: () => this.input.beginFrame() });
     this.input.onGesture.on(() => this.audio.unlock());
     this.hud.onHover.on(() => this.audio.sfx('uiHover'));
-    this.player.onStep.on((speed) => this.audio.sfx('footstep', { gain: 0.35 + 0.4 * speed }));
+    this.player.onStep.on((speed) => this.audio.sfx('footstep', { gain: 0.175 + 0.2 * speed }));
   }
 
   addSystem(update: (dt: number, time: number) => void): void {

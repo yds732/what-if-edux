@@ -7,13 +7,13 @@ const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial }
   const group = new THREE.Group();
   group.name = 'companion alert';
   const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.86, 0.05, 0.06), transparent: true, depthWrite: false, toneMapped: false });
-  const bar = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.16, 4, 12), material);
-  bar.position.y = 0.13;
+  const bar = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.15, 4, 12), material);
+  bar.position.y = 0.17;
   bar.scale.set(1, 1, 0.6);
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 10), material);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(0.034, 16, 10), material);
   dot.scale.set(1, 1, 0.6);
   const disc = new THREE.Mesh(new THREE.CircleGeometry(0.19, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false, toneMapped: false }));
-  disc.position.set(0, 0.09, -0.03);
+  disc.position.set(0, 0.12, -0.03);
   group.add(disc, bar, dot);
   group.renderOrder = 5;
   return { group, material };
