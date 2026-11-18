@@ -7,7 +7,7 @@ import { makeLook } from '../../render/PostPipeline';
 import { bakeRoomEnvironment } from '../../render/env';
 import type { Future } from '../../story/script';
 import { Panel } from '../../ui/Panel';
-import { THEMES, font, glass, roundRect, spaced, wrap } from '../../ui/draw';
+import { font, roundRect, spaced, wrap } from '../../ui/draw';
 import { World, anchor, anchorToward, characterYaw, type Anchor, type BuildContext, type FrameContext } from '../World';
 import type { Obstacle } from '../colliders';
 import { dress, framed, sizeOf, type Spot } from '../dressing';
@@ -44,6 +44,8 @@ export const CLASSROOM = {
 } as const satisfies Record<string, Anchor | THREE.Vector3>;
 
 export type ClassroomVariant = 'morning' | 'golden' | 'viewer';
+/** The display's inks: dark navy on its pale blue. */
+const INK = { accent: '#3a7bd0', text: '#1c2f52', body: '#3a4d70', dim: 'rgba(58, 77, 112, 0.7)' };
 export type ScreenContent =
   | { kind: 'title'; eyebrow: string; title: string; body: string }
   | { kind: 'voice'; name: string; line: string }
@@ -251,11 +253,9 @@ export class ClassroomWorld extends World {
     b.box('satin', 0xe9ecf1, [STAGE.wide, STAGE_HEIGHT - 0.012, STAGE.deep], [0, (STAGE_HEIGHT - 0.012) / 2, STAGE.z], { r: 0.01 });
     b.box('satin', 0xd9dde5, [STAGE.wide - 0.02, 0.012, STAGE.deep - 0.02], [0, STAGE_HEIGHT - 0.006, STAGE.z], { r: 0.004 });
     b.box('glow', 0xbfe0ff, [STAGE.wide - 0.1, 0.006, 0.006], [0, 0.03, STAGE.z + STAGE.deep / 2 + 0.002]);
-    // the display: one frameless pane of dark glass, edged with a hairline of light
-    b.box('gloss', 0x10131c, [5.0, 2.3, 0.05], [0.2, 2.05, -D + 0.04], { r: 0.02 });
-    for (const [w, h, x, y] of [[5.0, 0.006, 0.2, 2.05 + 1.15], [5.0, 0.006, 0.2, 2.05 - 1.15], [0.006, 2.3, 0.2 - 2.5, 2.05], [0.006, 2.3, 0.2 + 2.5, 2.05]] as const) {
-      b.box('glow', 0x9fd0ff, [w, h, 0.006], [x, y, -D + 0.066]);
-    }
+    // the display: a soft white bezel with well-rounded corners round a pale screen, a line of light under it
+    b.box('gloss', 0xf7f8fa, [5.2, 2.5, 0.07], [0.2, 2.05, -D + 0.045], { r: 0.06 });
+    b.box('glow', 0xcfe4ff, [4.6, 0.006, 0.006], [0.2, 2.05 - 1.255, -D + 0.07]);
     // ---- tables for two pushed together, their chairs, slates, paper and pencil pots ----
     // the front tables stand in a group of their own: they are cleared away for the after-school club
     const sets = [this.frontRow, scene].map((to) => ({ to, b: new Builder(), chairs: [] as Spot[], slates: [] as Spot[], bags: [] as Spot[], colliders: [] as Obstacle[] }));
@@ -540,7 +540,7 @@ export class ClassroomWorld extends World {
     this.screen = new Panel(1920, 880, { world: true });
     this.screen.mesh.scale.set(4.84, 2.2, 1);
     this.screen.mesh.position.set(0.2, 2.05, -D + 0.092);
-    this.screen.mesh.material.color.setScalar(1.25);
+    this.screen.mesh.material.color.setScalar(0.96);
     scene.add(this.screen.mesh);
     const screenLight = new THREE.PointLight(0x9fc6ff, 2.2, 9, 1.6);
     screenLight.position.set(0.2, 2.1, -4.9);
@@ -701,15 +701,16 @@ export class ClassroomWorld extends World {
   /** What the front display shows. */
   setScreen(content: ScreenContent): void {
     this.screenPulse = 1;
-    const theme = THEMES.real;
     this.screen.paint((ctx, w, h) => {
+      // a pale sky-blue screen with rounded corners, to sit quietly in a white room
       const g = ctx.createLinearGradient(0, 0, w, h);
-      g.addColorStop(0, '#0f1730');
-      g.addColorStop(1, '#1a2a52');
+      g.addColorStop(0, '#e6f1fd');
+      g.addColorStop(1, '#bfd9f5');
       ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
+      roundRect(ctx, 0, 0, w, h, 34);
+      ctx.fill();
       // faint concentric rings: the Echo mark
-      ctx.strokeStyle = 'rgba(140, 190, 255, 0.16)';
+      ctx.strokeStyle = 'rgba(70, 140, 220, 0.18)';
       ctx.lineWidth = 3;
       for (let i = 1; i <= 6; i++) {
         ctx.beginPath();
@@ -718,50 +719,55 @@ export class ClassroomWorld extends World {
       }
       ctx.textBaseline = 'middle';
       if (content.kind === 'title') {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 34);
         spaced(ctx, content.eyebrow.toUpperCase(), 130, 190, 10);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(300, 118);
         wrap(ctx, content.title, w - 520).forEach((l, i) => ctx.fillText(l, 124, 330 + i * 128));
         const n = wrap(ctx, content.title, w - 520).length;
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.9)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(400, 48);
         wrap(ctx, content.body, w - 620).forEach((l, i) => ctx.fillText(l, 130, 330 + n * 128 + 20 + i * 62));
       } else if (content.kind === 'voice') {
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 34);
         spaced(ctx, 'ECHO COMMUNITY CONSULTATION', 130, 150, 10);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(300, 130);
         ctx.fillText(content.name, 124, 330);
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.92)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(300, 58);
         wrap(ctx, `“${content.line}”`, w - 560).forEach((l, i) => ctx.fillText(l, 130, 500 + i * 76));
       } else {
         const f = content.future;
-        ctx.fillStyle = theme.accent;
+        ctx.fillStyle = INK.accent;
         ctx.font = font(600, 32);
         spaced(ctx, content.heading, 110, 96, 9);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(600, 104);
         ctx.fillText(f.title, 104, 216);
-        ctx.fillStyle = 'rgba(220, 232, 255, 0.92)';
+        ctx.fillStyle = INK.body;
         ctx.font = font(300, 46);
         ctx.fillText(f.summary, 110, 310);
         const col = (x: number, good: boolean, head: string, body: string): void => {
-          glass(ctx, x, 380, 830, 300, theme, { radius: 30, glow: 0.4, border: good ? 'rgba(150, 230, 190, 0.7)' : 'rgba(255, 200, 140, 0.7)', borderWidth: 3 });
-          ctx.fillStyle = good ? '#9fe6c9' : '#ffcf9a';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+          roundRect(ctx, x, 380, 830, 300, 30);
+          ctx.fill();
+          ctx.strokeStyle = good ? 'rgba(60, 170, 120, 0.6)' : 'rgba(220, 140, 60, 0.6)';
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.fillStyle = good ? '#2f9a6c' : '#d27a2c';
           ctx.font = font(600, 28);
           spaced(ctx, good ? 'WHAT IT GIVES' : 'WHAT IT COSTS', x + 44, 434, 6);
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = INK.text;
           ctx.font = font(600, 40);
           let y = 500;
           for (const l of wrap(ctx, head, 740)) {
             ctx.fillText(l, x + 44, y);
             y += 50;
           }
-          ctx.fillStyle = 'rgba(220, 232, 255, 0.88)';
+          ctx.fillStyle = INK.body;
           ctx.font = font(400, 32);
           for (const l of wrap(ctx, body, 740)) {
             ctx.fillText(l, x + 44, y + 8);
@@ -770,10 +776,10 @@ export class ClassroomWorld extends World {
         };
         col(104, true, f.gain.head, f.gain.body);
         col(984, false, f.cost.head, f.cost.body);
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = INK.text;
         ctx.font = font(300, 56);
         ctx.fillText(`“${f.question}”`, 110, 762);
-        ctx.fillStyle = 'rgba(200, 215, 245, 0.7)';
+        ctx.fillStyle = INK.dim;
         ctx.font = font(400, 28);
         ctx.textAlign = 'right';
         ctx.fillText(content.note, w - 110, 826);
@@ -841,7 +847,7 @@ export class ClassroomWorld extends World {
       this.applyMood();
     }
     this.screenPulse = Math.max(0, this.screenPulse - dt * 2);
-    this.screen.mesh.material.color.setScalar(1.25 + this.screenPulse * 1.5);
+    this.screen.mesh.material.color.setScalar(0.96 + this.screenPulse * 0.2);
     // voices fade up as projections and fade away again
     let any = 0;
     for (const who of ['alex', 'sam', 'riley']) {
