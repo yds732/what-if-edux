@@ -14,8 +14,8 @@ interface Recolour {
 const COBALT: Shift = [0.615, 0.72, 0.78];
 const DEEP_COBALT: Shift = [0.63, 0.6, 0.62];
 const REGAL: Shift = [0.74, 0.55, 0.55];
-const MEADOW_GOLD: Shift = [0.14, 0.48, 1.75];
-const CRYSTAL_BLUE: Shift = [0.54, 0.62, 1.2];
+const MEADOW_GOLD: Shift = [0.14, 0.55, 1.3];
+const CRYSTAL_BLUE: Shift = [0.55, 0.6, 0.8];
 
 const RECOLOURS: Record<string, Recolour> = {
   'stepping-stone': { pink: COBALT, all: true, gold: {} },
@@ -64,7 +64,7 @@ float hvLine = 0.0;
   vec3 o = s;
   o = mix(o, hvShift(hsv, uHvPink), pink);
   o = mix(o, hvShift(hsv, uHvGreen), green * (1.0 - pink));
-  o = mix(o, hvShift(hsv, vec3(0.13, 0.58, 1.6)), blossom * sat);
+  o = mix(o, hvShift(hsv, vec3(0.12, 0.72, 1.05)), blossom * sat);
   // gold: a pale, faintly blue alloy, brighter where it catches the light; its brightest edges carry a line of light
   float luma = dot(s, vec3(0.299, 0.587, 0.114));
   vec3 alloy = vec3(luma) * vec3(1.18, 0.95, 0.52) * 1.15;

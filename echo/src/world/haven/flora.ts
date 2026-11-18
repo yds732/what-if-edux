@@ -43,7 +43,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0xf6dc5e), b = new THREE.Color(0xfff29e), glow = new THREE.Color(0xfffad6), c = new THREE.Color();
+  const a = new THREE.Color(0x86b4ec), b = new THREE.Color(0xbcdcfc), glow = new THREE.Color(0xe4f2ff), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -81,7 +81,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBladeV;\nvarying vec3 vTint;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = vTint * (0.62 + 0.55 * vBladeV);')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.42;');
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vTint * vBladeV * vBladeV * 0.26;');
   };
   mat.customProgramCacheKey = () => 'echo-grass';
   const mesh = new THREE.Mesh(geo, mat);
