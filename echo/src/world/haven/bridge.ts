@@ -233,7 +233,8 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
   const rings = RING_POINTS.map((p, i) => new Ring(p, start, hoops[i]!));
   for (const r of rings) group.add(r.group);
 
-  const line: THREE.Vector3[] = [];
+  const LEAD = 3.5;
+  const line: THREE.Vector3[] = [v3(start.x, start.y, start.z + LEAD)];
   for (let i = 0; i <= 160; i++) line.push(path.getPointAt(i / 160));
   const walkway = new Walkway(line, W - 0.1);
   const landing = new Walkway([end.clone(), v3(end.x, end.y, end.z - 4.2)], 1.6);
@@ -259,7 +260,7 @@ export const buildStarBridge = (start: THREE.Vector3, end: THREE.Vector3, hoops:
       const speed = Math.max(9, Math.abs(want - deckU.uReveal.value) * 1.6);
       deckU.uReveal.value += Math.sign(want - deckU.uReveal.value) * Math.min(Math.abs(want - deckU.uReveal.value), speed * dt);
       bridge.built = (Math.max(0, deckU.uReveal.value - STUB) / (TILES - STUB)) * 3;
-      walkway.reach = Math.min(1, Math.max(0, Math.floor(deckU.uReveal.value) - 0.1) / TILES);
+      walkway.reach = (LEAD + (walkway.length - LEAD) * Math.min(1, Math.max(0, Math.floor(deckU.uReveal.value) - 0.1) / TILES)) / walkway.length;
       landing.reach = bridge.built >= 2.999 ? 1 : 0;
       for (const r of rings) r.update(dt, time);
     },
