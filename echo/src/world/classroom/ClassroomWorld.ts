@@ -207,9 +207,10 @@ export class ClassroomWorld extends World {
         const [cx, cz] = onTable(t, p.side * TABLE.seatX + (state === 'askew' ? rng.range(-0.12, 0.12) : 0), p.facing * back);
         const turn = (p.facing === 1 ? 180 : 0) + t.yaw + (state === 'askew' ? rng.pick([-1, 1]) * rng.range(10, 22) : rng.range(-4, 4));
         set.chairs.push([cx, 0, cz, turn]);
-        if (used) {
+        const lean = used ? rng.range(-5, 5) : 0;
+        if (p.who) {
           const [sx, sz] = onTable(t, p.side * TABLE.seatX, p.facing * 0.08);
-          set.slates.push([sx, TABLE.top, sz, turn + 180 + rng.range(-5, 5)]);
+          set.slates.push([sx, TABLE.top, sz, turn + 180 + lean]);
         }
         if (p.who) {
           set.colliders.push({ kind: 'circle', cx, cz, r: 0.3 });
