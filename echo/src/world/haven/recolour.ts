@@ -14,7 +14,7 @@ interface Recolour {
 const COBALT: Shift = [0.615, 0.72, 0.78];
 const DEEP_COBALT: Shift = [0.63, 0.6, 0.62];
 const REGAL: Shift = [0.74, 0.55, 0.55];
-const MEADOW_GOLD: Shift = [0.14, 0.55, 1.3];
+const MEADOW_GOLD: Shift = [0.14, 0.55, 1.45];
 const CRYSTAL_BLUE: Shift = [0.55, 0.6, 0.8];
 
 const RECOLOURS: Record<string, Recolour> = {

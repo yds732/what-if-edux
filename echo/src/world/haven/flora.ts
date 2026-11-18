@@ -43,7 +43,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
   blade.setIndex(idx);
 
   const data: number[] = [], tints: number[] = [], heights: number[] = [];
-  const a = new THREE.Color(0xf7e070), b = new THREE.Color(0xfff4b4), glow = new THREE.Color(0x9cc8f4), c = new THREE.Color();
+  const a = new THREE.Color(0xf7e070), b = new THREE.Color(0xfff4b4), glow = new THREE.Color(0xfffad6), c = new THREE.Color();
   let placed = 0;
   for (let i = 0; i < count * 14 && placed < count; i++) {
     const r = radius * Math.sqrt(rng.next()), ang = rng.range(0, TAU);
@@ -58,7 +58,7 @@ export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: 
     const h = (0.16 + 0.34 * rng.next() ** 1.6) * (0.6 + 0.6 * patch + 1.5 * lush * tuft) * g.scale;
     data.push(x, z, rng.range(0, TAU), h);
     heights.push(g.y);
-    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.16) ? 0.75 : 0);
+    c.copy(a).lerp(b, patch * 0.8 + rng.range(0, 0.2)).lerp(glow, rng.chance(0.1) ? 0.55 : 0);
     tints.push(c.r, c.g, c.b);
     placed++;
   }
