@@ -202,7 +202,7 @@ export class HavenWorld extends World {
       if (Math.hypot(x, z + 0.6) < 9.2) this.gems.push(v3(x, y + 0.45 * scale, z));
       if (color === 0x59d8ff) crystals['crystals-b'].push([x, y, z, rng.range(0, 360), scale * 0.8]);
       else crystals['crystals-a'].push([x, y, z, rng.range(0, 360), scale * 0.95]);
-      const halo = makeHalo(color, scale * 3.2, 0.5);
+      const halo = makeHalo(0x8fd4ff, scale * 3.2, 0.5);
       halo.position.set(x, y + scale * 0.6, z);
       scene.add(halo);
       this.colliders.circle(x, z, scale * 0.5);
