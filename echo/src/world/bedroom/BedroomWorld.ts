@@ -159,7 +159,6 @@ export class BedroomWorld extends World {
     this.ping = buildPing(1.12, 0.3);
     this.ping.mesh.position.set(0, (H * 0.65) / 2 - 0.26, 0.034);
     board.add(this.ping.mesh);
-    scene.add(buildBottle(0.42, deskTop, -2.46));
     scene.add(buildBook(bx + 0.08, MATTRESS_TOP, bz + 0.38, 28));
     await ctx.step('bedroom: furniture');
 
@@ -783,28 +782,6 @@ const drawCloud = (c: CanvasRenderingContext2D, x: number, y: number, s: number)
   }
   roundRect(c, x - 34 * s, y + 4 * s, 70 * s, 20 * s, 10 * s);
   c.fill();
-};
-
-const buildBottle = (x: number, y: number, z: number): THREE.Group => {
-  const group = new THREE.Group();
-  const profile = [[0, 0], [0.033, 0], [0.036, 0.008], [0.036, 0.07], [0.032, 0.1], [0.036, 0.13], [0.036, 0.18], [0.03, 0.2], [0.024, 0.205]]
-    .map(([r, h]) => new THREE.Vector2(r, h));
-  const body = new THREE.Mesh(new THREE.LatheGeometry(profile, 32), new THREE.MeshStandardMaterial({ color: 0x23a6a0, roughness: 0.35 }));
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x585e68, roughness: 0.6 });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.027, 0.032, 28), capMat);
-  cap.position.y = 0.221;
-  const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.022, 16), new THREE.MeshStandardMaterial({ color: 0xe9ecef, roughness: 0.5 }));
-  spout.position.y = 0.247;
-  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.004, 8, 20), capMat);
-  loop.position.set(0.024, 0.236, 0);
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.0365, 0.0365, 0.024, 32, 1, true), new THREE.MeshStandardMaterial({ color: 0xf2f4f6, roughness: 0.5 }));
-  band.position.y = 0.15;
-  for (const m of [body, cap, spout, loop, band]) {
-    m.castShadow = m.receiveShadow = true;
-    group.add(m);
-  }
-  group.position.set(x, y, z);
-  return group;
 };
 
 const buildBook = (x: number, y: number, z: number, yawDeg: number): THREE.Group => {
