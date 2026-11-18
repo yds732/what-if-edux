@@ -73,10 +73,6 @@ export class Character {
   private hover = 0;
   private liveliness = 1;
   private seatHeight = 0.36;
-  /**
-   * Called each frame with the skeleton as posed, before the figure is fitted to it: the place to put a hand
-   * exactly on something (a bat on a ball), which no stored gesture can do.
-   */
   onPose: ((bones: Rig['bones']) => void) | null = null;
 
   constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {

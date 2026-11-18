@@ -8,7 +8,6 @@ export type InputMode = 'mouse' | 'touch' | 'xr';
 const KEY_ACTIONS: Record<string, Action> = {
   KeyE: 'interact', KeyF: 'interact', Space: 'advance', Enter: 'advance', Digit1: 'choice1', Digit2: 'choice2', Digit3: 'choice3',
   Numpad1: 'choice1', Numpad2: 'choice2', Numpad3: 'choice3', KeyQ: 'headset', KeyP: 'pause', KeyK: 'controls',
-  // with the mouse captured the browser keeps Escape for itself (and the game pauses as the mouse is let go); with a free cursor it arrives here
   Escape: 'pause',
 };
 export const ACTION_LABELS: Record<InputMode, Record<'interact' | 'headset', string>> = {
@@ -40,7 +39,6 @@ export class Input {
   tap: { x: number; y: number } | null = null;
   mode: InputMode = 'mouse';
   wantsLock = false;
-  /** On a touch screen the left of the picture is a walking stick. Off, a finger anywhere is the pointer: a game played by pointing. */
   sticks = true;
   sensitivity = 1;
   readonly onModeChange = new Signal<InputMode>();

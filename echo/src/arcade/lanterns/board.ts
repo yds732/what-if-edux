@@ -1,23 +1,11 @@
 import type { Rng } from '../../core/math';
 
-/**
- * Lantern Lights as rules: a square board of jewels, the swap that makes a line of three, and everything that
- * follows from it. Pure data, so a whole game can be played in a test; the world plays the waves back one by one.
- *
- * Columns are x, left to right; rows are y, bottom to top. Jewels fall toward y = 0.
- *
- * Longer lines leave a jewel with a power behind: four in a line a BEAM (clears the row or column it was made
- * along), a corner or a T a BURST (clears the eight around it), five in a line a PRISM (swapped with a jewel,
- * clears every jewel of that kind).
- */
 export const SIZE = 7;
-/** Which jewel: its shape and colour. A prism has none (-1). */
 export type Kind = number;
 export const PRISM: Kind = -1;
 export type Power = 'none' | 'beamH' | 'beamV' | 'burst' | 'prism';
 
 export interface Gem {
-  /** Unique for the life of a board: the world keeps one model per id. */
   readonly id: number;
   readonly kind: Kind;
   readonly power: Power;
@@ -28,16 +16,11 @@ export interface At {
   readonly y: number;
 }
 
-/** One wave of what a swap sets off: what went, what was left behind, and what fell to fill the gaps. */
 export interface Wave {
-  /** 1 for the swap's own matches, rising with each wave that follows from the fall. */
   readonly chain: number;
   readonly cleared: readonly (At & { readonly gem: Gem; readonly by: 'match' | 'beam' | 'burst' | 'prism' })[];
-  /** Powers that went off in this wave, for their light. */
   readonly fired: readonly (At & { readonly power: Power; readonly kind: Kind })[];
-  /** Jewels with powers made by this wave's lines: they take the place of one of the jewels that made them. */
   readonly made: readonly (At & { readonly gem: Gem })[];
-  /** Every jewel that moved: `fromY` at or above SIZE is a new one, dropping in from over the board. */
   readonly falls: readonly { readonly gem: Gem; readonly x: number; readonly fromY: number; readonly toY: number }[];
 }
 
@@ -52,7 +35,6 @@ interface Run {
 }
 
 export class Board {
-  /** `cells[x][y]`. Never holds a gap between waves. */
   readonly cells: Gem[][] = [];
   private nextId = 1;
 
@@ -68,14 +50,12 @@ export class Board {
     return { id: this.nextId++, kind, power };
   }
 
-  /** A fresh board: no lines already made, and at least one move to be found. */
   fill(): void {
     do {
       for (let x = 0; x < SIZE; x++) {
         this.cells[x] = [];
         for (let y = 0; y < SIZE; y++) {
           let kind: Kind;
-          // never a third in a row as the board is laid
           do kind = this.rng.int(0, this.kinds - 1);
           while ((x >= 2 && this.cells[x - 1]![y]!.kind === kind && this.cells[x - 2]![y]!.kind === kind) || (y >= 2 && this.cells[x]![y - 1]!.kind === kind && this.cells[x]![y - 2]!.kind === kind));
           this.cells[x]![y] = this.gem(kind);
@@ -84,7 +64,6 @@ export class Board {
     } while (!this.findMove());
   }
 
-  /** Every line of three or more alike, across and up. */
   private runs(): Run[] {
     const found: Run[] = [];
     for (const horizontal of [true, false]) {
@@ -111,7 +90,6 @@ export class Board {
     this.cells[b.x]![b.y] = t;
   }
 
-  /** Whether swapping two neighbours does anything: makes a line, or uses a prism. */
   canSwap(a: At, b: At): boolean {
     if (!inside(a.x, a.y) || !inside(b.x, b.y) || !adjacent(a, b)) return false;
     if (this.at(a.x, a.y).power === 'prism' || this.at(b.x, b.y).power === 'prism') return true;
@@ -121,7 +99,6 @@ export class Board {
     return made;
   }
 
-  /** A swap that would do something, if there is one: the hint, and the test for a board with no moves left. */
   findMove(): [At, At] | null {
     for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) {
       for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
@@ -132,7 +109,6 @@ export class Board {
     return null;
   }
 
-  /** Every swap that would do something. */
   moves(): [At, At][] {
     const all: [At, At][] = [];
     for (let x = 0; x < SIZE; x++) for (let y = 0; y < SIZE; y++) {
@@ -144,7 +120,6 @@ export class Board {
     return all;
   }
 
-  /** Lays the same jewels out afresh, when no swap would do anything. */
   shuffle(): void {
     const all = this.cells.flat();
     do {
@@ -157,16 +132,11 @@ export class Board {
     } while (this.runs().length > 0 || !this.findMove());
   }
 
-  /**
-   * Swaps two neighbours and plays out everything that follows. Returns the waves in order, or null if the swap
-   * does nothing (and so is not made).
-   */
   swap(a: At, b: At): Wave[] | null {
     if (!this.canSwap(a, b)) return null;
     const ga = this.at(a.x, a.y), gb = this.at(b.x, b.y);
     this.swapCells(a, b);
     const waves: Wave[] = [];
-    // a prism takes every jewel of the kind it was swapped with (two prisms take the board)
     if (ga.power === 'prism' || gb.power === 'prism') {
       const prismAt = ga.power === 'prism' ? b : a, other = ga.power === 'prism' ? gb : ga;
       const start = new Map<number, 'match' | 'beam' | 'burst' | 'prism'>([[key(prismAt.x, prismAt.y), 'prism']]);
@@ -183,12 +153,10 @@ export class Board {
     return waves;
   }
 
-  /** The jewels with powers a wave's lines leave behind, and where: on the jewel the player moved, if it is in the line. */
   private powersFrom(runs: Run[], moved: At[]): (At & { power: Power; kind: Kind })[] {
     const made: (At & { power: Power; kind: Kind })[] = [];
     const used = new Set<Run>();
     const place = (cells: At[]): At => moved.find((m) => cells.some((c) => c.x === m.x && c.y === m.y)) ?? cells[Math.floor(cells.length / 2)]!;
-    // a corner or a T: a line across and a line up that share a jewel
     for (const h of runs.filter((r) => r.horizontal)) {
       for (const v of runs.filter((r) => !r.horizontal && r.kind === h.kind)) {
         const cross = h.cells.find((c) => v.cells.some((d) => d.x === c.x && d.y === c.y));
@@ -205,12 +173,10 @@ export class Board {
     return made;
   }
 
-  /** Clears a set of cells, sets off any powers among them, leaves the new powers behind, and lets everything fall. */
   private resolve(start: Map<number, 'match' | 'beam' | 'burst' | 'prism'>, powers: (At & { power: Power; kind: Kind })[], chain: number, firedAlready: (At & { power: Power; kind: Kind })[]): Wave {
     const cleared = new Map(start);
     const fired: (At & { power: Power; kind: Kind })[] = [...firedAlready];
     const done = new Set<number>(firedAlready.map((f) => key(f.x, f.y)));
-    // powers caught in the clearing go off, and what they clear may set off more
     for (let again = true; again; ) {
       again = false;
       for (const [k] of [...cleared]) {
@@ -226,7 +192,6 @@ export class Board {
         else if (gem.power === 'beamV') for (let i = 0; i < SIZE; i++) add(x, i, 'beam');
         else if (gem.power === 'burst') for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) add(x + dx, y + dy, 'burst');
         else {
-          // a prism caught in something else's blast takes whichever kind there is most of
           const counts = new Map<Kind, number>();
           for (const g of this.cells.flat()) if (g.kind !== PRISM) counts.set(g.kind, (counts.get(g.kind) ?? 0) + 1);
           kind = [...counts].sort((p, q) => q[1] - p[1])[0]?.[0] ?? 0;
@@ -237,7 +202,6 @@ export class Board {
     }
 
     const gone = [...cleared].map(([k, by]) => ({ x: k % SIZE, y: Math.floor(k / SIZE), gem: this.at(k % SIZE, Math.floor(k / SIZE)), by }));
-    // a new power takes the place of one of the jewels that made it
     const made = powers.map((p) => ({ x: p.x, y: p.y, gem: this.gem(p.power === 'prism' ? PRISM : p.kind, p.power) }));
     const keep = new Map(made.map((m) => [key(m.x, m.y), m.gem]));
 
@@ -249,7 +213,6 @@ export class Board {
         if (replaced) column.push({ gem: replaced, fromY: y });
         else if (!cleared.has(k)) column.push({ gem: this.at(x, y), fromY: y });
       }
-      // new jewels queue up over the board, in the order they will land
       for (let n = 0; column.length < SIZE; n++) column.push({ gem: this.gem(this.rng.int(0, this.kinds - 1)), fromY: SIZE + n });
       column.forEach((c, y) => {
         this.cells[x]![y] = c.gem;
@@ -260,9 +223,6 @@ export class Board {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------- lanterns to light
-
-/** A lantern to light: so many jewels of one kind. */
 export interface Goal {
   readonly kind: Kind;
   readonly count: number;
@@ -274,20 +234,16 @@ export interface Level {
   readonly goals: readonly Goal[];
 }
 
-/** Three evenings, each with more lanterns to light. A win moves on to the next. */
 export const LEVELS: readonly Level[] = [
   { name: 'First Light', moves: 14, goals: [{ kind: 2, count: 14 }, { kind: 3, count: 14 }, { kind: 4, count: 14 }] },
   { name: 'Evening', moves: 17, goals: [{ kind: 0, count: 20 }, { kind: 1, count: 20 }, { kind: 2, count: 20 }, { kind: 3, count: 20 }] },
   { name: 'Festival', moves: 20, goals: [{ kind: 0, count: 27 }, { kind: 1, count: 27 }, { kind: 2, count: 27 }, { kind: 3, count: 27 }, { kind: 4, count: 27 }] },
 ];
 
-/** A game in progress: the board, the moves left, and how full each lantern is. */
 export class Game {
   readonly board: Board;
   movesLeft: number;
-  /** Jewels gathered toward each goal, in the level's order. */
   readonly gathered: number[];
-  /** The longest chain of waves one swap has set off. */
   bestChain = 0;
 
   constructor(readonly level: Level, rng: Rng) {
@@ -304,7 +260,6 @@ export class Game {
     return this.won || this.movesLeft <= 0;
   }
 
-  /** Makes a swap. Returns the waves it set off, or null if it does nothing (no move is spent). */
   play(a: At, b: At): Wave[] | null {
     if (this.over) return null;
     const waves = this.board.swap(a, b);
@@ -321,7 +276,6 @@ export class Game {
     return waves;
   }
 
-  /** Stars for a win: by how many moves were left over. */
   get stars(): 0 | 1 | 2 | 3 {
     if (!this.won) return 0;
     const spare = this.movesLeft / this.level.moves;
@@ -329,10 +283,6 @@ export class Game {
   }
 }
 
-/**
- * The swap a careful player would make: the one that gathers most toward the lanterns still unlit, counting what
- * falls after. Used by tests, by the scripted player, and (the first swap it finds) as the hint.
- */
 export const bestMove = (game: Game, rng: Rng, care = 1): [At, At] | null => {
   const moves = game.board.moves();
   if (moves.length === 0) return null;
@@ -340,7 +290,6 @@ export const bestMove = (game: Game, rng: Rng, care = 1): [At, At] | null => {
   const need = new Set(game.level.goals.filter((g, i) => game.gathered[i]! < g.count).map((g) => g.kind));
   let best = moves[0]!, bestScore = -1;
   for (const move of moves) {
-    // a look at what the swap itself lines up (not what falls after: nobody can see that)
     const [a, b] = move, ga = game.board.at(a.x, a.y), gb = game.board.at(b.x, b.y);
     let score = ga.power !== 'none' || gb.power !== 'none' ? 6 : 0;
     for (const [at, gem] of [[b, ga], [a, gb]] as const) {
@@ -351,7 +300,6 @@ export const bestMove = (game: Game, rng: Rng, care = 1): [At, At] | null => {
           for (let n = 1; n < SIZE; n++) {
             const x = at.x + dx * n * s, y = at.y + dy * n * s;
             if (!inside(x, y)) break;
-            // the two swapped jewels have changed places
             const there = x === a.x && y === a.y ? gb : x === b.x && y === b.y ? ga : game.board.at(x, y);
             if (there.kind !== gem.kind) break;
             run++;

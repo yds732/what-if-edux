@@ -54,7 +54,6 @@ export class Game {
   readonly hud: Hud;
   readonly interaction: Interaction;
   readonly director: Director;
-  /** The games behind the portals on Haven's arcade isle. */
   readonly arcade: Arcade;
   readonly autopilot = new Autopilot();
   readonly headset: HeadsetProp;
@@ -111,7 +110,6 @@ export class Game {
     this.app.systems.splice(this.app.systems.length - 1, 0, { update });
   }
 
-  /** What a world is built with. */
   context(): BuildContext {
     return { renderer: this.app.renderer, quality: this.app.quality, assets: this.assets, step: () => new Promise((r) => setTimeout(r, 0)) };
   }

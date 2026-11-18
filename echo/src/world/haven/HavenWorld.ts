@@ -43,7 +43,6 @@ export const HAVEN = {
   lumiTitle: anchorToward(-10.25, 0, -1.8, -10.9, 4.4),
 } as const satisfies Record<string, Anchor | THREE.Vector3 | number | readonly THREE.Vector3[]>;
 
-/** `arcade` is the festival's Haven with the arcade isle open: a bridge of light out to it, and its portals awake. */
 export type HavenVariant = 'arrival' | 'bonus' | 'evening' | 'festival' | 'title' | 'arcade';
 
 const ISLANDS = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;

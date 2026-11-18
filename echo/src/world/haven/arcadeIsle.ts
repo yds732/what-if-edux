@@ -12,30 +12,20 @@ import { makeHalo } from './atmosphere';
 import { buildGlowFlowers, buildGrass } from './flora';
 import { buildIsland, type Island } from './islands';
 
-/**
- * The arcade isle: a small island south of Haven's meadow, behind where the player arrives, with five portals
- * standing in a half circle. In the story it is scenery, dark and out of reach. From the title's "Haven Arcade"
- * a bridge of light runs out to it and the portals open, each onto one of the games in src/arcade.
- */
 export const ARCADE_ISLE = {
   centre: new THREE.Vector3(0, 0, 29),
   radius: 9.6,
-  /** The level middle of the isle that can be walked on. */
   plaza: 7.5,
-  /** How far from the middle the gates stand, and the arc they stand along, measured from due south. */
   gateRing: 6.15,
   gateArc: 78,
 } as const;
 
-/** The gate as modelled: 3.6 m tall, its opening an upright oval. Measured with tools/assets/profile.mjs. */
 const GATE = { openingY: 1.6, openingWide: 0.98, openingTall: 1.12, base: 1.5 };
 const BRIDGE_WIDE = 2.2;
-/** The light the bridge is made of: the same cool cyan as the Star Bridge. */
 const BRIDGE_LIGHT = new THREE.Color(0.45, 0.84, 1.0);
 
-const FILM_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-/** A portal's film: arms of light wound slowly toward a bright middle. Shut, only a ghost of it hangs in the arch. */
-const FILM_FS = /* glsl */ `
+const FILM_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const FILM_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uOpen, uNear; uniform vec3 uColor;
 varying vec2 vUv;
@@ -59,7 +49,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const DECK_VS = /* glsl */ `
+const DECK_VS = `
 attribute float aTile;
 uniform float uTime, uReveal;
 varying vec2 vUv; varying float vTile, vBuilt;
@@ -70,8 +60,7 @@ void main(){
   p.y += (1.0 - vBuilt) * -0.25 + sin(uTime * 1.1 + aTile * 0.7) * 0.015 * vBuilt;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
-/** One pane of the light bridge: a rounded tile with a bright edge, and a slow sheen that runs out toward the isle. */
-const DECK_FS = /* glsl */ `
+const DECK_FS = `
 uniform float uTime; uniform vec3 uLight;
 varying vec2 vUv; varying float vTile, vBuilt;
 float sdBox(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
@@ -89,17 +78,12 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-/** One of the five gates. */
 export interface PortalGate {
   readonly id: MinigameId;
-  /** Where its base stands, and which way it faces: toward the middle of the isle. */
   readonly position: THREE.Vector3;
   readonly yaw: number;
-  /** The middle of its film: what the player looks at to step through. */
   readonly film: THREE.Vector3;
-  /** Where the player is put on coming back out, their back to the gate. */
   readonly back: Anchor;
-  /** Where whoever keeps the game stands, beside the gate and turned to the plaza. */
   readonly keeper: Anchor;
 }
 
@@ -107,13 +91,9 @@ export interface ArcadeIsle {
   readonly group: THREE.Group;
   readonly island: Island;
   readonly gates: Record<MinigameId, PortalGate>;
-  /** Where the arcade begins: on the plaza, looking at the gates. */
   readonly spawn: Anchor;
-  /** Where Lumi waits for the player. */
   readonly guide: Anchor;
-  /** Opens the arcade: the bridge of light runs out and the gates wake. Shut, the isle is scenery. */
   setOpen(open: boolean, immediate?: boolean): void;
-  /** Lights `stars` of the three stars on a gate's plate. */
   setStars(id: MinigameId, stars: number): void;
   update(dt: number, time: number, camera: THREE.Camera): void;
 }
@@ -165,10 +145,6 @@ const paintPlate = (plate: Panel, id: MinigameId, stars: number): void => {
   });
 };
 
-/**
- * Builds the isle into Haven's scene and makes it walkable. `main` is the meadow's island: the bridge sets out
- * from its southern rim.
- */
 export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, colliders: Colliders, main: Island, time: { value: number }): Promise<ArcadeIsle> => {
   const q = ctx.quality, rng = new Rng(5150);
   const C = ARCADE_ISLE.centre;
@@ -177,13 +153,11 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
   group.position.copy(C);
   scene.add(group);
 
-  // ---- the island itself, in the meadow's own rock and turf ----
   const island = buildIsland({ radius: ARCADE_ISLE.radius, depth: 15, seed: 9, lump: 0.07, hills: 0.55, flat: 0.84 });
   const rock = new THREE.Mesh(island.geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }));
   rock.receiveShadow = true;
   group.add(rock);
 
-  // ---- the plaza: the same star dais as the meadow's, and the gates around its southern half ----
   const daisTall = (await sizeOf(ctx, 'dais'))[1];
   await dress(ctx, group, 'dais', [[0, 0.07 - daisTall, 0, 36]]);
   const gates = {} as Record<MinigameId, PortalGate>;
@@ -191,10 +165,8 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
   const spots: Spot[] = [];
   const lit = q.tier === 'high' || q.tier === 'ultra';
   for (const [i, id] of MINIGAME_IDS.entries()) {
-    // from due south, fanned evenly to either side
     const bearing = ((i / (MINIGAME_IDS.length - 1)) * 2 - 1) * -ARCADE_ISLE.gateArc * (Math.PI / 180);
     const lx = Math.sin(bearing) * ARCADE_ISLE.gateRing, lz = Math.cos(bearing) * ARCADE_ISLE.gateRing;
-    // a prop faces +Z: turned to look back at the middle of the isle
     const yaw = Math.atan2(-lx, -lz);
     spots.push([lx, 0, lz, THREE.MathUtils.radToDeg(yaw)]);
     const position = v3(C.x + lx, 0, C.z + lz);
@@ -217,11 +189,9 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
     film.renderOrder = 2;
     const halo = makeHalo(MINIGAMES[id].color, 5.2, 0);
     halo.position.set(lx, GATE.openingY, lz).addScaledVector(inward, 0.3);
-    // the name floats over the keystone, turned to the plaza
     const plate = new Panel(760, 250, { world: true });
     plate.mesh.scale.set(3.3, 3.3 * (250 / 760), 1);
     plate.mesh.position.set(lx, 4.5, lz).addScaledVector(inward, 0.2);
-    // tipped down a little toward whoever stands on the plaza
     plate.mesh.rotation.order = 'YXZ';
     plate.mesh.rotation.x = 0.16;
     plate.mesh.rotation.y = yaw;
@@ -238,11 +208,9 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
   await dress(ctx, group, 'portal-gate', spots);
   await ctx.step('haven: arcade gates');
 
-  // ---- turf, flowers, crystals ----
   const ground = (x: number, z: number): { y: number; scale: number } | null => {
     const y = island.heightAt(x, z);
     if (y === null || Math.hypot(x, z) > island.outline(Math.atan2(x, z)) * 0.95) return null;
-    // the dais, and the stone under each gate, are bare
     if (Math.hypot(x, z) < 2.72) return null;
     for (const [sx, , sz] of spots) if (Math.hypot(x - sx, z - sz) < GATE.base + 0.05) return null;
     return { y, scale: Math.hypot(x, z) < 5 ? 0.6 : 1 };
@@ -255,7 +223,6 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
     if (g) flowers.push({ x, y: g.y, z, h: rng.range(0.18, 0.46), color: rng.pick(flowerColors) });
   }
   group.add(buildGlowFlowers(flowers));
-  // crystals at the back, between and behind the gates, and a pair by the bridge
   const crystals: Record<'crystals-a' | 'crystals-b', Spot[]> = { 'crystals-a': [], 'crystals-b': [] };
   for (const [n, [x, z, scale]] of ([[-8.0, 3.6, 1.0], [8.1, 3.2, 1.15], [-4.4, 7.6, 0.9], [4.6, 7.5, 1.0], [-2.9, -7.4, 0.8], [3.1, -7.3, 0.85], [0.1, 8.7, 1.2]] as const).entries()) {
     const y = (island.heightAt(x, z) ?? 0) - 0.12;
@@ -265,7 +232,6 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
   for (const id of ['crystals-a', 'crystals-b'] as const) await dress(ctx, group, id, crystals[id]);
   await ctx.step('haven: arcade isle');
 
-  // ---- the bridge of light, from the meadow's southern rim to the isle's northern one ----
   const fromZ = main.outline(0) * 0.9, toZ = C.z - island.outline(Math.PI) * 0.9;
   const fromY = (main.heightAt(0, fromZ) ?? 0) + 0.1, toY = (island.heightAt(0, toZ - C.z) ?? 0) + 0.1;
   const TILES = Math.max(4, Math.round(toZ - fromZ));
@@ -292,7 +258,6 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
   deck.renderOrder = 2;
   scene.add(deck);
 
-  // the way there: over the meadow's rim mounds, along the bridge, down onto the plaza
   const path: { x: number; y: number; z: number }[] = [{ x: 0, y: 0, z: 8.2 }];
   for (let z = 9; z < fromZ; z += 0.5) path.push({ x: 0, y: main.heightAt(0, z) ?? 0, z });
   path.push({ x: 0, y: fromY, z: fromZ }, { x: 0, y: toY, z: toZ });
@@ -329,7 +294,6 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
       camera.getWorldPosition(pos);
       for (const id of MINIGAME_IDS) {
         const p = parts[id], gate = gates[id], ready = MINIGAMES[id].load ? 1 : 0.22;
-        // a gate quickens as the player comes up to it
         const near = Math.max(0, 1 - Math.hypot(pos.x - gate.position.x, pos.z - gate.position.z) / 5);
         p.near = damp(p.near, near * open, 4, dt);
         p.uniforms.uOpen.value = shown * ready;

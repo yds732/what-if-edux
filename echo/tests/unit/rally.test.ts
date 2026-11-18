@@ -3,7 +3,6 @@ import { BALL_RADIUS, GRAVITY, STEP, TABLE, cloneBall, predictArrival, sideOf, s
 
 const REST = TABLE.height + BALL_RADIUS;
 
-/** Flies a ball until it has met `count` things, and says what and where. */
 const fly = (ball: Ball, count: number, seconds = 4): { contact: Contact; x: number; z: number; ball: Ball }[] => {
   const met: { contact: Contact; x: number; z: number; ball: Ball }[] = [];
   for (let t = 0; t < seconds && met.length < count; t += STEP) {
@@ -43,7 +42,6 @@ describe('the ball', () => {
       const ball: Ball = { p: v(0, REST + 0.25, 0.2), v: v(0, 0, -5), w: v(spinX, 0, 0) };
       return -fly(ball, 1)[0]!.ball.v.z;
     };
-    // moving toward -Z, topspin turns about -X
     expect(through(-120)).toBeGreaterThan(through(0) + 0.3);
     expect(through(120)).toBeLessThan(through(0) - 0.3);
   });
@@ -63,7 +61,6 @@ describe('solveShot', () => {
   });
 
   it('lifts a shot that would have gone into the net', () => {
-    // from low and close, a fast flat ball cannot clear the tape: the answer is a slower, higher one
     const low = v(0, TABLE.height + 0.06, 0.9);
     const shot = solveShot(low, 0, -0.5, 9)!;
     expect(shot).not.toBeNull();
@@ -109,7 +106,6 @@ describe('predictArrival', () => {
   });
 
   it('gravity is what the solver assumes', () => {
-    // a ball thrown straight up comes back in 2v/g, less a little for drag
     const ball: Ball = { p: v(3, 1, 3), v: v(0, 3, 0), w: v() };
     let t = 0;
     while (ball.p.y >= 1 && t < 2) {

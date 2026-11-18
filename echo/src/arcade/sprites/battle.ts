@@ -1,20 +1,10 @@
 import { clamp, type Rng } from '../../core/math';
 
-/**
- * Sprite Duel as rules: who the sprites are, what their moves do, and what happens in a round. Pure data and
- * functions, so a battle can be played out in a test, and the world that draws it only has to act out the events.
- *
- * Three elements chase each other round: Ember burns Bloom, Bloom drinks Tide, Tide douses Ember. Each side has
- * three sprites and one of them out at a time. A round is one action each: a move, or bringing another sprite in.
- */
-
 export type Element = 'ember' | 'tide' | 'bloom';
 export const ELEMENTS: readonly Element[] = ['ember', 'tide', 'bloom'];
-/** What each element is strong against. */
 const BEATS: Record<Element, Element> = { ember: 'bloom', bloom: 'tide', tide: 'ember' };
 
 export const STRONG = 1.5, WEAK = 0.67;
-/** How an attack of one element lands on a sprite of another. A plain move (no element) always lands as it is. */
 export const effectiveness = (attack: Element | null, target: Element): number => (attack === null ? 1 : BEATS[attack] === target ? STRONG : BEATS[target] === attack ? WEAK : 1);
 
 export type SpriteId = 'cindle' | 'kilnip' | 'nimbray' | 'dewbell' | 'petalwing' | 'tufflet';
@@ -22,26 +12,16 @@ export const SPRITE_IDS: readonly SpriteId[] = ['cindle', 'kilnip', 'nimbray', '
 
 export interface Move {
   readonly name: string;
-  /** Null for a plain knock that every sprite has. */
   readonly element: Element | null;
   readonly power: number;
-  /** Sparks it costs: a sprite gathers one each round, and holds three at most. */
   readonly cost: number;
-  /** 1 goes before everything, -1 after. */
   readonly priority?: number;
-  /** Chance of leaving the target scorched: it smoulders for a little damage at the end of each round. */
   readonly scorch?: number;
-  /** Share of the damage dealt that comes back to the user as health. */
   readonly drain?: number;
-  /** Share of the damage dealt that the user takes too. */
   readonly recoil?: number;
-  /** Puts a shell round the user: damage halved while it lasts. */
   readonly shield?: boolean;
-  /** Share of the user's full health it restores; it also clears whatever ails them. */
   readonly heal?: number;
-  /** Dusts the target's eyes: its moves hit softer for a while. */
   readonly dazzle?: boolean;
-  /** One line for the move's button. */
   readonly text: string;
 }
 
@@ -53,9 +33,7 @@ export interface Sprite {
   readonly attack: number;
   readonly guard: number;
   readonly speed: number;
-  /** A plain knock, the element's own move, and the one only this sprite has. */
   readonly moves: readonly [Move, Move, Move];
-  /** What it is, for the card it is chosen from. */
   readonly blurb: string;
 }
 
@@ -112,17 +90,14 @@ export const SPRITES: Record<SpriteId, Sprite> = {
 
 export const MAX_SPARK = 3;
 const SHIELD_ROUNDS = 2, SCORCH_ROUNDS = 3, DAZZLE_ROUNDS = 3, SCORCH_DAMAGE = 7, DAZZLED = 0.7, SHIELDED = 0.5;
-/** A quick sprite finds the soft spot more often: the chance of a hit half as hard again. */
 export const critChance = (speed: number): number => 0.03 + Math.max(0, speed - 5) / 400;
 
 export type Status = 'shield' | 'scorch' | 'dazzle';
 
-/** A sprite in a battle. */
 export interface Fighter {
   readonly sprite: Sprite;
   hp: number;
   spark: number;
-  /** Rounds each condition has left. */
   readonly status: Record<Status, number>;
 }
 
@@ -131,7 +106,6 @@ export const opposite = (side: Side): Side => (side === 'you' ? 'foe' : 'you');
 
 export type Action = { readonly kind: 'move'; readonly index: 0 | 1 | 2 } | { readonly kind: 'switch'; readonly to: number };
 
-/** What happened, in order: the world acts these out one by one. `side` is whose sprite it happened to (or who acted). */
 export type BattleEvent =
   | { readonly type: 'switch'; readonly side: Side; readonly from: number; readonly to: number }
   | { readonly type: 'move'; readonly side: Side; readonly move: Move }
@@ -145,7 +119,6 @@ export type BattleEvent =
 
 const fighter = (id: SpriteId): Fighter => ({ sprite: SPRITES[id], hp: SPRITES[id].hp, spark: 1, status: { shield: 0, scorch: 0, dazzle: 0 } });
 
-/** What a move would do to a target before luck comes into it: used by the battle, and by whoever is deciding what to play. */
 export const expectedDamage = (user: Fighter, move: Move, target: Fighter): number => {
   if (move.power <= 0) return 0;
   const raw = move.power * (0.6 + user.sprite.attack / 60) * (30 / (30 + target.sprite.guard)) * effectiveness(move.element, target.sprite.element);
@@ -166,12 +139,10 @@ export class Battle {
     return this.teams[side][this.active[side]]!;
   }
 
-  /** Whether `side` has anyone left standing on the bench. */
   bench(side: Side): number[] {
     return this.teams[side].map((f, i) => (f.hp > 0 && i !== this.active[side] ? i : -1)).filter((i) => i >= 0);
   }
 
-  /** The sprite that is out has fainted and another must be sent in before the next round. */
   needsReplacement(side: Side): boolean {
     return this.winner === null && this.out(side).hp <= 0;
   }
@@ -182,13 +153,11 @@ export class Battle {
     return this.out(side).spark >= this.out(side).sprite.moves[action.index].cost;
   }
 
-  /** Everything `side` may do this round. */
   options(side: Side): Action[] {
     const all: Action[] = [{ kind: 'move', index: 0 }, { kind: 'move', index: 1 }, { kind: 'move', index: 2 }, ...this.teams[side].map((_, to): Action => ({ kind: 'switch', to }))];
     return all.filter((a) => this.legal(side, a));
   }
 
-  /** Sends in a replacement for a fainted sprite. */
   replace(side: Side, to: number): BattleEvent[] {
     if (!this.needsReplacement(side) || !this.bench(side).includes(to)) throw new Error(`${side} cannot send in sprite ${to} now`);
     const from = this.active[side];
@@ -196,14 +165,12 @@ export class Battle {
     return [{ type: 'switch', side, from, to }];
   }
 
-  /** Plays one round and returns what happened. Both actions must be legal. */
   round(you: Action, foe: Action): BattleEvent[] {
     if (!this.legal('you', you) || !this.legal('foe', foe)) throw new Error('an action that cannot be taken now');
     const events: BattleEvent[] = [];
     const chosen: Record<Side, Action> = { you, foe };
     this.rounds++;
 
-    // ---- whoever is changing sprites does so before anything is thrown ----
     for (const side of ['you', 'foe'] as const) {
       const action = chosen[side];
       if (action.kind !== 'switch') continue;
@@ -211,7 +178,6 @@ export class Battle {
       this.active[side] = action.to;
     }
 
-    // ---- moves: by priority, then by speed; a dead heat is a coin toss ----
     const movers = (['you', 'foe'] as const).filter((side) => chosen[side].kind === 'move');
     const key = (side: Side): number => {
       const action = chosen[side] as { index: 0 | 1 | 2 };
@@ -220,12 +186,10 @@ export class Battle {
     movers.sort((a, b) => key(b) - key(a) || (this.rng.chance(0.5) ? 1 : -1));
     for (const side of movers) {
       const user = this.out(side);
-      // a sprite that has just been knocked out does not get its turn
       if (user.hp <= 0 || this.winner) continue;
       this.play(side, user.sprite.moves[(chosen[side] as { index: 0 | 1 | 2 }).index], events);
     }
 
-    // ---- the end of the round: scorches smoulder, conditions wear off, sparks gather ----
     for (const side of ['you', 'foe'] as const) {
       const f = this.out(side);
       if (f.hp <= 0) continue;
@@ -299,15 +263,8 @@ export class Battle {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------- the other side
-
-/** How well a sprite stands against another: above 0 it has the better of the elements. */
 const matchup = (mine: Sprite, theirs: Sprite): number => effectiveness(mine.element, theirs.element) - effectiveness(theirs.element, mine.element);
 
-/**
- * What Nova plays. `skill` 0..1: at 0 she picks almost at random; at 1 she takes the hardest hit on offer, mends
- * and shields at sensible moments, and gets a sprite out of a bad match.
- */
 export const chooseAction = (battle: Battle, side: Side, rng: Rng, skill: number): Action => {
   const options = battle.options(side);
   if (options.length === 0) throw new Error('nothing to choose from');
@@ -317,14 +274,12 @@ export const chooseAction = (battle: Battle, side: Side, rng: Rng, skill: number
   for (const action of options) {
     let score: number;
     if (action.kind === 'switch') {
-      // worth a round only out of a bad match and into a good one, with enough health to stay
       const next = battle.teams[side][action.to]!;
       score = matchup(me.sprite, foe.sprite) < 0 && matchup(next.sprite, foe.sprite) > 0 && next.hp > next.sprite.hp * 0.4 ? 20 + 26 * skill : -10;
     } else {
       const move = me.sprite.moves[action.index];
       const damage = expectedDamage(me, move, foe);
       score = damage;
-      // a knockout is worth more than the damage it takes to get one
       if (damage >= foe.hp) score += 40;
       if (move.heal) score += me.hp < me.sprite.hp * 0.5 ? 34 : -20;
       if (move.shield) score += me.status.shield === 0 && me.hp > me.sprite.hp * 0.3 ? 12 : -12;
@@ -341,7 +296,6 @@ export const chooseAction = (battle: Battle, side: Side, rng: Rng, skill: number
   return best;
 };
 
-/** Who Nova sends in after one of hers has fallen: the best match against what is out. */
 export const chooseReplacement = (battle: Battle, side: Side, rng: Rng): number => {
   const foe = battle.out(opposite(side)), bench = battle.bench(side);
   let best = bench[0]!, bestScore = -Infinity;
@@ -356,11 +310,8 @@ export const chooseReplacement = (battle: Battle, side: Side, rng: Rng): number 
   return best;
 };
 
-/** The two sprites of each element: a team is one from each pair, so both sides always field all three elements. */
 export const PAIRS: Record<Element, readonly [SpriteId, SpriteId]> = { ember: ['cindle', 'kilnip'], tide: ['nimbray', 'dewbell'], bloom: ['petalwing', 'tufflet'] };
 
-/** The three sprites the player did not take: Nova's team. */
 export const restOf = (picked: readonly SpriteId[]): SpriteId[] => SPRITE_IDS.filter((id) => !picked.includes(id));
 
-/** How far a health bar is filled, 0..1. */
 export const healthOf = (f: Fighter): number => clamp(f.hp / f.sprite.hp, 0, 1);

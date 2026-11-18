@@ -2,32 +2,20 @@ import { bell, drip, shape, sparkle, thump, tick } from './instruments';
 import type { SfxSpec } from './sfx';
 import { SLACK, dB, glide, mtof, pentatonic, swell, type Patch } from './synth';
 
-/**
- * The sounds of the arcade: the portals, and each game behind them. They are made on the same instruments as the
- * story's, and Haven's rule holds here too: a reward is built on the chord that is playing, and losing a point
- * never sounds like being told off.
- */
 export type ArcadeSfx =
   | 'portalEnter' | 'portalExit' | 'arcadeWin' | 'arcadeLose' | 'arcadeStar' | 'arcadeCount' | 'arcadeGo'
-  // Moonlight Rally
   | 'ballTable' | 'ballBat' | 'ballNet' | 'ballSmash' | 'ballOut' | 'pointWon' | 'pointLost' | 'serveToss'
-  // Sprite Duel
   | 'spriteIn' | 'spriteBack' | 'moveEmber' | 'moveTide' | 'moveBloom' | 'moveKnock' | 'spriteHit' | 'spriteStrong' | 'spriteFell' | 'spriteMend' | 'spriteShell' | 'spriteDazzle'
-  // Lantern Lights
   | 'gemPick' | 'gemSwap' | 'gemBack' | 'gemClear' | 'gemLand' | 'gemGather' | 'gemBeam' | 'gemBurst' | 'gemPrism' | 'gemPower' | 'lanternLit'
-  // Driftlight
   | 'hookCast' | 'hookSplash' | 'woodGet' | 'glowGet' | 'tileLay' | 'wyrmRise' | 'wyrmKnock' | 'wyrmFlee' | 'wyrmLunge' | 'wyrmBite' | 'lanternLow' | 'thunder' | 'landHo'
-  // Duskbreak
   | 'sparkThrow' | 'lingLit' | 'bruteLit' | 'gateMore' | 'gateLess' | 'gateQuick' | 'flockDim' | 'mawComes' | 'mawStruck' | 'dawnBreaks';
 
-/** Air rushing through a gate: band-passed noise that sweeps up (going in) or down (coming out). */
 const rush = (p: Patch, into: boolean): void => {
   const t = p.t, dur = into ? 0.7 : 0.55, m = p.mix(0.4);
   const air = p.filter('bandpass', 600, 1.4), g = p.gain(0);
   glide(air.frequency, t, into ? 300 : 4200, into ? 4800 : 380, dur);
   swell(g.gain, t, dB(-8), dur * (into ? 0.7 : 0.1), 0.02, dur * (into ? 0.25 : 0.85));
   p.noise('pink', t, t + dur + 0.2).connect(air).connect(g).connect(m);
-  // the pull of it underneath: a low tone bending the same way
   const low = p.osc('sine', 80, t, t + dur + SLACK), lg = p.gain(0);
   glide(low.frequency, t, into ? 60 : 150, into ? 150 : 55, dur);
   swell(lg.gain, t, dB(-12), dur * 0.4, 0.05, dur * 0.5);
@@ -39,7 +27,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     bus: 'sfx', level: -5.5,
     build: (p, c) => {
       rush(p, true);
-      // the gate answers: a rising run of bells that lands as the picture goes to light
       const t = p.t, m = p.mix(0.5), pool = pentatonic(c.root, 67, 96);
       sparkle(p, m, t + 0.12, [0, 2, 4, 5, 7, 9].map((k) => mtof(pool[Math.min(k, pool.length - 1)]!)), 0.07, dB(-17), 0.9);
       bell(p, m, t + 0.56, mtof(c.root + 24), { level: dB(-13), dur: 2.4, ratio: 3.5, index: 1.3 });
@@ -56,7 +43,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   arcadeWin: {
     bus: 'sfx', level: -8.5,
     build: (p, c) => {
-      // a little fanfare: three rising chords of bells, the last one held, and light falling out of it
       const t = p.t, m = p.mix(0.5), root = c.root + 12;
       [[0, [0, 4, 7]], [0.16, [2, 7, 11]], [0.34, [4, 7, 12, 16]]].forEach(([at, chord], n) => {
         for (const semis of chord as number[]) bell(p, m, t + (at as number), mtof(root + semis), { level: dB(-17), dur: n === 2 ? 2.6 : 0.7, ratio: 3.5, index: 1.3 });
@@ -69,7 +55,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   arcadeLose: {
     bus: 'sfx', level: -5,
     build: (p, c) => {
-      // not a failure sound: two soft bells stepping down, and the chord left open
       const t = p.t, m = p.mix(0.5), root = c.root + 12;
       bell(p, m, t, mtof(root + 7), { level: dB(-16), dur: 1.4, ratio: 2, index: 0.7 });
       bell(p, m, t + 0.22, mtof(root + 4), { level: dB(-17), dur: 1.9, ratio: 2, index: 0.7 });
@@ -97,12 +82,9 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     },
   },
 
-  // ------------------------------------------------------------------------------------------------ Moonlight Rally
-
   ballTable: {
     bus: 'sfx', level: -4,
     build: (p) => {
-      // a hollow ball on polished stone: a bright knock with almost no body
       const t = p.t, m = p.mix(0.16);
       thump(p, m, t, 1180, 760, 0.05, dB(-9));
       p.tone('sine', 2650, t, 0.022, dB(-17)).amp.connect(m);
@@ -112,7 +94,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   ballBat: {
     bus: 'sfx', level: -3,
     build: (p) => {
-      // rubber on the ball: lower and rounder than the table, with the pop of the blade behind it
       const t = p.t, m = p.mix(0.1);
       thump(p, m, t, 640, 330, 0.07, dB(-8));
       p.tone(shape(p.kit, 'hollow'), 410, t, 0.05, dB(-17)).amp.connect(m);
@@ -122,7 +103,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   ballSmash: {
     bus: 'sfx', level: -2,
     build: (p) => {
-      // a full swing: the crack of the bat and the air the ball tears through
       const t = p.t, m = p.mix(0.3);
       thump(p, m, t, 820, 210, 0.11, dB(-6));
       tick(p, m, t, dB(-9), 2600, 0.03);
@@ -143,7 +123,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   ballOut: {
     bus: 'sfx', level: -9,
     build: (p) => {
-      // the ball gone off into the grass: a couple of small soft bounces
       const t = p.t, m = p.mix(0.2);
       [0, 0.16, 0.27].forEach((at, i) => thump(p, m, t + at, 520 - 60 * i, 300, 0.05, dB(-12 - 5 * i)));
     },
@@ -160,7 +139,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   pointLost: {
     bus: 'sfx', level: -2,
     build: (p, c) => {
-      // the other side's point: one round note, a little lower. Nothing in Haven sounds wrong
       const t = p.t, m = p.mix(0.4);
       bell(p, m, t, mtof(c.root + 7), { level: dB(-15), dur: 1.3, ratio: 2, index: 0.6 });
       bell(p, m, t + 0.12, mtof(c.root + 4), { level: dB(-19), dur: 1.1, ratio: 2, index: 0.5 });
@@ -176,12 +154,9 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     },
   },
 
-  // ------------------------------------------------------------------------------------------------ Sprite Duel
-
   spriteIn: {
     bus: 'sfx', level: -2,
     build: (p, c) => {
-      // out of a point of light: a quick rising run and a soft pop of air
       const t = p.t, m = p.mix(0.4), pool = pentatonic(c.root, 72, 96);
       sparkle(p, m, t, [0, 2, 4, 6].map((k) => mtof(pool[Math.min(k, pool.length - 1)]!)), 0.045, dB(-15), 0.6);
       thump(p, m, t + 0.16, 420, 180, 0.12, dB(-13));
@@ -197,7 +172,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   moveEmber: {
     bus: 'sfx', level: 0,
     build: (p) => {
-      // a breath of flame: noise that opens and roars, over a low growl
       const t = p.t, m = p.mix(0.25), fire = p.filter('bandpass', 500, 1.1), g = p.gain(0);
       glide(fire.frequency, t, 380, 2400, 0.4);
       swell(g.gain, t, dB(-8), 0.07, 0.2, 0.3);
@@ -208,7 +182,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   moveTide: {
     bus: 'sfx', level: 0,
     build: (p) => {
-      // a jet of water: bright hiss falling in pitch, and the plops it leaves
       const t = p.t, m = p.mix(0.3), jet = p.filter('bandpass', 3000, 2.2), g = p.gain(0);
       glide(jet.frequency, t, 4200, 900, 0.45);
       swell(g.gain, t, dB(-9), 0.03, 0.18, 0.3);
@@ -223,7 +196,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   moveBloom: {
     bus: 'sfx', level: 3,
     build: (p, c) => {
-      // a flurry of petals: soft air and a scatter of small high bells
       const t = p.t, m = p.mix(0.45), air = p.filter('bandpass', 1700, 0.9), g = p.gain(0);
       swell(g.gain, t, dB(-12), 0.09, 0.2, 0.3);
       p.lfo(19, 500, t, t + 0.7).connect(air.frequency);
@@ -251,7 +223,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   spriteStrong: {
     bus: 'sfx', level: -5.5,
     build: (p, c) => {
-      // the right element: the hit, and a bright chord ringing off it
       const t = p.t, m = p.mix(0.4);
       thump(p, m, t, 300, 70, 0.26, dB(-7));
       tick(p, m, t, dB(-11), 3000, 0.04);
@@ -261,7 +232,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   spriteFell: {
     bus: 'sfx', level: -3,
     build: (p, c) => {
-      // not a defeat: a sprite going back to light, three notes down and a long soft tail
       const t = p.t, m = p.mix(0.55), pool = pentatonic(c.root, 67, 88);
       [6, 4, 2].forEach((k, i) => bell(p, m, t + 0.13 * i, mtof(pool[Math.min(k, pool.length - 1)]!), { level: dB(-15), dur: 1.6, ratio: 2, index: 0.7 }));
       p.tone('sine', mtof(c.root - 12), t + 0.26, 1.2, dB(-18), 0.02).amp.connect(m);
@@ -277,7 +247,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   spriteShell: {
     bus: 'sfx', level: -2,
     build: (p, c) => {
-      // stone plates closing: a low knock and a held glassy note
       const t = p.t, m = p.mix(0.35);
       thump(p, m, t, 200, 110, 0.16, dB(-10));
       p.tone(shape(p.kit, 'glass'), mtof(c.root + 12), t + 0.03, 0.9, dB(-17), 0.02).amp.connect(m);
@@ -292,8 +261,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     },
   },
 
-  // ------------------------------------------------------------------------------------------------ Lantern Lights
-
   gemPick: {
     bus: 'ui', level: -6,
     build: (p, c) => bell(p, p.mix(0.2), p.t, mtof(c.root + 24), { level: dB(-14), dur: 0.5, ratio: 2, index: 0.7 }),
@@ -301,7 +268,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gemSwap: {
     bus: 'sfx', level: -5,
     build: (p) => {
-      // two jewels sliding past each other: a short breath of air and a glassy tick
       const t = p.t, m = p.mix(0.15), air = p.filter('bandpass', 2200, 1.5), g = p.gain(0);
       glide(air.frequency, t, 1400, 3200, 0.12);
       swell(g.gain, t, dB(-13), 0.03, 0.02, 0.1);
@@ -312,7 +278,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gemBack: {
     bus: 'sfx', level: -8,
     build: (p) => {
-      // a swap that made nothing: the two settle back, with no reproach in it
       const t = p.t, m = p.mix(0.15);
       p.tone(shape(p.kit, 'glass'), 520, t, 0.14, dB(-15)).amp.connect(m);
       p.tone(shape(p.kit, 'glass'), 440, t + 0.09, 0.2, dB(-16)).amp.connect(m);
@@ -321,7 +286,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gemClear: {
     bus: 'sfx', level: -3,
     build: (p, c) => {
-      // jewels turning to light: a small chord of glass, pitched by the game as a chain climbs
       const t = p.t, m = p.mix(0.4), root = c.root + 12;
       [0, 4, 7].forEach((semis, i) => bell(p, m, t + 0.018 * i, mtof(root + semis), { level: dB(-16), dur: 0.9, ratio: 3.5, index: 1.2 }));
       tick(p, m, t, dB(-15), 5200, 0.03);
@@ -342,7 +306,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gemBeam: {
     bus: 'sfx', level: -1,
     build: (p, c) => {
-      // a line of light across the board: a bright sweep and the note it leaves
       const t = p.t, m = p.mix(0.4), air = p.filter('bandpass', 2000, 3), g = p.gain(0);
       glide(air.frequency, t, 900, 7000, 0.28);
       swell(g.gain, t, dB(-10), 0.02, 0.1, 0.22);
@@ -362,7 +325,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gemPrism: {
     bus: 'sfx', level: -3.5,
     build: (p, c) => {
-      // every jewel of a kind at once: a run up the whole scale and a chord held over it
       const t = p.t, m = p.mix(0.55), pool = pentatonic(c.root, 72, 103);
       sparkle(p, m, t, pool.filter((_, i) => i % 2 === 0).map(mtof), 0.035, dB(-17), 0.6);
       for (const semis of [0, 7, 12, 16]) bell(p, m, t + 0.3, mtof(c.root + 12 + semis), { level: dB(-17), dur: 2.2, ratio: 3.5, index: 1.4 });
@@ -379,7 +341,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   lanternLit: {
     bus: 'sfx', level: -7.5,
     build: (p, c) => {
-      // a lantern catching: warm air filling it, and a low bell as it lifts
       const t = p.t, m = p.mix(0.5), air = p.filter('lowpass', 900, 0), g = p.gain(0);
       swell(g.gain, t, dB(-14), 0.2, 0.2, 0.6);
       p.noise('pink', t, t + 1.1).connect(air).connect(g).connect(m);
@@ -389,12 +350,9 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     },
   },
 
-  // ------------------------------------------------------------------------------------------------ Driftlight
-
   hookCast: {
     bus: 'sfx', level: 2,
     build: (p) => {
-      // the line running out: air through a narrowing gap, and the hook's small ring
       const t = p.t, m = p.mix(0.12), air = p.filter('bandpass', 1200, 2.2), g = p.gain(0);
       glide(air.frequency, t, 700, 2900, 0.22);
       swell(g.gain, t, dB(-11), 0.04, 0.03, 0.18);
@@ -405,7 +363,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   hookSplash: {
     bus: 'sfx', level: -1,
     build: (p) => {
-      // into the water: a round plop and the spray after it
       const t = p.t, m = p.mix(0.2);
       drip(p, m, t, 520, dB(-9));
       thump(p, m, t, 300, 110, 0.1, dB(-13));
@@ -415,7 +372,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   woodGet: {
     bus: 'sfx', level: -3,
     build: (p) => {
-      // planks landing on the deck: two wooden knocks close together
       const t = p.t, m = p.mix(0.14);
       thump(p, m, t, 430, 250, 0.06, dB(-8));
       thump(p, m, t + 0.07, 360, 220, 0.07, dB(-11));
@@ -425,7 +381,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   glowGet: {
     bus: 'sfx', level: -4,
     build: (p, c) => {
-      // light going into the lantern: a bell on the chord, and the shimmer of it catching
       const t = p.t, m = p.mix(0.45), pool = pentatonic(c.root, 79, 98);
       bell(p, m, t, mtof(c.root + 19), { level: dB(-13), dur: 1.4, ratio: 3.5, index: 1.2 });
       sparkle(p, m, t + 0.06, [1, 3, 5].map((k) => mtof(pool[Math.min(k, pool.length - 1)]!)), 0.05, dB(-20), 0.5);
@@ -434,7 +389,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   tileLay: {
     bus: 'sfx', level: -3,
     build: (p, c) => {
-      // a tile lashed on: wood on wood, the rope pulled tight, and one glad note
       const t = p.t, m = p.mix(0.3);
       thump(p, m, t, 330, 150, 0.12, dB(-7));
       thump(p, m, t + 0.11, 410, 230, 0.07, dB(-10));
@@ -449,7 +403,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   wyrmRise: {
     bus: 'sfx', level: -7,
     build: (p) => {
-      // something large coming up: the water lifted, and a low note climbing under it
       const t = p.t, m = p.mix(0.35), water = p.filter('lowpass', 500, 0.7), g = p.gain(0);
       glide(water.frequency, t, 260, 1800, 0.7);
       swell(g.gain, t, dB(-9), 0.5, 0.1, 0.5);
@@ -463,7 +416,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   wyrmKnock: {
     bus: 'sfx', level: -1,
     build: (p) => {
-      // the hook on its nose: a hollow bonk, a yelp going up, and the splash of it flinching
       const t = p.t, m = p.mix(0.22);
       thump(p, m, t, 520, 170, 0.13, dB(-6));
       const yelp = p.osc('sine', 500, t + 0.03, t + 0.3 + SLACK), yg = p.gain(0);
@@ -476,7 +428,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   wyrmFlee: {
     bus: 'sfx', level: -6.5,
     build: (p, c) => {
-      // seen off: a slide down out of sight, the water closing over it, and three bright notes for the raft
       const t = p.t, m = p.mix(0.4);
       const slide = p.osc('sine', 700, t, t + 0.6 + SLACK), sg = p.gain(0);
       glide(slide.frequency, t, 820, 150, 0.45);
@@ -490,7 +441,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   wyrmLunge: {
     bus: 'sfx', level: 5.5,
     build: (p) => {
-      // it comes: water torn open in a rush that rises
       const t = p.t, m = p.mix(0.2), rush2 = p.filter('bandpass', 700, 1.3), g = p.gain(0);
       glide(rush2.frequency, t, 400, 3000, 0.5);
       swell(g.gain, t, dB(-8), 0.4, 0.04, 0.12);
@@ -500,7 +450,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   wyrmBite: {
     bus: 'sfx', level: -1,
     build: (p) => {
-      // a plank gone: a crack, splinters, and the heavy splash after
       const t = p.t, m = p.mix(0.25);
       thump(p, m, t, 700, 120, 0.1, dB(-6));
       [0, 0.035, 0.08, 0.13].forEach((at, i) => tick(p, m, t + at, dB(-10 - 2 * i), 2400 + 500 * i, 0.03));
@@ -511,7 +460,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   lanternLow: {
     bus: 'sfx', level: -2,
     build: (p, c) => {
-      // the lantern asking: two soft low notes, the second a little lower. Not an alarm
       const t = p.t, m = p.mix(0.45);
       bell(p, m, t, mtof(c.root + 7), { level: dB(-14), dur: 1.5, ratio: 2, index: 0.6 });
       bell(p, m, t + 0.3, mtof(c.root + 5), { level: dB(-16), dur: 1.7, ratio: 2, index: 0.5 });
@@ -520,7 +468,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   thunder: {
     bus: 'sfx', level: -4.5,
     build: (p) => {
-      // a long way off: a crack with no edge to it, and the roll that follows it round the sky
       const t = p.t, m = p.mix(0.6), sky = p.filter('lowpass', 900, 0.4), g = p.gain(0);
       glide(sky.frequency, t, 1400, 120, 1.6);
       swell(g.gain, t, dB(-5), 0.03, 0.3, 2.2);
@@ -531,7 +478,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   landHo: {
     bus: 'sfx', level: -4,
     build: (p, c) => {
-      // the lighthouse answers: two long warm notes, a fifth apart, like a horn across water
       const t = p.t, m = p.mix(0.6);
       [[0, 0], [0.55, 7]].forEach(([at, semis]) => {
         const horn = p.tone(shape(p.kit, 'hollow'), mtof(c.root - 12 + semis!), t + at!, 1.5, dB(-13), 0.18);
@@ -541,12 +487,9 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
     },
   },
 
-  // ------------------------------------------------------------------------------------------------ Duskbreak
-
   sparkThrow: {
     bus: 'sfx', level: -6,
     build: (p) => {
-      // one spark of very many: a tick with a little air behind it
       const t = p.t, m = p.mix(0.08);
       tick(p, m, t, dB(-12), 5200, 0.016);
       p.tone('sine', 1500, t, 0.03, dB(-22)).amp.connect(m);
@@ -555,7 +498,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   lingLit: {
     bus: 'sfx', level: -8,
     build: (p, c) => {
-      // a gloomling relit: a soft pop, and one small bell on the chord
       const t = p.t, m = p.mix(0.3), pool = pentatonic(c.root, 76, 96);
       thump(p, m, t, 520, 240, 0.05, dB(-14));
       bell(p, m, t + 0.01, mtof(pool[Math.floor(Math.random() * pool.length)]!), { level: dB(-16), dur: 0.5, ratio: 3.5, index: 1.1 });
@@ -564,7 +506,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   bruteLit: {
     bus: 'sfx', level: -7,
     build: (p, c) => {
-      // a big one going back to light: the weight of it, and a chord opening out of the top
       const t = p.t, m = p.mix(0.45);
       thump(p, m, t, 260, 60, 0.3, dB(-7));
       p.hiss('pink', t, 0.3, dB(-14)).amp.connect(p.filter('bandpass', 1400, 0.8)).connect(m);
@@ -574,7 +515,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gateMore: {
     bus: 'sfx', level: -4,
     build: (p, c) => {
-      // through a gate that makes them more: a quick run up, as if counting them
       const t = p.t, m = p.mix(0.4), pool = pentatonic(c.root, 72, 100);
       sparkle(p, m, t, [0, 2, 3, 5, 7, 9].map((k) => mtof(pool[Math.min(k, pool.length - 1)]!)), 0.04, dB(-14), 0.5);
       bell(p, m, t + 0.24, mtof(c.root + 24), { level: dB(-14), dur: 1.3, ratio: 3.5, index: 1.3 });
@@ -583,7 +523,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gateLess: {
     bus: 'sfx', level: -3,
     build: (p, c) => {
-      // through one that makes them fewer: two soft notes going down. Nothing in Haven scolds
       const t = p.t, m = p.mix(0.4);
       bell(p, m, t, mtof(c.root + 7), { level: dB(-14), dur: 1.0, ratio: 2, index: 0.6 });
       bell(p, m, t + 0.13, mtof(c.root + 3), { level: dB(-16), dur: 1.2, ratio: 2, index: 0.5 });
@@ -593,7 +532,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   gateQuick: {
     bus: 'sfx', level: -4,
     build: (p, c) => {
-      // quickened: air rushing up, and a bright fifth on top of it
       const t = p.t, m = p.mix(0.35), air = p.filter('bandpass', 900, 1.6), g = p.gain(0);
       glide(air.frequency, t, 600, 4200, 0.3);
       swell(g.gain, t, dB(-12), 0.2, 0.03, 0.14);
@@ -604,7 +542,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   flockDim: {
     bus: 'sfx', level: -4,
     build: (p) => {
-      // a sprite put out: a small breath, like a candle
       const t = p.t, m = p.mix(0.2);
       p.hiss('pink', t, 0.14, dB(-12)).amp.connect(p.filter('bandpass', 1900, 1.2)).connect(m);
       thump(p, m, t, 300, 150, 0.08, dB(-15));
@@ -613,7 +550,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   mawComes: {
     bus: 'sfx', level: -6,
     build: (p) => {
-      // the Gloom: a long low swell with the air drawn out of it
       const t = p.t, m = p.mix(0.5);
       const low = p.osc(shape(p.kit, 'hollow'), 49, t, t + 2.4 + SLACK), lg = p.gain(0);
       glide(low.frequency, t, 62, 41, 1.8);
@@ -628,7 +564,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   mawStruck: {
     bus: 'sfx', level: -8,
     build: (p) => {
-      // light landing on something very large: a dull knock with a ring inside it
       const t = p.t, m = p.mix(0.3);
       thump(p, m, t, 190, 70, 0.14, dB(-9));
       p.tone('sine', 620, t, 0.12, dB(-20)).amp.connect(m);
@@ -637,7 +572,6 @@ export const ARCADE_SFX: Record<ArcadeSfx, SfxSpec> = {
   dawnBreaks: {
     bus: 'sfx', level: -11.5,
     build: (p, c) => {
-      // the Gloom relit: everything it was holding let go at once, upward
       const t = p.t, m = p.mix(0.65), root = c.root + 12;
       thump(p, m, t, 180, 40, 0.5, dB(-8));
       [[0, [0, 7]], [0.14, [4, 12]], [0.3, [7, 16]], [0.5, [12, 19, 24]]].forEach(([at, chord], n) => {

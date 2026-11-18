@@ -13,17 +13,14 @@ interface Tally {
   matches: number;
   points: number;
   shots: number;
-  /** Seconds a player has between Kai striking the ball and it reaching their bat, summed and counted. */
   window: number;
   windows: number;
-  /** How points ended: a shot the other never reached, or a mistake (net, out) by whoever hit last. */
   yourWinners: number;
   kaiMistakes: number;
   kaiWinners: number;
   yourMistakes: number;
 }
 
-/** Plays whole games between Kai at a level and a stand-in for a person, and counts what happened. */
 const play = (level: number, skill: number, matches: number): Tally => {
   const tally: Tally = { wins: 0, matches, points: 0, shots: 0, window: 0, windows: 0, yourWinners: 0, kaiMistakes: 0, kaiWinners: 0, yourMistakes: 0 };
   for (let m = 0; m < matches; m++) {
@@ -66,7 +63,6 @@ const play = (level: number, skill: number, matches: number): Tally => {
       for (let t = 0; t < 240 && winner === null; t += FRAME) {
         clock += FRAME;
         bot.update(FRAME, court.ball, court.rally.lastHitter === 'kai', court.rally.awaitingServeBounce());
-        // the bat rises to the ball as it does in the game, a little behind it
         y += ((court.batHeight(bot.z) ?? H + 0.2) - y) * (1 - Math.exp(-16 * FRAME));
         court.step(FRAME, { x: bot.x, y, z: bot.z }, (ox, oy) => bot.swing(ox, oy, court.brain.x), at, ease);
       }
@@ -86,7 +82,6 @@ describe('Moonlight Rally, played by a stand-in for a person', () => {
   const pct = (n: number, t: Tally): string => `${Math.round((100 * n) / t.points)}%`;
   const report = (name: string, t: Tally): string =>
     `${name}: wins ${t.wins}/${t.matches}, ${(t.shots / t.points).toFixed(1)} shots a point, ${(t.window / Math.max(1, t.windows)).toFixed(2)} s to reach the ball; points: your winners ${pct(t.yourWinners, t)}, Kai's mistakes ${pct(t.kaiMistakes, t)}, Kai's winners ${pct(t.kaiWinners, t)}, your mistakes ${pct(t.yourMistakes, t)}`;
-  // every level against a capable player and against someone new to it: played once, read by each test
   const table = LEVELS.map((level, i) => {
     const capable = play(i, 1, 40), fresh = play(i, 0.5, 40);
     console.log(report(`${level.name}, capable player`, capable));
@@ -98,7 +93,6 @@ describe('Moonlight Rally, played by a stand-in for a person', () => {
 
   it('gives a player time to reach the ball, less of it at each level', () => {
     const [friendly, keen, fierce] = table.map((row) => window(row.capable)) as [number, number, number];
-    // the first level leaves most of a second; the last still more than a reaction time and a move
     expect(friendly).toBeGreaterThan(0.8);
     expect(fierce).toBeGreaterThan(0.52);
     expect(friendly).toBeGreaterThan(keen);

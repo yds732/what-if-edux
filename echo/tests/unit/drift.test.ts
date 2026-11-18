@@ -5,7 +5,6 @@ import { CASTAWAY_TRIES, HOOK_BACK, HOOK_OUT, MAX_LIGHT, PLANS, SEA, Voyage, WOO
 const DT = 1 / 30;
 const LENGTH = PLANS[0]!.length;
 
-/** Runs a voyage for `seconds`, keeping what happened. */
 const run = (v: Voyage, seconds: number, each?: (v: Voyage) => void): VoyageEvent[] => {
   const seen: VoyageEvent[] = [];
   for (let t = 0; t < seconds && !v.over; t += DT) {
@@ -16,14 +15,12 @@ const run = (v: Voyage, seconds: number, each?: (v: Voyage) => void): VoyageEven
   return seen;
 };
 
-/** Puts a thing on the water. */
 const drop = (v: Voyage, kind: ItemKind, x: number, z: number, who?: Item['who']): Item => {
   const item: Item = { id: 9000 + v.items.length, kind, x, z, who, phase: 0, hooked: false };
   v.items.push(item);
   return item;
 };
 
-/** A voyage on a sea with nothing in it and no wyrm: for looking at one rule at a time. */
 const quiet = (seed = 1, plan = PLANS[0]): Voyage => {
   const v = new Voyage(new Rng(seed), plan);
   v.items.length = 0;
@@ -39,7 +36,6 @@ describe('the raft', () => {
     expect([...v.tiles]).toEqual(['0,0']);
     expect(v.light).toBeGreaterThan(50);
     expect(v.slots().map((s) => `${s.cx},${s.cz}`).sort()).toEqual(['-1,0', '0,-1', '0,1', '1,0']);
-    // and no further than two cells out from the lantern
     for (const key of ['1,0', '2,0']) v.tiles.add(key);
     expect(v.slots().some((s) => s.cx === 3)).toBe(false);
   });
@@ -128,14 +124,12 @@ describe('the crew', () => {
     expect(seen.some((e) => e.type === 'rescued' && e.who === 'cindle')).toBe(true);
     expect(v.crew).toEqual(['cindle']);
 
-    // Cindle: the lantern burns longer
     const plain = quiet(), kept = quiet();
     kept.crew.push('cindle');
     run(plain, 20);
     run(kept, 20);
     expect(kept.light).toBeGreaterThan(plain.light + 3);
 
-    // Nimbray: things are fetched in without the hook
     const fetch = quiet();
     fetch.crew.push('nimbray');
     drop(fetch, 'wood', 4, -4);
@@ -236,11 +230,6 @@ describe('a voyage', () => {
     expect(lost.stars).toBe(0);
   });
 
-  /**
-   * Sailors of three kinds, to see that each voyage is fair. `every` is the seconds between one deed and the next;
-   * `picky` how often the sailor does the wise thing (the rest of the time the hook goes at whatever is floating
-   * by, wyrm or no wyrm); `slop` how far off the throw lands.
-   */
   interface Sailor { every: number; picky: number; slop: number }
   const SAILORS = {
     keen: { every: 0.85, picky: 0.95, slop: 0.25 },
@@ -293,20 +282,16 @@ describe('a voyage', () => {
     const fmt = (r: ReturnType<typeof tally>): string => `${String(r.arrived).padStart(2)}/${RUNS} home (${r.dark} dark, ${r.sunk} sunk)  ${r.stars.toFixed(2)} stars  ${r.tiles.toFixed(1)} tiles  ${r.crew.toFixed(1)} crew  ${r.bitten.toFixed(1)} bites  light ${r.light.toFixed(0)}`;
     console.log(table.map((row) => `${row.plan}\n  keen   ${fmt(row.keen)}\n  casual ${fmt(row.casual)}\n  dreamy ${fmt(row.dreamy)}`).join('\n'));
     const [still, evening, squall] = table as [typeof table[0], typeof table[0], typeof table[0]];
-    // the first voyage is a welcome: nobody who is trying at all is sent home
     expect(still.keen.arrived).toBe(RUNS);
     expect(still.casual.arrived).toBeGreaterThanOrEqual(57);
     expect(still.dreamy.arrived).toBeGreaterThanOrEqual(50);
-    // the last one asks for attention, and those who give it still get there
     expect(squall.keen.arrived).toBeGreaterThanOrEqual(56);
     expect(squall.casual.arrived).toBeGreaterThanOrEqual(50);
     expect(squall.dreamy.arrived).toBeLessThanOrEqual(46);
     expect(squall.dreamy.arrived).toBeGreaterThanOrEqual(20);
-    // each is harder than the one before it
     expect(evening.dreamy.arrived).toBeLessThanOrEqual(still.dreamy.arrived);
     expect(squall.dreamy.arrived).toBeLessThan(evening.dreamy.arrived);
     expect(squall.casual.stars).toBeLessThan(still.casual.stars);
-    // and the stars tell sailors apart: all three on the last voyage are for the keen
     for (const row of table) {
       expect(row.keen.stars).toBeGreaterThanOrEqual(row.casual.stars);
       expect(row.casual.stars).toBeGreaterThan(row.dreamy.stars + 0.5);

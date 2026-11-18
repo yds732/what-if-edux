@@ -6,20 +6,12 @@ export const isMinigame = (v: string | null): v is MinigameId => v !== null && (
 
 export interface MinigameInfo {
   readonly title: string;
-  /** One line under the title, on the card that opens the game and on its portal. */
   readonly tagline: string;
-  /** The light of its portal, and the colour the picture goes through on the way in and out. */
   readonly color: number;
-  /** Who keeps the game: they stand by its portal on the arcade isle. */
   readonly keeper: 'lumi' | 'kai' | 'nova';
-  /** Fetches the game's code and makes its world. A game still being built has none, and its portal stays shut. */
   readonly load?: () => Promise<Minigame>;
 }
 
-/**
- * The games behind the five portals on Haven's arcade isle, in the order the portals stand. Each is its own module,
- * fetched (with its models) the first time its portal is entered.
- */
 export const MINIGAMES: Record<MinigameId, MinigameInfo> = {
   rally: {
     title: 'Moonlight Rally', tagline: 'Table tennis with Kai, first to seven', color: 0xffb24a, keeper: 'kai',

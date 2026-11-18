@@ -12,7 +12,6 @@ type Pick = { gate: MinigameId } | { talk: Keeper };
 
 const _head = new THREE.Vector3();
 
-/** Offers the five gates and the three companions, and resolves with whichever the player uses. */
 const pick = (game: Game, haven: HavenWorld): Promise<Pick> =>
   new Promise<Pick>((resolve, reject) => {
     const signal = game.director.signal;
@@ -46,10 +45,6 @@ const pick = (game: Game, haven: HavenWorld): Promise<Pick> =>
     signal.addEventListener('abort', onAbort, { once: true });
   });
 
-/**
- * The arcade, from arriving on the isle to leaving for the title: Lumi's welcome, then for as long as the player
- * stays, a walk about the isle between games. `first` goes straight through that gate (tests, and links to one game).
- */
 export const runHub = async (game: Game, first: MinigameId | null = null): Promise<void> => {
   const { director: d, player, hud, audio, app, arcade } = game;
   app.fx.fade = 1;
@@ -60,7 +55,6 @@ export const runHub = async (game: Game, first: MinigameId | null = null): Promi
   player.teleport(isle.spawn);
   for (const id of MINIGAME_IDS) isle.setStars(id, arcade.stars[id]);
   arcade.onStars = (id, stars) => isle.setStars(id, stars);
-  // everyone at their post: Lumi to greet, Kai and Nova by the gates they keep
   const { lumi, kai, nova } = haven.cast;
   haven.stand(lumi!, isle.guide);
   haven.stand(kai!, isle.gates.rally.keeper);
@@ -108,7 +102,6 @@ export const runHub = async (game: Game, first: MinigameId | null = null): Promi
     game.reach(`arcade.enter.${id}`);
     await arcade.play(id, isle.gates[id].back, 'havenFestival');
     game.reach(`arcade.back.${id}`);
-    // Lumi is always pleased, however it went
     const said = arcade.last?.won ? HUB.back.won : arcade.last ? HUB.back.lost : HUB.back.left;
     player.faceToward(lumi!.headWorld(_head), 0.8);
     await d.play([said[(before + (arcade.plays[id] ?? 0)) % said.length]!]);

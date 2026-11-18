@@ -4,7 +4,6 @@ import { GAP, LANE, MARCH, MAW_STAND, MAX_FLOCK, RANGE, STAGES, March, flockRadi
 
 const DT = 1 / 30;
 
-/** Runs a march for `seconds`, keeping what happened. `each` is called before every step: it is the leader. */
 const run = (m: March, seconds: number, each?: (m: March) => void): MarchEvent[] => {
   const seen: MarchEvent[] = [];
   for (let t = 0; t < seconds && !m.over; t += DT) {
@@ -15,7 +14,6 @@ const run = (m: March, seconds: number, each?: (m: March) => void): MarchEvent[]
   return seen;
 };
 
-/** A bridge with nothing on it: for looking at one rule at a time. */
 const EMPTY: Stage = { ...STAGES[0]!, beats: [], length: 1e6 };
 const bare = (count = 10): March => {
   const m = new March(new Rng(3), EMPTY);
@@ -51,7 +49,6 @@ describe('a gate', () => {
     const plus: GateOp = { kind: 'add', n: 8 }, twice: GateOp = { kind: 'mul', n: 2 };
     expect(worthOf(5, 0, plus)).toBeGreaterThan(worthOf(5, 0, twice));
     expect(worthOf(20, 0, twice)).toBeGreaterThan(worthOf(20, 0, plus));
-    // quicker sparks are worth a quarter more sprites, until they can be quickened no further
     expect(worthOf(20, 0, { kind: 'quick' })).toBe(25);
     expect(worthOf(20, 3, { kind: 'quick' })).toBe(20);
   });
@@ -177,10 +174,6 @@ describe('the Gloom', () => {
 });
 
 describe('a march', () => {
-  /**
-   * Leaders of three kinds, to see that each march is fair. `wise` is how often the better half of a gate is taken;
-   * `late` how long the leader takes to notice that things have changed (the lead is only looked at that often).
-   */
   interface Leader { wise: number; late: number; idle?: boolean }
   const LEADERS = { keen: { wise: 0.95, late: 0.12 }, casual: { wise: 0.72, late: 0.35 }, careless: { wise: 0.5, late: 0.7 }, idle: { wise: 0.5, late: 1, idle: true } } satisfies Record<string, Leader>;
 
@@ -191,7 +184,6 @@ describe('a march', () => {
     for (let t = 0; t < 400 && !m.over; t += DT) {
       if ((wait -= DT) <= 0) {
         wait = leader.late;
-        // each gate is made up the leader's mind about once, when it is first seen
         const gate = m.gates.find((g) => !g.taken);
         if (gate && !choice.has(gate.id)) choice.set(gate.id, mind.chance(leader.wise));
         m.lead = leader.idle ? 0 : leadFor(m, gate ? choice.get(gate.id)! : true) + mind.range(-0.3, 0.3);
@@ -222,25 +214,20 @@ describe('a march', () => {
     const fmt = (r: ReturnType<typeof tally>): string => `${String(r.dawn).padStart(2)}/${RUNS} dawn  ${r.stars.toFixed(2)} stars  flock ${r.flock.toFixed(0)} (most ${r.most.toFixed(0)}, ${r.dimmed.toFixed(0)} put out)  ${r.seconds.toFixed(0)} s`;
     console.log(table.map((row) => `${row.stage}\n  keen     ${fmt(row.keen)}\n  casual   ${fmt(row.casual)}\n  careless ${fmt(row.careless)}\n  idle     ${fmt(row.idle)}`).join('\n'));
     const [first, long, deep] = table as [typeof table[0], typeof table[0], typeof table[0]];
-    // the first march is a welcome: anyone who leads at all breaks the dusk
     expect(first.keen.dawn).toBe(RUNS);
     expect(first.casual.dawn).toBeGreaterThanOrEqual(RUNS - 3);
     expect(first.careless.dawn).toBeGreaterThanOrEqual(RUNS * 0.66);
-    // the last asks for the right gates, and those who take them still get there
     expect(deep.keen.dawn).toBeGreaterThanOrEqual(RUNS * 0.7);
     expect(deep.casual.dawn).toBeGreaterThanOrEqual(RUNS * 0.4);
     expect(deep.careless.dawn).toBeLessThanOrEqual(RUNS * 0.45);
     expect(long.careless.dawn).toBeLessThanOrEqual(first.careless.dawn);
     for (const row of table) {
-      // the stars tell leaders apart, and a flock that is not led at all is never enough
       expect(row.keen.stars).toBeGreaterThan(row.casual.stars);
       expect(row.casual.stars).toBeGreaterThan(row.careless.stars + 0.3);
       expect(row.keen.stars).toBeGreaterThan(2.2);
       expect(row.idle.dawn).toBe(0);
-      // and nobody waits long at the end of the bridge
       expect(row.keen.seconds).toBeLessThan(STAGES.find((s) => s.name === row.stage)!.length / MARCH + 26);
     }
-    // (three hundred and sixty marches: give them time)
   }, 60000);
 
   it('cannot be won by standing still', () => {

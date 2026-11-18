@@ -21,7 +21,6 @@ export const SHOT_WORLDS: Record<string, WorldFactory> = {
   haven: () => new HavenWorld(),
   bedroom: () => new BedroomWorld(),
   classroom: () => new ClassroomWorld(),
-  // the arcade's worlds, as built: nobody is playing in them
   rally: () => new RallyWorld(),
   sprites: () => new SpriteWorld(),
   lanterns: () => new LanternWorld(),

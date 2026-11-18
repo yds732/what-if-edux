@@ -118,7 +118,6 @@ class Menus {
     this.applySettings();
     game.onLoading = (label, bytes) => {
       const arrived = bytes ? ` · ${(bytes / 1e6).toFixed(1)} MB` : '';
-      // a world is named by its id; a game of the arcade by its title
       const what = !label ? '' : label === 'haven' ? 'Building Haven' : /^[A-Z]/.test(label) ? `Opening ${label}` : `Building the ${label}`;
       this.loading.textContent = what + arrived;
       if (label) this.loading.append(el('i'));
@@ -263,7 +262,6 @@ class Menus {
     void game.run(chapter, state);
   }
 
-  /** Leaves the title for the arcade isle. */
   private beginArcade(): void {
     const game = this.game;
     this.title = null;
@@ -385,7 +383,6 @@ class Menus {
     buttons.style.width = '100%';
     buttons.append(button('Resume', 'btn--primary', () => this.resume()));
     if (playing) {
-      // a game of the arcade: begin it again, or go back out through its portal
       buttons.append(
         button('Restart game', '', () => {
           this.resume(false);
@@ -425,7 +422,6 @@ class Menus {
     game.input.flush();
     game.app.paused = false;
     game.audio.setPaused(false);
-    // in a game of the arcade the cursor stays free: it is what the game is played with
     if (capture && !game.hud.choosing && !game.arcade.active) game.input.capturePointer();
   }
 
@@ -468,7 +464,6 @@ class Menus {
     layer.append(stick, knob, pause);
     this.root.append(layer);
     game.addSystem(() => {
-      // a touch screen has no key to pause with; nor has a mouse that a game of the arcade has left free
       pause.hidden = !(game.input.mode === 'touch' || (game.input.mode === 'mouse' && !!game.arcade.active));
       const v = game.input.stickView;
       stick.style.opacity = knob.style.opacity = v ? '1' : '0';

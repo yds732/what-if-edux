@@ -3,20 +3,14 @@ import { clamp01 } from '../core/math';
 import { GLSL_OUTPUT } from '../render/glsl';
 import { getHaloTexture } from '../world/haven/atmosphere';
 
-/**
- * Effects the arcade's games share: the streak a fast thing leaves behind it, the ring where something lands, many
- * copies of a model in one draw, the soft shadow that says how high a ball is, and a way to give a copy of a model
- * its own colour.
- */
-
-const TRAIL_VS = /* glsl */ `
+const TRAIL_VS = `
 attribute float aAge; attribute float aSide;
 varying float vAge; varying float vSide;
 void main(){
   vAge = aAge; vSide = aSide;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
-const TRAIL_FS = /* glsl */ `
+const TRAIL_FS = `
 uniform vec3 uColor, uHot; uniform float uGain;
 varying float vAge; varying float vSide;
 void main(){
@@ -31,13 +25,8 @@ const _along = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const _eye = new THREE.Vector3();
 
-/**
- * A ribbon of light behind something that moves: where it has been over the last `life` seconds, turned to face
- * the camera, thinning and fading toward its tail.
- */
 export class Trail {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>;
-  /** Half the ribbon's width at its head, in metres. */
   width: number;
   readonly uniforms = { uColor: { value: new THREE.Color(0.45, 0.84, 1.0) }, uHot: { value: new THREE.Color(1, 0.97, 0.9) }, uGain: { value: 2.4 } };
   private readonly points: THREE.Vector3[] = [];
@@ -65,14 +54,12 @@ export class Trail {
     this.mesh.renderOrder = 4;
   }
 
-  /** Forgets where the thing has been: it was put somewhere new, and must not streak across the gap. */
   clear(): void {
     this.points.length = this.born.length = 0;
     this.age.fill(1);
     this.mesh.geometry.attributes.aAge!.needsUpdate = true;
   }
 
-  /** Call every frame with where the thing is now. */
   update(head: THREE.Vector3, camera: THREE.Camera, dt: number): void {
     this.clock += dt;
     this.points.unshift(head.clone());
@@ -86,7 +73,6 @@ export class Trail {
     for (let i = 0; i < this.capacity; i++) {
       const k = Math.min(i, n - 1), p = this.points[k]!;
       const age = i < n ? (this.clock - this.born[k]!) / this.life : 1;
-      // across the ribbon: at right angles to its run and to the line of sight
       _along.subVectors(this.points[Math.max(0, k - 1)]!, this.points[Math.min(n - 1, k + 1)]!);
       _side.crossVectors(_along, _to.subVectors(_eye, p));
       const length = _side.length();
@@ -100,8 +86,8 @@ export class Trail {
   }
 }
 
-const RING_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const RING_FS = /* glsl */ `
+const RING_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const RING_FS = `
 uniform vec3 uColor; uniform float uAge;
 varying vec2 vUv;
 void main(){
@@ -120,7 +106,6 @@ interface RingSlot {
   age: number;
 }
 
-/** Rings of light that spread from where something landed and are gone in a moment. A fixed pool: the oldest is reused. */
 export class Rings {
   readonly group = new THREE.Group();
   private readonly slots: RingSlot[] = [];
@@ -140,7 +125,6 @@ export class Rings {
     }
   }
 
-  /** A ring `size` metres across, lying on the plane whose normal is `normal` (straight up if left out). */
   emit(at: THREE.Vector3, size: number, color: THREE.Color, life = 0.45, normal?: THREE.Vector3): void {
     const slot = this.slots[this.next]!;
     this.next = (this.next + 1) % this.slots.length;
@@ -166,10 +150,6 @@ export class Rings {
 const _batch = new THREE.Matrix4();
 const UNTINTED = new THREE.Color(1, 1, 1);
 
-/**
- * Many copies of one model drawn as a single batch: forty-nine jewels are five draws, not forty-nine. Each frame
- * `begin`, `add` every copy that is to be seen (where it is, and a tint: above 1 it glows), then `end`.
- */
 export class Batch {
   private readonly meshes: { mesh: THREE.InstancedMesh; base: THREE.Matrix4 }[] = [];
   private count = 0;
@@ -183,7 +163,6 @@ export class Batch {
       mesh.frustumCulled = false;
       mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
-      // every copy has a tint from the start: adding one later would mean compiling the material again
       for (let i = 0; i < capacity; i++) mesh.setColorAt(i, UNTINTED);
       mesh.count = 0;
       parent.add(mesh);
@@ -213,10 +192,6 @@ export class Batch {
   }
 }
 
-/**
- * The soft dark patch under something in the air. A shadow map cannot draw a ball three centimetres across; this
- * can, and it is what tells the eye how high the ball is and where it will come down.
- */
 export class BlobShadow {
   readonly mesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
 
@@ -226,20 +201,14 @@ export class BlobShadow {
     this.mesh.renderOrder = 1;
   }
 
-  /** Lays the shadow on a surface at `surface` under a thing at (x, y, z). */
   place(x: number, y: number, z: number, surface: number): void {
     const height = Math.max(0, y - surface);
     this.mesh.position.set(x, surface + 0.003, z);
-    // higher is wider and fainter
     this.mesh.scale.setScalar(this.radius * (2.4 + height * 3.2));
     this.mesh.material.opacity = this.strength / (1 + height * 3.5);
   }
 }
 
-/**
- * Gives a material of a generated model another colour: paint within `width` of the hue `from` (0..1 around the
- * wheel) is turned to the hue `to`, keeping its light and shade. Call on a copy's own material (see `ownMaterials`).
- */
 export const repaint = (material: THREE.MeshStandardMaterial, from: number, to: number, width = 0.12): void => {
   const uniforms = { uRepaint: { value: new THREE.Vector3(from, to, width) } };
   const before = material.onBeforeCompile.bind(material);
@@ -274,14 +243,12 @@ vec3 rpRgb(vec3 c){
   material.needsUpdate = true;
 };
 
-/** Gives a copy of a model materials of its own, so that changing them leaves every other copy as it was. */
 export const ownMaterials = (object: THREE.Object3D): THREE.MeshStandardMaterial[] => {
   const made: THREE.MeshStandardMaterial[] = [];
   object.traverse((o) => {
     if (!(o instanceof THREE.Mesh)) return;
     const source = o.material as THREE.MeshStandardMaterial;
     const own = source.clone();
-    // a clone copies what a material is made of, but not the hooks that repaint it or make its paint glow
     own.onBeforeCompile = source.onBeforeCompile;
     own.customProgramCacheKey = source.customProgramCacheKey;
     o.material = own;

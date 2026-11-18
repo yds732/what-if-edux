@@ -30,7 +30,6 @@ describe('the elements', () => {
 
 describe('a round', () => {
   it('lets the faster sprite strike first, and a fainted sprite does not strike back', () => {
-    // Petalwing (speed 32) against Tufflet (speed 10)
     const battle = new Battle(['petalwing', 'cindle', 'nimbray'], ['tufflet', 'kilnip', 'dewbell'], new Rng(1));
     const events = battle.round(move(0), move(0));
     const moves = of(events, 'move');
@@ -60,7 +59,6 @@ describe('a round', () => {
     battle.round(move(0), move(0));
     expect(battle.out('you').spark).toBe(2);
     battle.round(move(2), move(0));
-    // two spent, one gathered
     expect(battle.out('you').spark).toBe(1);
     for (let i = 0; i < 6 && !battle.winner && !battle.needsReplacement('you') && !battle.needsReplacement('foe'); i++) battle.round(move(0), move(0));
     expect(battle.out('you').spark).toBeLessThanOrEqual(MAX_SPARK);
@@ -120,7 +118,6 @@ describe('a round', () => {
   });
 });
 
-/** Plays a whole duel between two ways of choosing, and says who won and in how many rounds. */
 const duel = (team: SpriteId[], seed: number, you: (b: Battle, rng: Rng) => Action, skill: number): { winner: Side; rounds: number } => {
   const rng = new Rng(seed), battle = new Battle(team, restOf(team), new Rng(seed + 1));
   for (let i = 0; i < 200 && !battle.winner; i++) {
@@ -132,7 +129,6 @@ const duel = (team: SpriteId[], seed: number, you: (b: Battle, rng: Rng) => Acti
 };
 
 describe('whole duels', () => {
-  // a team is one sprite of each element: eight teams, each facing the three it left behind
   const TEAMS: SpriteId[][] = PAIRS.ember.flatMap((e) => PAIRS.tide.flatMap((w) => PAIRS.bloom.map((b) => [e, w, b])));
   const careful = (b: Battle, rng: Rng): Action => chooseAction(b, 'you', rng, 1);
   const careless = (b: Battle, rng: Rng): Action => rng.pick(b.options('you'));
@@ -174,7 +170,6 @@ describe('whole duels', () => {
       return won / GAMES;
     });
     console.log('how often a team with each sprite wins: ' + SPRITE_IDS.map((id) => `${id} ${Math.round((100 * share[id]!) / (GAMES * 4))}%`).join(', '));
-    // no sprite carries a team or sinks one, and no choice of team is a foregone conclusion
     for (const id of SPRITE_IDS) {
       expect(share[id]! / (GAMES * 4), id).toBeGreaterThan(0.4);
       expect(share[id]! / (GAMES * 4), id).toBeLessThan(0.6);

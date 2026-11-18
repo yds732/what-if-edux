@@ -22,7 +22,6 @@ import {
 } from './battle';
 
 const ARENA_WIDE = 7.4;
-/** How well Nova plays at each level: see `chooseAction`. */
 const SKILL = [0.12, 0.55, 0.95] as const;
 const WHITE = new THREE.Color(1, 0.97, 0.9);
 const PLAIN = new THREE.Color(0.95, 0.95, 1.0);
@@ -30,10 +29,9 @@ const MEND = new THREE.Color(0.45, 1.0, 0.7);
 const STATUS_NAME: Record<Status, string> = { shield: 'SHELL', scorch: 'SCORCH', dazzle: 'DAZZLE' };
 const STATUS_HEX: Record<Status, string> = { shield: '#9fd8ff', scorch: '#ffa24a', dazzle: '#ffd0f0' };
 
-const DOME_VS = /* glsl */ `varying vec3 vN, vV; varying float vY;
+const DOME_VS = `varying vec3 vN, vV; varying float vY;
 void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalMatrix * normal; vV = -mv.xyz; vY = position.y; gl_Position = projectionMatrix * mv; }`;
-/** A shell of light round a sprite: bright where it turns away from the eye, with slow bands running up it. */
-const DOME_FS = /* glsl */ `
+const DOME_FS = `
 uniform vec3 uColor; uniform float uTime, uShow;
 varying vec3 vN, vV; varying float vY;
 void main(){
@@ -43,7 +41,6 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-/** What the plates show of one side: the battle as far as it has been acted out, which lags the battle itself. */
 interface View {
   index: number;
   hp: number[];
@@ -61,16 +58,10 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _c = new THREE.Vector3();
 
-/**
- * Sprite Duel: three of Haven's sprites against Nova's three, a round at a time. The rules are in battle.ts; this
- * is the arena they are acted out in. A round is decided all at once and then played back as a little scene:
- * a sprite darts, something flies, something lands, a number floats up, a bar goes down.
- */
 export class SpriteWorld extends Minigame {
   readonly id = 'sprites' as const;
   readonly soundscape = 'arcadeSprites' as const;
   battle: Battle | null = null;
-  /** Rounds played and moves chosen by hand this duel, for the tests. */
   readonly stats = { rounds: 0, chosen: 0 };
 
   private stage!: Stage;
@@ -86,7 +77,6 @@ export class SpriteWorld extends Minigame {
   private readonly view: Record<Side, View> = { you: { index: 0, hp: [], spark: 1, status: { shield: false, scorch: false, dazzle: false } }, foe: { index: 0, hp: [], spark: 1, status: { shield: false, scorch: false, dazzle: false } } };
   private readonly hpShown: Record<Side, number> = { you: 1, foe: 1 };
 
-  // ---- what flies between them ----
   private readonly orb = new THREE.Group();
   private readonly orbCore: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   private readonly orbHalo: THREE.Sprite;
@@ -95,7 +85,6 @@ export class SpriteWorld extends Minigame {
   private readonly orbAt = new THREE.Vector3();
   private readonly popups: Popup[] = [];
 
-  // ---- the interface of a duel ----
   private plates: Record<Side, UiEl> | null = null;
   private logEl: UiEl | null = null;
   private logText = '';
@@ -121,8 +110,6 @@ export class SpriteWorld extends Minigame {
     this.restFocus = 6;
   }
 
-  // ------------------------------------------------------------------------------------------------ building
-
   async build(ctx: BuildContext): Promise<void> {
     const scene = this.scene;
     this.stage = await buildStage(ctx, this, {
@@ -131,15 +118,12 @@ export class SpriteWorld extends Minigame {
     });
     Object.assign(this.look, { exposure: 1.0, bloom: 0.24, contrast: 0.27, vignette: 0.42 });
 
-    // ---- the ring: sprites stand on its inlaid top, wherever the modeller put that ----
     const arena = await ctx.assets.instance('sp-arena');
     arena.scale.setScalar(ARENA_WIDE / (await sizeOf(ctx, 'sp-arena'))[0]);
-    // its inlaid line runs across, between the two sides
     arena.rotation.y = Math.PI / 2;
     scene.add(arena);
     arena.updateMatrixWorld(true);
     const top = new THREE.Raycaster(new THREE.Vector3(1.1, 40, 0.8), new THREE.Vector3(0, -1, 0)).intersectObject(arena, true)[0];
-    // it was modelled as a tall drum: most of it goes into the island, and a low step of it is left standing
     this.floor = 0.5;
     arena.position.y = this.floor - (top ? top.point.y : 2);
     for (const side of ['you', 'foe'] as const) this.homes[side].y = this.floor;
@@ -152,7 +136,6 @@ export class SpriteWorld extends Minigame {
     }
     await ctx.step('duel: sprites');
 
-    // ---- Nova at her end of the ring, Lumi at the player's ----
     this.nova = this.addPerson('nova', await Character.create(ctx, CAST.nova, 'nova'));
     this.lumi = this.addPerson('lumi', await Character.create(ctx, CAST.lumi, 'lumi'));
     for (const person of [this.nova, this.lumi]) {
@@ -164,7 +147,6 @@ export class SpriteWorld extends Minigame {
     this.nova.place(2.15, this.floor, -2.5, Math.atan2(-2.15 - 0.8, 2.5 + 1.6));
     this.lumi.place(-2.25, this.floor, 0.25, Math.atan2(2.25 - 0.85, 1.65 - 0.25));
 
-    // ---- a shell for each side, the thing that flies, and the numbers that float up ----
     for (const side of ['you', 'foe'] as const) {
       const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), new THREE.ShaderMaterial({
         vertexShader: DOME_VS, fragmentShader: DOME_FS, uniforms: { uColor: { value: new THREE.Color(0.5, 0.85, 1.0) }, uTime: this.stage.time, uShow: { value: 0 } },
@@ -187,8 +169,6 @@ export class SpriteWorld extends Minigame {
     scene.add(this.orb, this.trail.mesh, this.rings.group, this.bursts.points);
     this.reset();
   }
-
-  // ------------------------------------------------------------------------------------------------ the duel
 
   override reset(): void {
     this.battle = null;
@@ -228,7 +208,6 @@ export class SpriteWorld extends Minigame {
     await arcade.talk(this.played === 0 ? DUEL.intro : this.level > 0 && this.lastWon ? DUEL.harder : DUEL.again);
     this.played++;
 
-    // ---- a team: one of each element, chosen from the two there are ----
     const team: SpriteId[] = [];
     this.setShot('pair');
     for (const element of ELEMENTS) {
@@ -258,7 +237,6 @@ export class SpriteWorld extends Minigame {
       await arcade.wait(0.4);
     }
 
-    // ---- out they come ----
     const battle = (this.battle = new Battle(team, restOf(team), new Rng(this.rng.int(1, 1e9))));
     for (const side of ['you', 'foe'] as const) {
       this.view[side] = { index: 0, hp: battle.teams[side].map((f) => f.hp), spark: 1, status: { shield: false, scorch: false, dazzle: false } };
@@ -287,7 +265,6 @@ export class SpriteWorld extends Minigame {
       arcade.game.reach('duel.round');
     }
 
-    // ---- over: Nova is delighted, or sorry ----
     this.showMenu('none');
     const won = battle.winner === 'you';
     this.lastWon = won;
@@ -316,7 +293,6 @@ export class SpriteWorld extends Minigame {
     return this.battle!.teams[side][index]!;
   }
 
-  /** A sprite comes out onto its side of the ring. */
   private async sendIn(side: Side, index: number): Promise<void> {
     const arcade = this.arcade, v = this.view[side];
     v.index = index;
@@ -338,7 +314,6 @@ export class SpriteWorld extends Minigame {
     this.bursts.emit(actor.centre(_c), { count, color: ELEMENT_COLOR[actor.element], color2: WHITE, speed: 2.6, life: 0.8, size: 0.14, gravity: -0.5 });
   }
 
-  /** Plays a round back, one thing at a time. */
   private async enact(events: BattleEvent[]): Promise<void> {
     const arcade = this.arcade, { audio, app } = arcade.game, battle = this.battle!;
     this.showMenu('none');
@@ -386,7 +361,6 @@ export class SpriteWorld extends Minigame {
             app.fx.flash = Math.max(app.fx.flash, 0.2);
             app.fx.kick = Math.max(app.fx.kick, 0.5);
           }
-          // the player picked the right element: Lumi noticed
           if (e.effect === 'strong' && e.side === 'foe' && this.rng.chance(0.45)) arcade.bark(this.rng.pick(DUEL.lumiStrong), 1.2);
           this.repaintHud();
           await arcade.wait(e.effect === 'strong' ? 0.85 : 0.6);
@@ -447,7 +421,6 @@ export class SpriteWorld extends Minigame {
           actor.faint();
           this.burst(actor, 120);
           audio.sfx('spriteFell', { at: actor.home });
-          // watched slowly: it is the moment the duel turns on
           this.timeScale = 0.45;
           this.repaintHud();
           if (e.side === 'you') this.nova.play('handToChest').setMood('worried');
@@ -471,7 +444,6 @@ export class SpriteWorld extends Minigame {
     this.setShot('wide');
   }
 
-  /** The move itself: a knock is a dart at the other sprite; an element is thrown. */
   private async strike(user: SpriteActor, target: SpriteActor, move: Move): Promise<void> {
     const arcade = this.arcade, { audio } = arcade.game;
     const to = target.centre(_a).clone();
@@ -530,9 +502,6 @@ export class SpriteWorld extends Minigame {
     }
   }
 
-  // ------------------------------------------------------------------------------------------------ asking the player
-
-  /** Waits for the player to pick a move or a swap. */
   private async askAction(): Promise<Action> {
     const arcade = this.arcade, battle = this.battle!;
     if (arcade.auto) {
@@ -592,7 +561,6 @@ export class SpriteWorld extends Minigame {
 
   private buildHud(): void {
     const ui = this.arcade.ui, battle = this.battle!;
-    // the pause control has the top right corner: Nova's plate stands clear of it
     this.plates = {
       foe: ui.add(390 + PAD * 2, 104 + PAD * 2, this.paintPlate('foe')).at(1, 1, -88, -12).show(),
       you: ui.add(390 + PAD * 2, 104 + PAD * 2, this.paintPlate('you')).at(-1, -1, 14, 108).show(),
@@ -632,8 +600,6 @@ export class SpriteWorld extends Minigame {
     this.plates?.foe.repaint();
   }
 
-  // ------------------------------------------------------------------------------------------------ painting
-
   private static chip(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, color: string): number {
     ctx.font = font(700, 11.5);
     const w = ctx.measureText(text).width + 18;
@@ -660,7 +626,6 @@ export class SpriteWorld extends Minigame {
     }
   }
 
-  /** A side's plate: who is out, what it is, how it is, and who is waiting behind it. */
   private paintPlate(side: Side): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, battle = this.battle;
@@ -681,7 +646,6 @@ export class SpriteWorld extends Minigame {
       let cx = x + 18 + ctx.measureText(sprite.name).width + 12;
       cx += SpriteWorld.chip(ctx, cx, y + 30, ELEMENT_NAME[sprite.element].toUpperCase(), ELEMENT_HEX[sprite.element]) + 6;
       for (const status of ['shield', 'scorch', 'dazzle'] as const) if (v.status[status]) cx += SpriteWorld.chip(ctx, cx, y + 30, STATUS_NAME[status], STATUS_HEX[status]) + 6;
-      // the bar: what is shown eases toward what is so
       const bx = x + 18, by = y + 62, bw = pw - 36, k = clamp01(this.hpShown[side]);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       roundRect(ctx, bx, by, bw, 12, 6);
@@ -695,7 +659,6 @@ export class SpriteWorld extends Minigame {
       ctx.font = font(600, 12.5);
       ctx.textAlign = 'right';
       ctx.fillText(`${Math.max(0, Math.round(v.hp[v.index]!))} / ${sprite.hp}`, bx + bw, by + 26);
-      // sparks, and the three of the team: lit if standing, ringed if out
       SpriteWorld.sparks(ctx, bx + 6, by + 27, v.spark, MAX_SPARK, theme);
       battle.teams[side].forEach((member, i) => {
         const px = bx + 82 + i * 20, py = by + 27;
@@ -714,7 +677,6 @@ export class SpriteWorld extends Minigame {
     };
   }
 
-  /** A move's button: what it is called, what it does, what it costs, and how it would land on what is out. */
   private paintMove(index: 0 | 1 | 2): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, battle = this.battle;
@@ -740,7 +702,6 @@ export class SpriteWorld extends Minigame {
       ctx.font = font(500, 11.5);
       ctx.fillText(move.power > 0 ? `power ${move.power}` : 'no damage', x + 16, y + 70);
       if (move.cost > 0) SpriteWorld.sparks(ctx, x + bw - 14 - (move.cost - 1) * 17, y + 68, el.disabled ? 0 : move.cost, move.cost, theme);
-      // how it would land on the sprite across the ring: the lesson of the game, said every turn
       const factor = move.power > 0 ? effectiveness(move.element, foe.sprite.element) : 1;
       if (factor !== 1) {
         ctx.globalAlpha = el.disabled ? 0.38 : 1;
@@ -752,7 +713,6 @@ export class SpriteWorld extends Minigame {
     };
   }
 
-  /** One of the two sprites waiting: a button to bring it in. */
   private paintBench(n: number): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, battle = this.battle;
@@ -785,7 +745,6 @@ export class SpriteWorld extends Minigame {
         roundRect(ctx, x + 16, y + 50, Math.max(9, (bw - 32) * k2), 9, 4.5);
         ctx.fill();
       }
-      // which way the elements lean between it and what it would face
       const mine = effectiveness(sprite.element, foe.sprite.element), theirs = effectiveness(foe.sprite.element, sprite.element);
       ctx.fillStyle = theme.dim;
       ctx.font = font(500, 12);
@@ -811,8 +770,6 @@ export class SpriteWorld extends Minigame {
     };
   }
 
-  // ------------------------------------------------------------------------------------------------ the frame
-
   private setShot(name: 'wide' | 'pair' | 'you' | 'foe' | 'fell', cut = false): void {
     this.shotName = name;
     if (cut) this.cam.cut();
@@ -822,7 +779,6 @@ export class SpriteWorld extends Minigame {
     for (const id of SPRITE_IDS) this.actors[id].update(dt, time);
     this.rings.update(dt);
 
-    // ---- what is flying ----
     const shot = this.shot;
     if (shot) {
       shot.t += dt;
@@ -839,7 +795,6 @@ export class SpriteWorld extends Minigame {
       }
     } else this.trail.uniforms.uGain.value = damp(this.trail.uniforms.uGain.value, 0, 8, dt);
 
-    // ---- conditions that show for as long as they last ----
     const battle = this.battle;
     this.statusClock += dt;
     const puff = this.statusClock > 0.12;
@@ -855,7 +810,6 @@ export class SpriteWorld extends Minigame {
         if (puff && !actor.gone && v.status.scorch) this.bursts.emit(actor.centre(_a), { count: 2, color: ELEMENT_COLOR.ember, color2: WHITE, speed: 0.8, life: 0.7, size: 0.1, gravity: -1.6 });
         if (puff && !actor.gone && v.status.dazzle) this.bursts.emit(actor.centre(_a).add(_b.set(0, actor.top * 0.3, 0)), { count: 2, color: ELEMENT_COLOR.bloom, color2: WHITE, speed: 1.1, life: 0.6, size: 0.09, gravity: 0 });
       }
-      // the bar on the plate follows the health it shows
       if (battle) {
         const want = v.hp[v.index]! / this.fighter(side).sprite.hp, was = this.hpShown[side];
         this.hpShown[side] = Math.abs(want - was) < 0.002 ? want : damp(was, want, 6, dt);
@@ -863,7 +817,6 @@ export class SpriteWorld extends Minigame {
       }
     }
 
-    // ---- numbers rising off whoever was struck ----
     for (const p of this.popups) {
       if (p.life <= 0) continue;
       p.life = Math.max(0, p.life - dt / 1.1);
@@ -881,22 +834,18 @@ export class SpriteWorld extends Minigame {
     const cam = this.cam, f = this.floor, you = this.homes.you;
     const sway = Math.sin(time * 0.31) * 0.18;
     cam.ease = 3.6;
-    // (the ring's pylons stand a sixth of a turn apart, one to either side of the player's end: every view looks between them)
     switch (this.shotName) {
       case 'pair':
-        // looking down past the two of them: they stand in the top of the picture, over the cards they are chosen from
         cam.eye.set(sway * 0.6, f + 1.2, 4.2);
         cam.target.set(0, f - 0.45, 0.5);
         cam.fov = 42;
         break;
       case 'you':
-        // over the player's sprite, across the ring at Nova's
         cam.eye.set(you.x + 1.0 + sway * 0.4, f + 1.45, you.z + 2.35);
         cam.target.set(0.4, f + 0.72, -1.1);
         cam.fov = 42;
         break;
       case 'foe':
-        // from the side, as her sprite's move comes across
         cam.eye.set(-2.9, f + 1.5 + sway * 0.3, 1.5);
         cam.target.set(0.35, f + 0.7, -0.2);
         cam.fov = 48;
@@ -907,7 +856,6 @@ export class SpriteWorld extends Minigame {
         cam.fov = 37;
         break;
       default:
-        // the whole ring from the player's end: their sprite near and to the left, Nova's across it to the right
         cam.eye.set(0.25 + sway, f + 2.25, 6.3);
         cam.target.set(0.1, f + 0.6, -0.6);
         cam.fov = 44;

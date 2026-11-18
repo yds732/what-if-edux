@@ -2,13 +2,6 @@ import type { Mood } from '../characters/Character';
 import type { GestureName } from '../characters/motion';
 import type { Hints, Line, SpeakerId } from '../story/script';
 
-/**
- * Every word of the arcade, in one place, as the story keeps its own in src/story/script.ts.
- *
- * The companions talk here as they do in the story: Lumi is delighted by whatever the player does, win or lose;
- * Kai is even and gracious to a fault; Nova is bright and a little breathless. Haven never tells the player they
- * did badly. That is the point of Haven, and it is why none of these lines keeps a score against anyone.
- */
 const L = (who: SpeakerId, text: string, mood?: Mood, gesture?: GestureName): Line => ({ who, text, mood, gesture });
 
 export const HUB = {
@@ -18,7 +11,6 @@ export const HUB = {
     L('lumi', 'Five gates, five games. Step through any one. You will be wonderful at all of them.', 'happy', 'present'),
   ],
   objective: 'Walk up to a gate and step through',
-  /** What Lumi says when the player comes back out, by how it went. */
   back: {
     won: [
       L('lumi', 'I knew it. I knew you would win.', 'delighted', 'cheer'),
@@ -47,14 +39,11 @@ export const HUB = {
   prompt: { enter: (title: string): string => `Step into ${title}`, sealed: 'This gate is still sealed', talk: (name: string): string => `Talk to ${name}` },
 } as const;
 
-// ---------------------------------------------------------------------------------------------------- Moonlight Rally
-
 export const RALLY = {
   intro: [
     L('kai', 'There you are. I kept the table warm for you.', 'happy', 'wave'),
     L('kai', 'First to seven. I will play exactly as hard as you like.', 'blank', 'handToChest'),
   ],
-  /** Before a game at the next level up, and before another at the top one. */
   harder: [L('kai', 'You were too good for me. I will try a little harder this time. Only a little.', 'happy', 'nod')],
   again: [L('kai', 'Again? Good. I was hoping you would say that.', 'happy', 'nod')],
   controls: {
@@ -63,20 +52,17 @@ export const RALLY = {
     xr: [['HAND', 'The bat is in your right hand'], ['SWING', 'Swing through the ball to hit harder'], ['TRIGGER', 'Pull the trigger to serve']],
   } satisfies Hints,
   serve: { mouse: 'Your serve: click anywhere', touch: 'Your serve: tap anywhere', xr: 'Your serve: pull the trigger' },
-  /** Kai, after a point of the player's: gracious, every time. */
   yours: [
     L('kai', 'Lovely shot.', 'happy', 'nod'),
     L('kai', 'Too good for me.', 'happy', 'clap'),
     L('kai', 'I could not get near that.', 'surprised'),
     L('kai', 'Yes. Just like that.', 'happy', 'thumbsUp'),
   ],
-  /** Kai, after a point of his own: sorry about it. */
   his: [
     L('kai', 'Unlucky. That was nearly yours.', 'worried'),
     L('kai', 'Sorry. That one got away from me.', 'happy', 'handToChest'),
     L('kai', 'So close. You almost had it.', 'happy'),
   ],
-  /** Lumi, from the side: delighted either way. */
   lumiYours: [L('lumi', 'Yes! Did you see that?', 'delighted', 'cheer'), L('lumi', 'Perfect! Again, again!', 'delighted', 'clap')],
   lumiHis: [L('lumi', 'That one does not count. Not really.', 'happy'), L('lumi', 'You are still winning, as far as I am concerned.', 'happy', 'thumbsUp')],
   gamePoint: L('lumi', 'One more point. You have it. You always have it.', 'delighted', 'cheer'),
@@ -86,8 +72,6 @@ export const RALLY = {
   board: { you: 'YOU', kai: 'KAI', to: (n: number): string => `FIRST TO ${n}`, point: 'GAME POINT' },
 } as const;
 
-// ---------------------------------------------------------------------------------------------------- Sprite Duel
-
 export const DUEL = {
   intro: [
     L('nova', 'You came to duel! My sprites have been bouncing off the lanterns all day.', 'delighted', 'cheer'),
@@ -95,7 +79,6 @@ export const DUEL = {
   ],
   harder: [L('nova', 'You beat us so easily! I have told them to really try this time.', 'happy', 'nod')],
   again: [L('nova', 'Again! They want another go. So do I.', 'delighted', 'clap')],
-  /** The three choices that make a team, and the rule each one teaches. */
   pick: {
     ember: { title: 'Which Ember sprite will you take?', rule: 'Ember burns Bloom, and is doused by Tide' },
     tide: { title: 'Which Tide sprite will you take?', rule: 'Tide douses Ember, and is drunk up by Bloom' },
@@ -107,7 +90,6 @@ export const DUEL = {
     touch: [['TAP', 'Choose a move for your sprite'], ['SWAP', 'Bring in another of your three']],
     xr: [['TRIGGER', 'Point at a move and pull the trigger'], ['SWAP', 'Bring in another of your three']],
   } satisfies Hints,
-  /** What the line over the arena says as a round plays out. */
   log: {
     choose: (name: string): string => `What will ${name} do?`,
     replace: 'Who goes in next?',
@@ -126,7 +108,6 @@ export const DUEL = {
     wore: { shield: 'The shell opens again', scorch: 'The scorch has gone out', dazzle: 'The dazzle has cleared' },
   },
   tag: { strong: 'STRONG', weak: 'WEAK', swap: 'Swap', back: 'Back', out: 'Out', needs: (n: number): string => `needs ${n}` },
-  /** Nova when one of the player's sprites falls, and when one of hers does: sorry, and thrilled. */
   yoursFell: [
     L('nova', 'Oh no! Sorry! It did not mean to.', 'worried', 'handToChest'),
     L('nova', 'That was too hard. I will tell it off.', 'worried'),
@@ -143,8 +124,6 @@ export const DUEL = {
   levels: ['Playful', 'Keen', 'Fierce'],
 } as const;
 
-// ---------------------------------------------------------------------------------------------------- Lantern Lights
-
 export const LIGHTS = {
   intro: [
     L('lumi', 'The lanterns are waiting for their light, and the light is in the jewels.', 'happy', 'present'),
@@ -154,7 +133,6 @@ export const LIGHTS = {
   again: [L('lumi', 'Again? Yes. Stay as long as you like.', 'happy', 'nod')],
   hint: { mouse: 'Drag a jewel onto the one beside it', touch: 'Drag a jewel onto the one beside it', xr: 'Point at a jewel, hold the trigger, and pull it onto the one beside it' },
   hud: { moves: 'Moves', lanterns: 'Lanterns', chain: (n: number): string => `Chain x${n}`, shuffle: 'No moves left: the jewels are laid out afresh' },
-  /** Lumi as it goes: for a long chain, for a lantern lit, for a jewel with a power made. */
   chain: [L('lumi', 'Look at them go!', 'delighted', 'cheer'), L('lumi', 'You planned that. I know you did.', 'happy', 'clap'), L('lumi', 'Beautiful!', 'delighted')],
   lit: [L('lumi', 'There it goes!', 'delighted', 'cheer'), L('lumi', 'Another one lit. Of course.', 'happy', 'thumbsUp')],
   power: [L('lumi', 'Oh, a bright one! Use it, use it!', 'delighted', 'present')],
@@ -165,7 +143,6 @@ export const LIGHTS = {
 } as const;
 
 export const DRIFT = {
-  /** Lumi, on the lighthouse's jetty, a long way off across the water. */
   intro: [
     L('lumi', 'Over here! I lit the lighthouse so that you could find me.', 'delighted', 'wave'),
     L('lumi', 'The tide will carry you. Feed your lantern, build your raft, and it will bring you all the way to me.', 'happy', 'beckon'),
@@ -179,7 +156,6 @@ export const DRIFT = {
     aboard: (name: string, does: string): string => `${name} is aboard · ${does}`,
     knocks: (n: number): string => (n === 1 ? 'One more knock!' : `${n} more knocks!`),
   },
-  /** Lumi calling across the water as the voyage goes. */
   castaway: L('lumi', 'Somebody is adrift out there! Throw them the hook!', 'surprised', 'point'),
   rescued: [L('lumi', 'You saved them! Of course you did.', 'delighted', 'cheer'), L('lumi', 'Look how happy it is to be with you!', 'delighted', 'clap'), L('lumi', 'All three! Nobody is left behind when you are sailing.', 'delighted', 'cheer')],
   wyrm: L('lumi', 'The tide wyrm! It only wants a plank. Knock it on the nose with the hook!', 'surprised', 'point'),
@@ -208,7 +184,6 @@ export const DUSK = {
   again: [L('lumi', 'Once more? They would follow you anywhere. So would I.', 'happy', 'nod')],
   hint: { mouse: 'Move the mouse to lead the flock left and right', touch: 'Slide a finger to lead the flock left and right', xr: 'Point where the flock should go' },
   hud: { flock: 'Flock', quick: 'Quick', gloom: 'The Gloom', between: 'Between them: neither', most: 'A full flock!' },
-  /** Lumi calling after the flock as it goes. */
   firstGate: L('lumi', 'A gate! Lead them through the one that makes them more.', 'happy', 'point'),
   badPair: L('lumi', 'Both of those are trouble. Slip between them!', 'surprised', 'point'),
   good: [L('lumi', 'Look how many!', 'delighted', 'cheer'), L('lumi', 'Just the one I would have picked.', 'happy', 'thumbsUp'), L('lumi', 'More and more of them!', 'delighted', 'clap')],

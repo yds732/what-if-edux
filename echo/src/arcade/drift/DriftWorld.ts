@@ -19,23 +19,12 @@ import { PAD, paintHint, type Paint, type UiEl } from '../ui';
 import { Sea } from './sea';
 import { CASTAWAYS, HOOK_OUT, MAX_LIGHT, PLANS, TILE, Voyage, WOOD_PER_TILE, nextDeed, type CrewId, type Item, type ItemKind, type VoyageEvent } from './voyage';
 
-/** How high the deck rides above the water; and how far up the mast the line is made fast and the lantern hangs. */
 const DECK = 0.3, PEG = 1.25, LAMP = 2.25;
-/** Where on the lantern's own tile the mast is stepped: its back corner, which leaves the front of it to stand on. */
 const MAST = { x: 0.34, z: 0.34 } as const;
-/** How fast the tide carries the raft, in metres a second: what the sea, the islands and the lighthouse go by at. */
 const CRUISE = 1.55;
-/** How wide the voyage is seen, in degrees: the hook's whole reach to either side, and no more. */
 const VIEW = 41;
-/**
- * The lighthouse, as the raft comes in: where it stands, how deep its rock sits in the sea, how high its lamp is,
- * and where on its jetty (which reaches out toward the raft's path) someone can stand. Measured on the model with
- * tools/assets/profile.mjs --top.
- */
 const HOUSE = { x: -9.5, z: -12, sink: 2.75, lamp: 14.2, jetty: new THREE.Vector3(3.7, 3.2, 0.6), half: 5.9 } as const;
-/** The sprites are a duel's size in their own game; aboard a raft they are smaller, and the wyrm is drawn large. */
 const CREW_SCALE = 1.0, WYRM_SCALE = 1.5;
-/** How each thing that floats sits in the water: how deep, how big, and how much foam it makes. */
 const FLOAT: Record<Exclude<ItemKind, 'castaway'>, { id: string; sink: number; scale: number; foam: number }> = {
   wood: { id: 'drift-wood', sink: 0.1, scale: 1.3, foam: 2.0 },
   crate: { id: 'drift-crate', sink: 0.2, scale: 1.4, foam: 2.0 },
@@ -47,9 +36,8 @@ const WOOD = new THREE.Color(0.95, 0.8, 0.58), ALARM = new THREE.Color(1.0, 0.36
 const CREW_HEX: Record<CrewId, string> = { cindle: '#ffa24a', nimbray: '#5fd0ff', tufflet: '#ff8fc4' };
 const UP = new THREE.Vector3(0, 1, 0);
 
-const FLAT_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-/** Where a tile can be laid: a square of marching light on the water, with a plus in it. */
-const SLOT_FS = /* glsl */ `
+const FLAT_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const SLOT_FS = `
 uniform float uTime, uHover; uniform vec3 uColor;
 varying vec2 vUv;
 void main(){
@@ -62,8 +50,7 @@ void main(){
   gl_FragColor = vec4(uColor * (edge + plus * 0.9 + fill) * (0.75 + 0.9 * uHover), 1.0);
   ${GLSL_OUTPUT}
 }`;
-/** Where the hook will come down: a ring that closes to a mark when it is on something. */
-const AIM_FS = /* glsl */ `
+const AIM_FS = `
 uniform float uLock, uShow; uniform vec3 uColor;
 varying vec2 vUv;
 void main(){
@@ -75,7 +62,7 @@ void main(){
   gl_FragColor = vec4(uColor * (ring + ticks + dot_) * uShow, 1.0);
   ${GLSL_OUTPUT}
 }`;
-const BEAM_VS = /* glsl */ `
+const BEAM_VS = `
 varying float vAlong, vFar; varying vec3 vN; varying vec3 vV;
 void main(){
   vAlong = position.z;
@@ -84,8 +71,7 @@ void main(){
   vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
   gl_Position = projectionMatrix * mv;
 }`;
-/** The lighthouse's beam: a cone of lit air, brightest looked at through its middle, thinning to nothing at its end. */
-const BEAM_FS = /* glsl */ `
+const BEAM_FS = `
 uniform float uStrength; uniform vec3 uColor;
 varying float vAlong, vFar; varying vec3 vN; varying vec3 vV;
 void main(){
@@ -109,7 +95,6 @@ const _slope = { x: 0, z: 0 };
 const _seaPlane = new THREE.Plane(UP, 0);
 const _deckPlane = new THREE.Plane(UP, -DECK * 0.5);
 
-/** The hook's line: a thin ribbon hung between two points and turned to face the eye. */
 class Rope {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private readonly position: Float32Array;
@@ -118,7 +103,6 @@ class Rope {
   private static readonly side = new THREE.Vector3();
   private static readonly sight = new THREE.Vector3();
 
-  /** Half the line's width, in metres. */
   width = 0.018;
 
   constructor(private readonly points = 18) {
@@ -132,14 +116,12 @@ class Rope {
     this.mesh.frustumCulled = false;
   }
 
-  /** Hangs the line from `from` to `to`, sagging `sag` metres at its middle. */
   hang(from: THREE.Vector3, to: THREE.Vector3, sag: number, eye: THREE.Vector3): void {
     const n = this.points, at = Rope.at, run = Rope.run, side = Rope.side;
     for (let i = 0; i < n; i++) {
       const k = i / (n - 1);
       at.lerpVectors(from, to, k);
       at.y -= sag * 4 * k * (1 - k);
-      // across the line: at right angles to its run and to the line of sight
       run.subVectors(to, from);
       run.y -= sag * 4 * (1 - 2 * k);
       side.crossVectors(run, Rope.sight.subVectors(eye, at));
@@ -151,7 +133,6 @@ class Rope {
   }
 }
 
-/** A tile of the raft as it is drawn: growing as it is lashed on, flashing as it lands. */
 interface TileView {
   readonly cx: number;
   readonly cz: number;
@@ -160,7 +141,6 @@ interface TileView {
   readonly turn: number;
 }
 
-/** Something afloat as it is drawn. */
 interface ItemView {
   grow: number;
   readonly yaw: number;
@@ -169,20 +149,11 @@ interface ItemView {
 
 type Shot = 'house' | 'raft' | 'arrive' | 'dark';
 
-/**
- * Driftlight: a raft on Haven's Tidewater at dusk, carried toward a lighthouse. Hook in what drifts by: glow for
- * the lantern, wood to lay the raft wider, three sprites adrift who come aboard and help. See the tide wyrm off
- * before it takes a plank.
- *
- * The rules are in voyage.ts and the water in sea.ts. This draws the one on the other, and lends the player a hook.
- */
 export class DriftWorld extends Minigame {
   readonly id = 'drift' as const;
   readonly soundscape = 'arcadeDrift' as const;
   voyage: Voyage | null = null;
-  /** Whether the voyage is under way and the hook is the player's. */
   sailing = false;
-  /** Hooks thrown and tiles laid by hand this voyage, for the tests. */
   readonly stats = { casts: 0, built: 0 };
 
   private stage!: Stage;
@@ -192,7 +163,6 @@ export class DriftWorld extends Minigame {
   private readonly rings = new Rings(14);
   private readonly rng = new Rng(4421);
 
-  // ---- the raft ----
   private readonly raft = new THREE.Group();
   private tiles!: Batch;
   private tileTall = 0.65;
@@ -203,18 +173,15 @@ export class DriftWorld extends Minigame {
   private mastGlowFull = 1;
   private lampHalo!: THREE.Sprite;
   private lamp: THREE.PointLight | null = null;
-  /** The lantern as it is drawn, 0..1: it follows the rules a moment behind, and jumps when it is fed. */
   private lit = 1;
   private lampPulse = 0;
   private shownLight = MAX_LIGHT;
 
-  // ---- what floats ----
   private readonly floats = {} as Record<Exclude<ItemKind, 'castaway'>, Batch>;
   private readonly itemViews = new Map<number, ItemView>();
   private readonly crew = {} as Record<CrewId, { actor: SpriteActor; aboard: boolean }>;
   private sparkIn = 1;
 
-  // ---- the hook ----
   private readonly hook = new THREE.Group();
   private readonly rope = new Rope();
   private readonly aim = new THREE.Vector3();
@@ -225,7 +192,6 @@ export class DriftWorld extends Minigame {
   private hoverSlot: { cx: number; cz: number } | null = null;
   private autoWait = 0;
 
-  // ---- the wyrm ----
   private wyrm!: THREE.Group;
   private wyrmGlow = { value: 1 };
   private wyrmGlowFull = 1;
@@ -233,7 +199,6 @@ export class DriftWorld extends Minigame {
   private readonly wyrmView = { rise: 0, flinch: 0, x: 0, z: 0, seen: false };
   private alarmIn = 0;
 
-  // ---- the way ----
   private readonly house = new THREE.Group();
   private readonly beams = new THREE.Group();
   private readonly beamU = { uStrength: { value: 0.5 }, uColor: { value: new THREE.Color(1.0, 0.86, 0.6) } };
@@ -245,7 +210,6 @@ export class DriftWorld extends Minigame {
   private boltIn = 4;
   private bolt = 0;
 
-  // ---- the picture, and what is written over it ----
   private shot: Shot = 'raft';
   private sweep = 1;
   private gaugeEl: UiEl | null = null;
@@ -261,12 +225,9 @@ export class DriftWorld extends Minigame {
 
   constructor() {
     super();
-    // in a headset the player stands at the front of the lantern's tile, the mast behind one shoulder, looking up the tide
     this.seat = anchor(-0.2, DECK, -0.1, 0);
     this.restFocus = 12;
   }
-
-  // ------------------------------------------------------------------------------------------------ building
 
   async build(ctx: BuildContext): Promise<void> {
     const scene = this.scene, q = ctx.quality;
@@ -276,7 +237,6 @@ export class DriftWorld extends Minigame {
     this.sea = new Sea(q);
     scene.add(this.sea.group, this.raft, this.rings.group, this.bursts.points);
 
-    // ---- Haven's islands, hanging over the water and going by ----
     const kinds = [{ id: 'island-a', turf: 10.4 }, { id: 'island-b', turf: 10.8 }] as const;
     const hung: [x: number, y: number, z: number, radius: number][] = [
       [-36, 7, -58, 9], [42, 10, -118, 12], [-72, 17, -186, 17], [60, 6, -250, 10], [-46, 12, -318, 13], [94, 24, -380, 20], [-112, 28, -96, 22], [33, 8, 24, 6], [-54, 14, -440, 15],
@@ -295,7 +255,6 @@ export class DriftWorld extends Minigame {
     }
     await ctx.step('drift: sea');
 
-    // ---- the raft: its tiles as one batch, the mast and its lantern ----
     const tileSize = await sizeOf(ctx, 'raft-tile');
     this.tileTall = tileSize[1];
     this.tileFit = TILE / tileSize[0];
@@ -325,7 +284,6 @@ export class DriftWorld extends Minigame {
       this.slots.push(slot);
     }
 
-    // ---- what the tide brings ----
     for (const kind of Object.keys(FLOAT) as (keyof typeof FLOAT)[]) this.floats[kind] = new Batch(await ctx.assets.instance(FLOAT[kind].id), kind === 'wood' ? 34 : 16, scene);
     for (const c of CASTAWAYS) {
       const actor = new SpriteActor(c.who, SPRITES[c.who].element, await ctx.assets.instance(`sp-${c.who}`), await sizeOf(ctx, `sp-${c.who}`));
@@ -335,7 +293,6 @@ export class DriftWorld extends Minigame {
     }
     await ctx.step('drift: raft');
 
-    // ---- the hook, its line, and where it is aimed ----
     const hookMetal = new THREE.MeshStandardMaterial({ color: 0xd4e6f4, metalness: 0.85, roughness: 0.25, emissive: 0x3fd0ff, emissiveIntensity: 0.7 });
     const crook = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.022, 8, 20, Math.PI * 1.3), hookMetal);
     crook.rotation.z = Math.PI * 0.85;
@@ -349,7 +306,6 @@ export class DriftWorld extends Minigame {
     this.aimMark.renderOrder = 3;
     scene.add(this.hook, this.rope.mesh, this.aimMark);
 
-    // ---- the tide wyrm, and the knocks it will take ----
     this.wyrm = await ctx.assets.instance('tide-wyrm');
     this.wyrm.scale.setScalar(WYRM_SCALE);
     this.wyrm.visible = false;
@@ -363,7 +319,6 @@ export class DriftWorld extends Minigame {
       this.pips.push(pip);
     }
 
-    // ---- the lighthouse, its beam, and Lumi on its jetty ----
     this.house.add(await ctx.assets.instance('lighthouse'));
     const cone = new THREE.ConeGeometry(1, 1, 24, 1, true).translate(0, -0.5, 0).rotateX(-Math.PI / 2);
     for (const turn of [0, Math.PI]) {
@@ -385,8 +340,6 @@ export class DriftWorld extends Minigame {
     this.lumi.root.add(aura);
     this.reset();
   }
-
-  // ------------------------------------------------------------------------------------------------ a voyage
 
   override reset(): void {
     this.voyage = null;
@@ -424,7 +377,6 @@ export class DriftWorld extends Minigame {
     const v = (this.voyage = new Voyage(new Rng(this.rng.int(1, 1e9)), plan));
     arcade.game.reach('drift.intro');
 
-    // ---- the lighthouse first, and Lumi on its jetty, a long way off ----
     this.shot = 'house';
     this.cam.cut();
     hud.setCard(MINIGAMES.drift.title, `${plan.name} · reach the lighthouse`);
@@ -435,7 +387,6 @@ export class DriftWorld extends Minigame {
     await arcade.talk(this.played === 0 ? DRIFT.intro : this.level > 0 && this.lastWon ? DRIFT.harder : DRIFT.again);
     this.played++;
 
-    // ---- then back across the water to the raft, and up to where the whole reach of the hook can be seen ----
     this.shot = 'raft';
     this.sweep = 0;
     this.cam.cut();
@@ -474,7 +425,6 @@ export class DriftWorld extends Minigame {
     return outcome;
   }
 
-  /** What the rules say has happened, made into something seen and heard. */
   private onEvent(e: VoyageEvent): void {
     const arcade = this.arcade, { audio, app } = arcade.game, v = this.voyage!, sea = this.sea;
     const onWater = (x: number, z: number, lift = 0.05): THREE.Vector3 => _a.set(x, sea.height(x, z) + lift, z);
@@ -491,14 +441,12 @@ export class DriftWorld extends Minigame {
       }
       case 'gather': {
         const kind = e.item.kind;
-        // brought in on the hook, it lands at the foot of the mast; otherwise it comes aboard where it was
         const at = e.by === 'hook' ? _a.set(0, this.raft.position.y + DECK + 0.3, 0) : onWater(e.item.x, e.item.z, 0.3);
         if (kind === 'wood' || kind === 'crate') {
           this.bursts.emit(at, { count: 12, color: WOOD, color2: WHITE, speed: 1.6, life: 0.5, size: 0.07, gravity: 3 });
           audio.sfx('woodGet', { pitch: this.rng.range(0.92, 1.12) });
         }
         if (kind === 'buoy' || kind === 'crate') {
-          // its light goes up the mast and into the lantern
           this.bursts.emit(at, { count: 22, color: WARM, color2: WHITE, speed: 1.2, life: 0.9, size: 0.1, gravity: -2.6, toward: UP });
           this.lampPulse = 1;
           if (kind === 'buoy') audio.sfx('glowGet', { pitch: 1 + 0.25 * clamp01(v.light / MAX_LIGHT) });
@@ -562,7 +510,6 @@ export class DriftWorld extends Minigame {
           }
         } else if (e.what === 'lunge') audio.sfx('wyrmLunge');
         else {
-          // the bite: splinters, spray, and the tile is gone
           const tile = _b.set(e.cx * TILE, this.raft.position.y + DECK, e.cz * TILE);
           audio.sfx('wyrmBite');
           arcade.hitStop(0.1);
@@ -592,7 +539,6 @@ export class DriftWorld extends Minigame {
     }
   }
 
-  /** Gives each sprite aboard a place on the raft: the tiles nearest the mast, or beside it while it is all there is. */
   private seatCrew(): void {
     const v = this.voyage;
     if (!v) return;
@@ -602,7 +548,6 @@ export class DriftWorld extends Minigame {
     v.crew.forEach((id, i) => {
       const cell = cells[i], actor = this.crew[id].actor;
       const [x, z] = cell ? [cell[0] * TILE, cell[1] * TILE] : beside[i]!;
-      // each looks out the way the tide comes from, turned a little to its own side
       actor.place(_a.set(x, DECK, z), _b.set(x * 1.6, DECK, z - 6));
     });
   }
@@ -625,9 +570,6 @@ export class DriftWorld extends Minigame {
     }
   }
 
-  // ------------------------------------------------------------------------------------------------ the player's hand
-
-  /** Where the hook is sent for a point on the water: onto the wyrm or the nearest thing, if the point is on one. */
   private target(v: Voyage, out: THREE.Vector3): void {
     this.locked = null;
     const w = v.wyrm;
@@ -645,7 +587,6 @@ export class DriftWorld extends Minigame {
       }
     }
     this.locked = best;
-    // a thing afloat will have drifted on a little by the time the hook comes down
     if (best) out.set(best.x, 0, best.z + (v.storm ? 2.0 : CRUISE) * (best.kind === 'castaway' ? 0.8 : 1) * HOOK_OUT);
     else out.copy(this.aim);
   }
@@ -655,7 +596,6 @@ export class DriftWorld extends Minigame {
     this.hoverSlot = null;
     this.aimOn = false;
     if (arcade.auto) {
-      // a scripted sailor: as good a one as `autoSkill` says
       this.locked = null;
       if ((this.autoWait -= dt) > 0) return;
       const deed = nextDeed(v);
@@ -669,7 +609,6 @@ export class DriftWorld extends Minigame {
       this.locked = null;
       return;
     }
-    // a place for a tile under the pointer, if there is the wood to lay one
     if (v.wood >= WOOD_PER_TILE && pointer.onPlane(_deckPlane, _p)) {
       const cx = Math.round(_p.x / TILE), cz = Math.round(_p.z / TILE);
       if (v.slots().some((s) => s.cx === cx && s.cz === cz)) this.hoverSlot = { cx, cz };
@@ -693,7 +632,6 @@ export class DriftWorld extends Minigame {
     this.toastEl = ui.add(560 + PAD * 2, 44 + PAD * 2, paintHint(() => this.toastText)).at(0, -1, 0, 150);
   }
 
-  /** The lantern, the wood in hand, and the raft: the three things a sailor keeps an eye on. */
   private paintGauge(): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, v = this.voyage;
@@ -704,7 +642,6 @@ export class DriftWorld extends Minigame {
       ctx.font = font(600, 11.5);
       ctx.fillStyle = theme.dim;
       spaced(ctx, DRIFT.hud.lantern.toUpperCase(), x, PAD + 19, 2.5);
-      // the lantern: a bar of its own light, which goes rose when it is nearly out
       const k = clamp01(this.shownLight / MAX_LIGHT), low = this.shownLight < 22;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.13)';
       roundRect(ctx, x, PAD + 32, right - x, 11, 5.5);
@@ -720,7 +657,6 @@ export class DriftWorld extends Minigame {
         ctx.fill();
         ctx.shadowBlur = 0;
       }
-      // wood: a pip for each plank toward the next tile, and how many planks are over
       const ready = v.wood >= WOOD_PER_TILE;
       ctx.fillStyle = theme.dim;
       spaced(ctx, DRIFT.hud.wood.toUpperCase(), x, PAD + 65, 2.5);
@@ -733,7 +669,6 @@ export class DriftWorld extends Minigame {
       ctx.font = font(700, 13);
       ctx.fillStyle = ready ? theme.accent : theme.dim;
       ctx.fillText(ready ? DRIFT.hud.lay : `${v.wood} / ${WOOD_PER_TILE}`, right, PAD + 66);
-      // the raft, and the size that earns its star
       const fine = v.tiles.size >= v.plan.raft;
       ctx.textAlign = 'left';
       ctx.font = font(600, 11.5);
@@ -747,7 +682,6 @@ export class DriftWorld extends Minigame {
     };
   }
 
-  /** The way: the raft along a line to the lighthouse, the squall marked on it, and who has been brought aboard. */
   private paintWay(): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, v = this.voyage;
@@ -757,7 +691,6 @@ export class DriftWorld extends Minigame {
       ctx.font = font(600, 11.5);
       ctx.fillStyle = theme.dim;
       spaced(ctx, `${MINIGAMES.drift.title} · ${v.plan.name}`.toUpperCase(), PAD + 16, PAD + 19, 2.5);
-      // the three sprites: a ring for each, filled once it is aboard
       CASTAWAYS.forEach((c, i) => {
         const cx = w - PAD - 22 - (CASTAWAYS.length - 1 - i) * 20;
         ctx.beginPath();
@@ -795,7 +728,6 @@ export class DriftWorld extends Minigame {
       ctx.moveTo(x0, y);
       ctx.lineTo(at(v.progress), y);
       ctx.stroke();
-      // the raft: a small lit diamond
       const rx = at(v.progress);
       ctx.fillStyle = theme.text;
       ctx.shadowColor = theme.accent;
@@ -807,7 +739,6 @@ export class DriftWorld extends Minigame {
       ctx.lineTo(rx - 7, y);
       ctx.closePath();
       ctx.fill();
-      // the lighthouse: a tower with its lamp lit
       const lx = w - PAD - 20;
       ctx.fillStyle = theme.accent;
       ctx.beginPath();
@@ -824,8 +755,6 @@ export class DriftWorld extends Minigame {
     };
   }
 
-  // ------------------------------------------------------------------------------------------------ the frame
-
   tick(dt: number, time: number): void {
     const arcade = this.arcade, { app, audio } = arcade.game, v = this.voyage;
     this.rings.update(dt);
@@ -839,7 +768,6 @@ export class DriftWorld extends Minigame {
       }
     }
 
-    // ---- the tide: it carries the raft whenever the lantern is alight ----
     const lost = v?.over === 'dark' || v?.over === 'sunk';
     this.speed = damp(this.speed, lost ? 0.25 : v?.over === 'arrived' ? 0.3 : v?.storm ? 2.0 : CRUISE, 1.2, dt);
     this.sea.flow += this.speed * dt;
@@ -849,7 +777,6 @@ export class DriftWorld extends Minigame {
       isle.object.position.y = isle.baseY + Math.sin(time * 0.17 + isle.phase) * 0.5;
     }
 
-    // ---- the weather ----
     this.stormK = damp(this.stormK, v?.storm && !v.over ? 1 : 0, 0.7, dt);
     this.bolt = Math.max(0, this.bolt - dt * 5);
     if (this.stormK > 0.5 && (this.boltIn -= dt) <= 0) {
@@ -859,13 +786,11 @@ export class DriftWorld extends Minigame {
       app.tasks.wait(this.rng.range(0.25, 1.1), arcade.signal).then(() => audio.sfx('thunder', { pitch: this.rng.range(0.85, 1.1) }), () => undefined);
     }
 
-    // ---- the lantern ----
     const light = v ? v.light : MAX_LIGHT;
     this.shownLight = damp(this.shownLight, light, 6, dt);
     this.lit = damp(this.lit, clamp01(light / MAX_LIGHT), 4, dt);
     this.lampPulse = damp(this.lampPulse, 0, 5, dt);
 
-    // ---- the raft's tiles, as the rules have them ----
     if (v) {
       for (const key of v.tiles) {
         if (this.tileViews.has(key)) continue;
@@ -879,21 +804,18 @@ export class DriftWorld extends Minigame {
       view.flash = damp(view.flash, 0, 5, dt);
     }
 
-    // ---- the wyrm ----
     const view = this.wyrmView, up = !!v && v.wyrm.state !== 'away' && !v.over;
     view.rise = damp(view.rise, up ? 1 : 0, up ? 5 : 3.2, dt);
     view.flinch = damp(view.flinch, 0, 6, dt);
     if (v && up) {
       view.x = v.wyrm.x;
       view.z = v.wyrm.z;
-      // the tile it wants is marked, again and again, until it is seen off or has it
       if ((this.alarmIn -= dt) <= 0) {
         this.alarmIn = 0.5;
         this.rings.emit(_a.set(v.wyrm.cx * TILE, this.raft.position.y + DECK + 0.06, v.wyrm.cz * TILE), 1.7, ALARM, 0.5);
       }
     }
 
-    // ---- the sprites: adrift where the rules have them, aboard where they have been sat ----
     if (v) {
       for (const item of v.items) {
         if (item.kind !== 'castaway' || !item.who) continue;
@@ -907,12 +829,10 @@ export class DriftWorld extends Minigame {
         }
         actor.place(_a.set(item.x, this.sea.height(item.x, item.z) + 0.12, item.z), _b.set(0, 0, 0));
       }
-      // one that drifted past unhooked is gone until the tide brings it round again
       for (const c of CASTAWAYS) {
         const crew = this.crew[c.who];
         if (!crew.aboard && !crew.actor.gone && !v.items.some((i) => i.who === c.who)) crew.actor.root.visible = false;
       }
-      // Cindle feeds the lantern: a spark goes up to it every so often
       if (this.crew.cindle.aboard && (this.sparkIn -= dt) <= 0) {
         this.sparkIn = this.rng.range(0.7, 1.4);
         this.bursts.emit(this.crew.cindle.actor.centre(_a), { count: 3, color: WARM, color2: WHITE, speed: 0.5, life: 1.1, size: 0.08, gravity: -1.8, toward: UP });
@@ -920,7 +840,6 @@ export class DriftWorld extends Minigame {
     }
     for (const c of CASTAWAYS) this.crew[c.who].actor.update(dt, time);
 
-    // ---- what is written over the picture ----
     if (v && this.gaugeEl) {
       const key = `${Math.round(this.shownLight)}|${v.wood}|${v.tiles.size}`;
       if (key !== this.gaugeKey) {
@@ -941,33 +860,28 @@ export class DriftWorld extends Minigame {
   private moveCamera(time: number): void {
     const cam = this.cam, k = this.sweep, house = this.house.position;
     const sway = Math.sin(time * 0.21) * 0.3, storm = this.stormK;
-    // where the whole reach of the hook can be seen: the view the voyage is sailed from
     _a.set(sway + Math.sin(time * 0.9) * 0.12 * storm, 9.9 + this.raft.position.y * 0.6, 10.7);
     _b.set(0, 0, -2.0);
     switch (this.shot) {
       case 'house':
-        // from the end of the jetty, between its two lanterns, to Lumi, with the tower going up out of the picture behind her
         cam.eye.set(house.x + 9.6 + Math.sin(time * 0.3) * 0.15, 1.75, house.z + HOUSE.jetty.z + 0.5);
         cam.target.set(house.x + HOUSE.jetty.x, HOUSE.jetty.y - HOUSE.sink + 1.0, house.z + HOUSE.jetty.z);
         cam.fov = 36;
         cam.ease = 2.5;
         break;
       case 'raft':
-        // from low astern, the lighthouse a long way ahead, up to the sailing view
         cam.eye.set(lerp(2.4, _a.x, k), lerp(1.45, _a.y, k), lerp(5.6, _a.z, k));
         cam.target.set(lerp(-1.6, _b.x, k), lerp(2.0, _b.y, k), lerp(-40, _b.z, k));
         cam.fov = lerp(44, VIEW, k);
         cam.ease = k < 1 ? 30 : 4;
         break;
       case 'arrive':
-        // down beside the raft, to look up at the lighthouse it has reached
         cam.eye.set(lerp(_a.x, 5.6, k), lerp(_a.y, 1.9, k), lerp(_a.z, 7.4, k));
         cam.target.set(lerp(_b.x, house.x + 4.5, k), lerp(_b.y, 6.6, k), lerp(_b.z, house.z, k));
         cam.fov = lerp(VIEW, 56, k);
         cam.ease = 30;
         break;
       case 'dark':
-        // in close on the mast, where the light was
         cam.eye.set(lerp(_a.x, 1.2, k), lerp(_a.y, 3.4, k), lerp(_a.z, 5.6, k));
         cam.target.set(0, lerp(_b.y, DECK + 1.5, k), lerp(_b.z, 0, k));
         cam.fov = lerp(VIEW, 40, k);
@@ -983,7 +897,6 @@ export class DriftWorld extends Minigame {
     this.bursts.update(dt, frame.pixelHeight);
     camera.getWorldPosition(_eye);
 
-    // ---- the weather, in the light and the air ----
     const dark = this.shot === 'dark' ? this.sweep : 0;
     this.look.exposure = lerp(0.98, 0.82, storm) * (1 - 0.45 * dark) + this.bolt * 0.5;
     this.look.saturation = lerp(1.22, 0.96, storm);
@@ -992,7 +905,6 @@ export class DriftWorld extends Minigame {
     this.fog.density = lerp(0.0046, 0.011, storm);
     sea.storm = storm;
 
-    // ---- the raft, riding the swell ----
     sea.slope(0, 0, _slope);
     const raftY = sea.height(0, 0) * 0.55;
     this.raft.position.y = raftY;
@@ -1010,7 +922,6 @@ export class DriftWorld extends Minigame {
     }
     this.tiles.end();
 
-    // ---- where a tile can be laid, once there is the wood for one ----
     const open = v && this.sailing && v.wood >= WOOD_PER_TILE ? v.slots() : [];
     this.slots.forEach((slot, i) => {
       const cell = open[i];
@@ -1021,7 +932,6 @@ export class DriftWorld extends Minigame {
       slot.material.uniforms.uHover!.value = damp(slot.material.uniforms.uHover!.value as number, hover ? 1 : 0, 14, dt);
     });
 
-    // ---- the lantern: its glass, its halo, the light it throws, and the pool of it on the water ----
     const flicker = this.lit < 0.22 ? 0.75 + 0.25 * Math.sin(time * 17) * Math.sin(time * 7.3) : 1;
     const glow = (0.06 * (1 - dark) + 0.94 * this.lit) * flicker + 0.6 * this.lampPulse;
     this.mastGlow.value = this.mastGlowFull * glow;
@@ -1032,7 +942,6 @@ export class DriftWorld extends Minigame {
     sea.reach = v ? v.reach : 8.6;
     sea.ring = damp(sea.ring, this.sailing ? 1 : 0, 3, dt);
 
-    // ---- what floats ----
     sea.beginRipples();
     sea.ripple(((left + right) / 2) * TILE, 0, (Math.max(right - left, back * 2) + 2.4) * TILE, 0.13, 0.9);
     sea.setWake((right - left + 1) * TILE, (back + 0.5) * TILE, clamp01(this.speed / CRUISE));
@@ -1043,7 +952,6 @@ export class DriftWorld extends Minigame {
         let view = this.itemViews.get(item.id);
         if (!view) this.itemViews.set(item.id, (view = { grow: 0, yaw: item.phase * 3, spin: (item.phase - 3.14) * 0.05 }));
         view.grow = Math.min(1, view.grow + dt * 1.4);
-        // nothing is drawn floating through the lighthouse's rock
         if (Math.abs(item.x - house.x) < HOUSE.half && Math.abs(item.z - house.z) < HOUSE.half) continue;
         const kind = item.kind === 'castaway' ? 'wood' : item.kind, float = FLOAT[kind];
         const water = sea.height(item.x, item.z), bob = Math.sin(time * 1.7 + item.phase * 5) * 0.03;
@@ -1061,9 +969,7 @@ export class DriftWorld extends Minigame {
     }
     for (const batch of Object.values(this.floats)) batch.end();
 
-    // ---- the hook and its line ----
     const hand = this.arcade.game.input.xrRay, head = this.hook.position, state = v?.hook.state ?? 'ready';
-    // on a screen the line is made fast to the mast; in a headset it is in the hand that holds the controller
     const from = hand ? _a.copy(hand.origin).addScaledVector(hand.direction, 0.06) : _a.set(MAST.x + 0.1, raftY + DECK + PEG, MAST.z - 0.05);
     if (!v || state === 'ready') {
       if (hand) head.copy(hand.origin).addScaledVector(hand.direction, 0.2);
@@ -1077,11 +983,9 @@ export class DriftWorld extends Minigame {
     }
     this.hook.rotation.set(0, state === 'out' ? time * 14 : 0, 0);
     this.hook.scale.setScalar(hand && state === 'ready' ? 0.6 : 1);
-    // (held a hand's length from the eye it is a line; seen from the masthead it has to be drawn thick enough to see)
     this.rope.width = hand ? 0.004 : 0.018;
     this.rope.hang(from, head, state === 'out' ? 0.35 : state === 'back' ? 0.08 : 0.02, _eye);
 
-    // ---- where it is aimed ----
     const mark = this.aimMark, show = this.aimOn && this.sailing && v?.hook.state === 'ready' ? 1 : 0;
     mark.material.uniforms.uShow!.value = damp(mark.material.uniforms.uShow!.value as number, show, 12, dt);
     this.aimLock = damp(this.aimLock, this.locked ? 1 : 0, 16, dt);
@@ -1090,20 +994,17 @@ export class DriftWorld extends Minigame {
     if (this.aimOn && v) {
       const lockedItem = this.locked && this.locked !== 'wyrm' ? this.locked : null;
       const x = this.locked === 'wyrm' ? v.wyrm.x : lockedItem ? lockedItem.x : this.aim.x, z = this.locked === 'wyrm' ? v.wyrm.z : lockedItem ? lockedItem.z : this.aim.z;
-      // the mark stops where the line does
       const d = Math.hypot(x, z), within = d > v.reach ? v.reach / d : 1;
       mark.position.set(x * within, sea.height(x * within, z * within) + 0.06, z * within);
       mark.scale.setScalar(this.locked === 'wyrm' ? 2.6 : 1.5);
     }
 
-    // ---- the wyrm ----
     const view = this.wyrmView, body = this.wyrm;
     body.visible = view.seen && view.rise > 0.02;
     if (body.visible && v) {
       const w = v.wyrm, lunging = w.state === 'lunging' ? 1 - Math.max(0, w.timer / 0.55) : 0;
       const tx = w.cx * TILE, tz = w.cz * TILE;
       body.position.set(view.x, sea.height(view.x, view.z) - 0.3 - (1 - ease.outCubic(view.rise)) * 3.2 - lunging * 0.5, view.z);
-      // it watches the tile it wants; knocked, it rears back; lunging, it comes down on the raft
       body.rotation.set(-0.5 * view.flinch + 0.9 * lunging + Math.sin(time * 2.1) * 0.05, Math.atan2(tx - view.x, tz - view.z), Math.sin(time * 1.6) * 0.07);
       body.scale.set(WYRM_SCALE * (1 + 0.14 * view.flinch), WYRM_SCALE * (1 - 0.16 * view.flinch), WYRM_SCALE * (1 + 0.14 * view.flinch));
       this.wyrmGlow.value = this.wyrmGlowFull * (1 + 5 * view.flinch);
@@ -1115,13 +1016,10 @@ export class DriftWorld extends Minigame {
       });
     } else for (const pip of this.pips) pip.visible = false;
 
-    // ---- the lighthouse: nearer with every second sailed, its beam going round ----
     const plan = v?.plan ?? PLANS[this.level]!, toGo = v ? Math.max(0, plan.length - v.time) : plan.length;
-    // (having arrived, the raft goes on gliding in under the tower)
     const house = this.house.position.set(HOUSE.x, -HOUSE.sink, HOUSE.z - toGo * CRUISE + (this.shot === 'arrive' ? 4.5 * this.sweep : 0));
     const turn = time * 0.55;
     this.beams.rotation.y = turn;
-    // (faint: against a bright dusk sky anything more is a white wedge)
     this.beamU.uStrength.value = 0.11 * (1 - 0.4 * storm);
     sea.beam.set(house.x, house.z, turn, 0.9);
     this.houseLamp.material.color.setRGB(1.0, 0.85, 0.6).multiplyScalar(0.8 + 0.2 * Math.sin(time * 3.1));

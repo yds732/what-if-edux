@@ -13,35 +13,24 @@ import { recolourHavenProps } from '../world/haven/recolour';
 import { KEY_DIR, PLANET_DIR, buildSky, type HavenSky } from '../world/haven/sky';
 
 export interface StageOptions {
-  /** The island the game stands on: its turf is the plane y = 0. Leave out for a game with no ground of its own (a sea). */
   readonly island?: { readonly radius: number; readonly depth?: number; readonly seed?: number; readonly flat?: number; readonly hills?: number };
-  /** Blades of grass on it at full density, and what part of it stays bare: return true for a point that should be. */
   readonly grass?: number;
   readonly bare?: (x: number, z: number) => boolean;
-  /** Glowing flowers at full density. */
   readonly flowers?: number;
-  /** Paper lanterns floating in a ring about the island, and fireflies over it. */
   readonly lanterns?: number;
   readonly motes?: number;
-  /** Islands drifting in the distance, as in Haven itself. */
   readonly farIslands?: boolean;
-  /** How far the cloud sea lies below. */
   readonly cloudSea?: number | null;
-  /** Half the width of ground the key light's shadows cover, around `shadowCentre`. */
   readonly shadowSpan?: number;
   readonly shadowCentre?: THREE.Vector3;
-  /** Where the key light comes from. Haven's own by default: over the player's shoulder, so faces read. */
   readonly keyDir?: THREE.Vector3;
   readonly seed?: number;
 }
 
-/** What every world of the arcade shares with Haven: its sky and planet, its light, its rock and turf. */
 export interface Stage {
-  /** Seconds, as a uniform: shaders that sway or flow take this one. */
   readonly time: { value: number };
   readonly sky: HavenSky;
   readonly island: Island | null;
-  /** The clouds below, if the world has them: their colours are uniforms (uLit, uShade, uHaze, uGlow). */
   readonly cloudSea: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null;
   readonly key: THREE.DirectionalLight;
   readonly rim: THREE.DirectionalLight;
@@ -49,15 +38,9 @@ export interface Stage {
   update(frame: FrameContext): void;
 }
 
-/**
- * Sets a world of the arcade in Haven's sky. A portal leads somewhere else on the same evening: the same ringed
- * planet and aurora, the same warm key and cool rim, the same cobalt rock under emerald turf. Each game then
- * grades the picture its own way through its `look`.
- */
 export const buildStage = async (ctx: BuildContext, world: World, o: StageOptions = {}): Promise<Stage> => {
   const scene = world.scene, q = ctx.quality, rng = new Rng(o.seed ?? 31);
   const time = windUniforms.uTime;
-  // Haven's props are repainted as they are drawn: the same repaint, in case this world is built before Haven is
   await recolourHavenProps(ctx);
 
   world.near = 0.08;
@@ -139,7 +122,6 @@ export const buildStage = async (ctx: BuildContext, world: World, o: StageOption
   }
   for (const m of motes) scene.add(m.points);
 
-  // far islands: the same two models Haven hangs in its own sky, drifting
   const drifting: { object: THREE.Object3D; baseY: number; phase: number; amp: number }[] = [];
   if (o.farIslands ?? true) {
     const far: [x: number, y: number, z: number, radius: number][] = [

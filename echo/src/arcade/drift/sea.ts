@@ -2,30 +2,17 @@ import * as THREE from 'three';
 import { Rng } from '../../core/math';
 import { GLSL_NOISE, GLSL_OUTPUT } from '../../render/glsl';
 
-/**
- * Haven's Tidewater: the sea a raft is carried across, and what the weather does to it.
- *
- * The water is an ordinary lit material with the swell written into it, so that it takes the sky's reflection, the
- * key light's glitter, the lantern's glow and the raft's shadow exactly as everything standing on it does. The
- * swell is four waves; the same four are worked out here for anything that floats (`Sea.height`), so that a plank
- * rides the wave that is drawn under it.
- */
-
-/** The swell: which way each wave runs (x, z), its length and height in metres, and its speed over the water in m/s. */
 const SWELLS = [
   { dir: [0.24, 0.97], length: 17, height: 0.15, speed: 2.1 },
   { dir: [-0.5, 0.87], length: 9.2, height: 0.09, speed: 1.6 },
   { dir: [0.71, 0.71], length: 5.3, height: 0.05, speed: 1.25 },
   { dir: [-0.16, 0.99], length: 3.1, height: 0.028, speed: 0.95 },
 ] as const;
-/** The tallest the swell stands at an amplitude of 1. */
 const SWELL_HEIGHT = SWELLS.reduce((sum, w) => sum + w.height, 0);
-/** Past this the water is drawn flat: the horizon is a clean line, and nothing shimmers there. */
 const FLAT_FROM = 120, FLAT_BY = 420;
 
 const f = (n: number): string => (Number.isInteger(n) ? `${n}.0` : String(n));
-/** The swell as shader source, from the same numbers: height at `p` (already carried along by the tide) and its slope. */
-const GLSL_SWELL = /* glsl */ `
+const GLSL_SWELL = `
 uniform float uSeaTime, uFlow, uAmp;
 float seaWave(vec2 p, out vec2 slope){
   float h = 0.0; slope = vec2(0.0);
@@ -39,15 +26,14 @@ ${SWELLS.map((w) => {
 float seaFlat(vec2 p){ return 1.0 - smoothstep(${f(FLAT_FROM)}, ${f(FLAT_BY)}, length(p)); }
 `;
 
-const RIPPLE_VS = /* glsl */ `
+const RIPPLE_VS = `
 attribute vec2 aRipple;      // phase, strength
 varying vec2 vUv; varying vec2 vRipple;
 void main(){
   vUv = uv; vRipple = aRipple;
   gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
 }`;
-/** Foam about something afloat: lace that clings to it, and a ring that widens downstream and is gone. */
-const RIPPLE_FS = /* glsl */ `
+const RIPPLE_FS = `
 ${GLSL_NOISE}
 uniform float uSeaTime; uniform vec3 uFoam;
 varying vec2 vUv; varying vec2 vRipple;
@@ -63,9 +49,8 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const WAKE_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-/** The water the raft has parted: two broken lines of foam that open out behind it, and flecks of it between them. */
-const WAKE_FS = /* glsl */ `
+const WAKE_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const WAKE_FS = `
 ${GLSL_NOISE}
 uniform float uSeaTime, uFlow, uStrength; uniform vec3 uFoam;
 varying vec2 vUv;
@@ -82,7 +67,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const RAIN_VS = /* glsl */ `
+const RAIN_VS = `
 attribute vec4 aDrop;        // x, z, phase, which end of the streak
 uniform float uSeaTime, uRain; uniform vec3 uEye;
 varying float vEnd;
@@ -97,7 +82,7 @@ void main(){
   p += vec3(-0.22, 1.0, 0.3) * (aDrop.w * 0.62);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
-const RAIN_FS = /* glsl */ `
+const RAIN_FS = `
 uniform float uRain; uniform vec3 uColor;
 varying float vEnd;
 void main(){
@@ -110,7 +95,6 @@ const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const FLAT = new THREE.Quaternion();
 
-/** A disc of water finely cut near the middle, where the raft is, and coarsely out to the horizon. */
 const seaGeometry = (segments: number): THREE.BufferGeometry => {
   const radii: number[] = [];
   for (let r = 0.3; r < 12; r += 0.3) radii.push(r);
@@ -134,15 +118,11 @@ const seaGeometry = (segments: number): THREE.BufferGeometry => {
 
 export class Sea {
   readonly group = new THREE.Group();
-  /** How far the tide has carried the water past the raft, in metres: everything drawn on the water moves with it. */
   flow = 0;
-  /** 0 in fair weather, 1 in the thick of a squall. */
   storm = 0;
-  /** The lantern, 0..1; how far its light (and the hook's line) reaches; and whether the edge of it is marked. */
   light = 1;
   reach = 8;
   ring = 0;
-  /** The lighthouse's beam on the water: where the lighthouse stands (x, z), the way the beam points, how bright. */
   readonly beam = new THREE.Vector4(0, -200, 0, 0);
 
   private time = 0;
@@ -166,21 +146,21 @@ export class Sea {
       Object.assign(shader.uniforms, u);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>\n${GLSL_SWELL}\nvarying vec3 vSea;`)
-        .replace('#include <beginnormal_vertex>', /* glsl */ `
+        .replace('#include <beginnormal_vertex>', `
           vec2 seaSlope; float seaFar = seaFlat(position.xz);
           float seaH = seaWave(vec2(position.x, position.z - uFlow), seaSlope) * seaFar;
           vec3 objectNormal = normalize(vec3(-seaSlope.x * seaFar, 1.0, -seaSlope.y * seaFar));`)
-        .replace('#include <begin_vertex>', /* glsl */ `
+        .replace('#include <begin_vertex>', `
           vec3 transformed = vec3(position.x, seaH, position.z);
           vSea = transformed;`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', /* glsl */ `#include <common>
+        .replace('#include <common>', `#include <common>
 ${GLSL_NOISE}
 ${GLSL_SWELL}
 uniform float uStorm, uLight, uReach, uRing; uniform vec3 uDeep, uShallow, uFoam, uLantern, uSpark; uniform vec4 uBeam;
 varying vec3 vSea;
 float seaFoam = 0.0;`)
-        .replace('#include <color_fragment>', /* glsl */ `#include <color_fragment>
+        .replace('#include <color_fragment>', `#include <color_fragment>
 {
   vec2 sp = vec2(vSea.x, vSea.z - uFlow);
   // troughs are deep water, crests let the light through
@@ -191,9 +171,9 @@ float seaFoam = 0.0;`)
   seaFoam = smoothstep(0.8 - 0.3 * uStorm, 1.0, crest) * smoothstep(0.4, 0.68, lace) * seaFlat(vSea.xz);
   diffuseColor.rgb = mix(diffuseColor.rgb, uFoam, seaFoam * 0.85);
 }`)
-        .replace('#include <roughnessmap_fragment>', /* glsl */ `#include <roughnessmap_fragment>
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
 roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
-        .replace('#include <normal_fragment_maps>', /* glsl */ `
+        .replace('#include <normal_fragment_maps>', `
 {
   vec2 sp = vec2(vSea.x, vSea.z - uFlow);
   vec2 slope; seaWave(sp, slope);
@@ -207,7 +187,7 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
   vec3 seaNormal = normalize(vec3(-(slope.x + rip.x), 1.0, -(slope.y + rip.y)));
   normal = normalize((viewMatrix * vec4(seaNormal, 0.0)).xyz);
 }`)
-        .replace('#include <emissivemap_fragment>', /* glsl */ `#include <emissivemap_fragment>
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
 {
   float d = length(vSea.xz);
   // the lantern's light lying on the water, and the edge of it: as far as the hook's line will reach
@@ -232,7 +212,6 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     surface.frustumCulled = false;
     this.group.add(surface);
 
-    // ---- foam about whatever floats ----
     const quad = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.rippleData = new Float32Array(ripples * 2);
     quad.setAttribute('aRipple', new THREE.InstancedBufferAttribute(this.rippleData, 2).setUsage(THREE.DynamicDrawUsage));
@@ -249,7 +228,6 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     this.wake.frustumCulled = false;
     this.group.add(this.ripples, this.wake);
 
-    // ---- rain, for the squall ----
     const drops = Math.round(1500 * quality.density) + 300, rng = new Rng(808);
     const drop = new Float32Array(drops * 2 * 4);
     for (let i = 0; i < drops; i++) {
@@ -266,12 +244,10 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     this.group.add(this.rain);
   }
 
-  /** How high the swell stands in fair weather and at the height of a squall, as a share of its full height. */
   private get amp(): number {
     return 0.55 + 1.25 * this.storm;
   }
 
-  /** The height of the water at a point: what a floating thing there rides on. */
   height(x: number, z: number): number {
     const flat = 1 - THREE.MathUtils.smoothstep(Math.hypot(x, z), FLAT_FROM, FLAT_BY), pz = z - this.flow;
     let h = 0;
@@ -282,19 +258,16 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     return h * this.amp * flat;
   }
 
-  /** How the water leans at a point: its fall along x and along z, for tilting what floats there. */
   slope(x: number, z: number, out: { x: number; z: number }): void {
     const e = 0.4;
     out.x = (this.height(x + e, z) - this.height(x - e, z)) / (2 * e);
     out.z = (this.height(x, z + e) - this.height(x, z - e)) / (2 * e);
   }
 
-  /** Begins a frame's foam: every floating thing then asks for its own. */
   beginRipples(): void {
     this.rippleCount = 0;
   }
 
-  /** Foam about something afloat at (x, z), `size` metres across. `phase` 0..1 keeps neighbours out of step. */
   ripple(x: number, z: number, size: number, phase: number, strength = 1): void {
     const i = this.rippleCount;
     if (i >= this.rippleData.length / 2) return;
@@ -304,7 +277,6 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     this.rippleCount++;
   }
 
-  /** The raft's wake: `width` metres across where it leaves the raft at z = `from`. */
   setWake(width: number, from: number, strength: number): void {
     const long = 9 + width * 1.6;
     this.wake.scale.set(width * 2.6, 1, long);
@@ -322,7 +294,6 @@ roughnessFactor = mix(roughnessFactor, 0.7, seaFoam);`)
     u.uLight.value = this.light;
     u.uReach.value = this.reach;
     u.uRing.value = this.ring;
-    // fair weather: cobalt going to teal where the light comes through. A squall: slate, and the foam goes grey
     u.uDeep.value.setRGB(0.006, 0.04, 0.115).lerp(_c.setRGB(0.012, 0.024, 0.05), s);
     u.uShallow.value.setRGB(0.012, 0.2, 0.27).lerp(_c.setRGB(0.03, 0.085, 0.13), s);
     u.uFoam.value.setRGB(0.62, 0.82, 0.92).lerp(_c.setRGB(0.42, 0.5, 0.6), s);

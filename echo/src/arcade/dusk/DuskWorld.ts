@@ -17,30 +17,20 @@ import { buildStage, type Stage as Scenery } from '../stage';
 import { PAD, paintHint, type Paint, type UiEl } from '../ui';
 import { GAP, LANE, MAX_FLOCK, STAGES, March, flockRadius, labelOf, leadFor, toneOf, worthOf, type Foe, type GateOp, type MarchEvent } from './march';
 
-/** How wide the march is seen, in degrees. */
 const VIEW = 52;
-/** How far to either side the deck of light reaches, and how far up the bridge it is drawn. */
 const DECK = LANE + 0.55, AHEAD = 78, BEHIND = 16;
-/** A gate: how tall its film of light stands, and where the middle of each of the pair is. */
 const GATE_TALL = 2.7, GATE_MID = (GAP + LANE) / 2 + 0.05, GATE_WIDE = LANE - GAP + 0.1, LABEL_WIDE = 2.5;
-/** Lanterns hang along both sides of the bridge, this far apart: dark ahead of the flock, alight behind it. */
 const LANTERN_EVERY = 9, LANTERNS = 12;
-/** The light of each kind of gate, and of the dusk it stands in. */
 const TONE = { good: new THREE.Color(0.25, 1.0, 0.72), bad: new THREE.Color(1.0, 0.3, 0.48), quick: new THREE.Color(1.0, 0.76, 0.26) } as const;
 const TONE_HEX = { good: '#5dffc0', bad: '#ff6f96', quick: '#ffc866' } as const;
-/** Gloomlings are drawn larger than they were made: a horde should be seen. */
 const LING_SCALE = 1.65, BRUTE_SCALE = 1.2;
 const SPARK = new THREE.Color(1.0, 0.74, 0.34), WHITE = new THREE.Color(1, 0.97, 0.9), SMOKE = new THREE.Color(0.55, 0.42, 0.95);
 const DUSK_FOG = new THREE.Color(0x1c1036), DAWN_FOG = new THREE.Color(0x4a6a8a);
 const UP = new THREE.Vector3(0, 1, 0);
 
-const FLAT_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-const DECK_VS = /* glsl */ `varying vec3 vAt; void main(){ vAt = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-/**
- * The bridge: panes of light going by under the flock, a bright rail to either side. Ahead it runs into the dusk
- * and is lost; behind the flock it burns brighter, as if they had lit it by walking on it.
- */
-const DECK_FS = /* glsl */ `
+const FLAT_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const DECK_VS = `varying vec3 vAt; void main(){ vAt = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const DECK_FS = `
 uniform float uTime, uGone, uDawn, uHalf, uGain; uniform vec3 uLight, uDusk;
 varying vec3 vAt;
 float sdBox(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r; }
@@ -61,8 +51,7 @@ void main(){
   gl_FragColor = vec4(c * uGain, (0.34 + 0.6 * max(edge, diamond * 0.6)) * max(inside, rail) * far);
   ${GLSL_OUTPUT}
 }`;
-/** One of a pair of gates: a film of light in its own colour, lines of it climbing, a frame round it. */
-const GATE_FS = /* glsl */ `
+const GATE_FS = `
 uniform float uTime, uShow, uFlash; uniform vec3 uColor;
 varying vec2 vUv;
 void main(){
@@ -74,8 +63,7 @@ void main(){
   gl_FragColor = vec4(uColor * ((frame * 2.2 + body * 1.5) * uShow + uFlash * (0.8 + 1.0 * climb)), 1.0);
   ${GLSL_OUTPUT}
 }`;
-/** The dusk itself, hung across the far end of the bridge: smoke, thick below and ragged at its top, that everything comes out of. */
-const CURTAIN_FS = /* glsl */ `
+const CURTAIN_FS = `
 ${GLSL_NOISE}
 uniform float uTime, uShow; uniform vec3 uColor;
 varying vec2 vUv;
@@ -96,7 +84,7 @@ void main(){
   gl_FragColor = vec4(c, body * ends * uShow);
   ${GLSL_OUTPUT}
 }`;
-const SPARK_VS = /* glsl */ `
+const SPARK_VS = `
 attribute float aSize;
 uniform float uPixel;
 void main(){
@@ -104,7 +92,7 @@ void main(){
   gl_Position = projectionMatrix * mv;
   gl_PointSize = min(aSize * uPixel * 0.85 / max(-mv.z, 0.3), 64.0);
 }`;
-const SPARK_FS = /* glsl */ `
+const SPARK_FS = `
 uniform vec3 uColor;
 void main(){
   vec2 q = gl_PointCoord - 0.5; float r = length(q) * 2.0;
@@ -119,26 +107,21 @@ const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const _a = new THREE.Vector3();
 const _tint = new THREE.Color();
-/** Where the pointer leads: a wall across the bridge a little ahead of the flock, so that the lead does not depend on how far up the bridge is pointed at. */
 const _leadPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 2);
 
-/** A sprite of the flock as it is drawn: hurrying after its place in the huddle. */
 interface Sprite {
   x: number;
   z: number;
   grow: number;
   readonly phase: number;
-  /** How quickly it follows: each a little differently, so that the flock swings like a flock. */
   readonly keen: number;
 }
 
-/** A gloomling, a brute or the Gloom as it is drawn. */
 interface FoeView {
   flash: number;
   grow: number;
 }
 
-/** One of a pair of gates as it is drawn. */
 interface GateHalf {
   readonly film: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   readonly label: Panel;
@@ -146,7 +129,6 @@ interface GateHalf {
   flash: number;
 }
 interface GateView {
-  /** The gate of the rules this stands for; 0 when it is free. */
   id: number;
   readonly group: THREE.Group;
   readonly left: GateHalf;
@@ -155,18 +137,10 @@ interface GateView {
 
 type Shot = 'meet' | 'march' | 'dawn' | 'after' | 'dark';
 
-/**
- * Duskbreak: a flock of lantern sprites led down a bridge of light into the gloom. The player leads; the sprites
- * throw their sparks at whatever is ahead of them. Gates make the flock more or fewer; gloomlings are relit by the
- * hundred; at the bridge's end the Gloom itself is waiting to be reminded that it is a lantern.
- *
- * The rules are in march.ts. This draws them.
- */
 export class DuskWorld extends Minigame {
   readonly id = 'duskbreak' as const;
   readonly soundscape = 'arcadeDusk' as const;
   march: March | null = null;
-  /** Whether the flock is on the march and the player's to lead. */
   marching = false;
 
   private scenery!: Scenery;
@@ -176,7 +150,6 @@ export class DuskWorld extends Minigame {
   private readonly rng = new Rng(7741);
   private readonly deckU = { uTime: { value: 0 }, uGone: { value: 0 }, uDawn: { value: 0 }, uHalf: { value: DECK }, uGain: { value: 1 }, uLight: { value: new THREE.Color(0.45, 0.84, 1.0) }, uDusk: { value: new THREE.Color(0.3, 0.22, 0.75) } };
 
-  // ---- the flock ----
   private flock!: Batch;
   private readonly sprites: Sprite[] = [];
   private flockGlow!: THREE.Sprite;
@@ -190,7 +163,6 @@ export class DuskWorld extends Minigame {
   private sparkPoints!: THREE.Points;
   private readonly pop: { panel: Panel; life: number } = { panel: new Panel(300, 150, { world: true }), life: 0 };
 
-  // ---- what comes the other way ----
   private lings!: Batch;
   private brutes!: Batch;
   private readonly foeViews = new Map<number, FoeView>();
@@ -204,19 +176,16 @@ export class DuskWorld extends Minigame {
   private readonly risen: { x: number; y: number; z: number; pace: number; phase: number }[] = [];
   private readonly curtainU = { uTime: { value: 0 }, uShow: { value: 1 }, uColor: { value: new THREE.Color(0.07, 0.035, 0.16) } };
 
-  // ---- the bridge ----
   private litLanterns!: Batch;
   private darkLanterns!: Batch;
   private lumi!: Character;
   private dawn = 0;
   private gone = 0;
 
-  // ---- the picture, and what is written over it ----
   private shot: Shot = 'meet';
   private sweep = 1;
   private flockEl: UiEl | null = null;
   private wayEl: UiEl | null = null;
-  /** Whether the Gloom has been seen: from then on the panel that showed the way shows how much of it is relit. */
   private mawSeen = false;
   private toastEl: UiEl | null = null;
   private toastText = '';
@@ -230,13 +199,10 @@ export class DuskWorld extends Minigame {
 
   constructor() {
     super();
-    // in a headset the player stands at the flock's back, looking up the bridge
     this.seat = anchor(0, 0, 4.2, 0);
     this.eyeHeight = 1.5;
     this.restFocus = 14;
   }
-
-  // ------------------------------------------------------------------------------------------------ building
 
   async build(ctx: BuildContext): Promise<void> {
     const scene = this.scene;
@@ -244,7 +210,6 @@ export class DuskWorld extends Minigame {
     Object.assign(this.look, { exposure: 0.6, bloom: 0.34, saturation: 1.1, vignette: 0.5 });
     this.fog = scene.fog as THREE.FogExp2;
 
-    // ---- the bridge of light ----
     const deck = new THREE.Mesh(
       new THREE.PlaneGeometry(DECK * 2, AHEAD + BEHIND).rotateX(-Math.PI / 2).translate(0, 0, (BEHIND - AHEAD) / 2),
       new THREE.ShaderMaterial({ vertexShader: DECK_VS, fragmentShader: DECK_FS, uniforms: this.deckU, transparent: true, depthWrite: false, fog: false }),
@@ -256,7 +221,6 @@ export class DuskWorld extends Minigame {
     this.shade.mesh.renderOrder = this.mawShade.mesh.renderOrder = 1;
     scene.add(deck, curtain, this.shade.mesh, this.mawShade.mesh, this.rings.group, this.bursts.points);
 
-    // ---- lanterns along it: one batch of them alight, one of them dark ----
     const lit = await ctx.assets.instance('lantern'), dark = await ctx.assets.instance('lantern');
     for (const m of ownMaterials(lit)) {
       m.emissive = new THREE.Color(1.0, 0.62, 0.3);
@@ -268,7 +232,6 @@ export class DuskWorld extends Minigame {
     this.darkLanterns = new Batch(dark, LANTERNS * 2, scene, false);
     await ctx.step('dusk: bridge');
 
-    // ---- the flock, its sparks and its glow ----
     this.flock = new Batch(await ctx.assets.instance('sp-cindle-lite'), MAX_FLOCK + 4, scene);
     const sparks = new THREE.BufferGeometry();
     sparks.setAttribute('position', new THREE.BufferAttribute(this.sparkPos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -285,8 +248,6 @@ export class DuskWorld extends Minigame {
     this.pop.panel.mesh.renderOrder = 6;
     scene.add(this.sparkPoints, this.flockGlow, this.pop.panel.mesh);
 
-    // ---- gloomlings, brutes and the Gloom ----
-    // dark smoke on a dark bridge would not be seen at all: theirs has a faint light of its own
     const smoulder = async (id: string, strength: number): Promise<THREE.Group> => {
       const model = await ctx.assets.instance(id);
       for (const m of ownMaterials(model)) {
@@ -306,7 +267,6 @@ export class DuskWorld extends Minigame {
     scene.add(this.maw, this.mawHalo);
     await ctx.step('dusk: gloom');
 
-    // ---- three pairs of gates, used over and over ----
     const film = new THREE.PlaneGeometry(GATE_WIDE, GATE_TALL);
     const post = new THREE.CylinderGeometry(0.06, 0.08, GATE_TALL + 0.3, 10).translate(0, (GATE_TALL + 0.3) / 2, 0);
     const postLight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.9, 2.4), fog: false });
@@ -345,8 +305,6 @@ export class DuskWorld extends Minigame {
     this.reset();
   }
 
-  // ------------------------------------------------------------------------------------------------ a march
-
   override reset(): void {
     this.march = null;
     this.marching = false;
@@ -377,7 +335,6 @@ export class DuskWorld extends Minigame {
     const m = (this.march = new March(new Rng(this.rng.int(1, 1e9)), stage));
     arcade.game.reach('dusk.intro');
 
-    // ---- the flock at the head of the bridge, Lumi beside it, the dusk behind them ----
     this.shot = 'meet';
     this.cam.cut();
     hud.setCard(MINIGAMES.duskbreak.title, `${stage.name} · lead the flock to the dawn`);
@@ -388,7 +345,6 @@ export class DuskWorld extends Minigame {
     await arcade.talk(this.played === 0 ? DUSK.intro : this.level > 0 && this.lastWon ? DUSK.harder : DUSK.again);
     this.played++;
 
-    // ---- round behind them, and off ----
     this.shot = 'march';
     this.sweep = 0;
     arcade.tween(2.4, (k) => (this.sweep = k), ease.inOutCubic).catch(() => undefined);
@@ -408,7 +364,6 @@ export class DuskWorld extends Minigame {
     arcade.game.reach(won ? 'dusk.won' : 'dusk.lost');
     this.sweep = 0;
     if (won) {
-      // ---- the Gloom, relit: slowly at first, and then all at once ----
       this.shot = 'dawn';
       this.timeScale = 0.35;
       audio.sfx('dawnBreaks');
@@ -419,7 +374,6 @@ export class DuskWorld extends Minigame {
       await arcade.tween(2.6, (k) => (this.dawn = k), ease.outCubic);
       audio.sfx('cheer');
       await arcade.wait(1.0);
-      // ---- and the flock, turned round to be looked at, with Lumi come up the bridge after them ----
       this.shot = 'after';
       this.cam.cut();
       this.lumi.root.position.set(-2.0, 0, 1.2);
@@ -438,7 +392,6 @@ export class DuskWorld extends Minigame {
     return outcome;
   }
 
-  /** The Gloom lets go of everything it was holding: light, lanterns, the dusk itself. */
   private breakDusk(): void {
     const m = this.march, app = this.arcade.game.app;
     if (!m?.maw) return;
@@ -450,7 +403,6 @@ export class DuskWorld extends Minigame {
     this.rings.emit(_p.copy(at).setY(0.1), 22, SPARK, 1.6);
     this.bursts.emit(at, { count: 320, color: SPARK, color2: WHITE, speed: 9, spread: 0.5, life: 2.4, size: 0.3, gravity: -1.2 });
     this.bursts.emit(at, { count: 160, color: SMOKE, color2: WHITE, speed: 5, spread: 0.6, life: 1.8, size: 0.22, gravity: -2.5 });
-    // what it was made of goes up as lanterns
     for (let i = 0; i < 22; i++) this.risen.push({ x: at.x + this.rng.range(-3.2, 3.2), y: this.rng.range(0.4, 4.4), z: at.z + this.rng.range(-2.5, 2.5), pace: this.rng.range(0.9, 2.1), phase: this.rng.range(0, 6.28) });
     for (let i = 0; i < 8; i++) {
       app.tasks.wait(0.5 + i * 0.3 + this.rng.range(0, 0.1), this.arcade.signal).then(() => {
@@ -461,7 +413,6 @@ export class DuskWorld extends Minigame {
     }
   }
 
-  /** What the rules say has happened, made into something seen and heard. */
   private onEvent(e: MarchEvent): void {
     const arcade = this.arcade, { audio } = arcade.game, m = this.march!, sound = this.soundIn;
     switch (e.type) {
@@ -504,7 +455,6 @@ export class DuskWorld extends Minigame {
       case 'lit': {
         const at = _a.set(e.foe.x, e.foe.kind === 'ling' ? 0.45 : 1.1, -e.foe.ahead);
         if (e.foe.kind === 'ling') {
-          // relit: a puff of the smoke it was, and the light it is now going up
           this.bursts.emit(at, { count: 7, color: SPARK, color2: WHITE, speed: 1.6, life: 0.7, size: 0.13, gravity: -2.2 });
           this.bursts.emit(at, { count: 3, color: SMOKE, color2: WHITE, speed: 1.1, life: 0.5, size: 0.16, gravity: -0.5 });
           if (sound.lit <= 0) {
@@ -556,7 +506,6 @@ export class DuskWorld extends Minigame {
     }
   }
 
-  /** A word over the flock that rises and is gone: what a gate did, how many were put out. */
   private popUp(text: string, color: string): void {
     this.pop.panel.paint((ctx, w, h) => {
       ctx.textAlign = 'center';
@@ -580,12 +529,10 @@ export class DuskWorld extends Minigame {
     this.toastEl?.show(true);
   }
 
-  /** Writes what a gate does across it, in the colour of whether that is good. */
   private paintGate(half: GateHalf, op: GateOp): void {
     const tone = toneOf(op), color = TONE_HEX[tone];
     (half.film.material.uniforms.uColor!.value as THREE.Color).copy(TONE[tone]);
     half.label.paint((ctx, w, h) => {
-      // a dark plate behind the words: they are read against the sky, the dusk and the film's own light
       ctx.fillStyle = 'rgba(18, 8, 40, 0.62)';
       roundRect(ctx, 34, 44, w - 68, h - 88, 34);
       ctx.fill();
@@ -618,7 +565,6 @@ export class DuskWorld extends Minigame {
     this.toastEl = ui.add(520 + PAD * 2, 44 + PAD * 2, paintHint(() => this.toastText)).at(0, -1, 0, 150);
   }
 
-  /** How many the flock is, and how quickened. */
   private paintFlock(): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, m = this.march;
@@ -632,7 +578,6 @@ export class DuskWorld extends Minigame {
       ctx.fillStyle = m.count >= m.stage.stars[1] ? theme.accent : theme.text;
       ctx.textAlign = 'left';
       ctx.fillText(String(m.count), PAD + 16, PAD + 54);
-      // a mark for each quickening
       ctx.textAlign = 'right';
       ctx.font = font(800, 22);
       for (let i = 0; i < 3; i++) {
@@ -643,7 +588,6 @@ export class DuskWorld extends Minigame {
     };
   }
 
-  /** The bridge: how far along it the flock has come, and what is waiting at the end of it. */
   private paintWay(): Paint {
     return (ctx, w, h, el) => {
       const theme = el.layer.theme, m = this.march;
@@ -656,7 +600,6 @@ export class DuskWorld extends Minigame {
       spaced(ctx, (maw ? DUSK.hud.gloom : `${MINIGAMES.duskbreak.title} · ${m.stage.name}`).toUpperCase(), PAD + 16, PAD + 19, 2.5);
       const x0 = PAD + 22, x1 = w - PAD - 36, y = PAD + 50, at = (k: number): number => x0 + (x1 - x0) * k;
       if (maw) {
-        // the Gloom, at the end of the bridge: how much of it has been relit
         const k = clamp01(1 - maw.hp / maw.maxHp);
         ctx.fillStyle = 'rgba(122, 95, 208, 0.55)';
         roundRect(ctx, x0 - 6, y - 7, x1 - x0 + 34, 14, 7);
@@ -694,7 +637,6 @@ export class DuskWorld extends Minigame {
       ctx.arc(fx, y, 6, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
-      // the Gloom at the bridge's end: a dark mound with two pale eyes
       const gx = w - PAD - 22;
       ctx.fillStyle = '#7a5fd0';
       ctx.beginPath();
@@ -712,8 +654,6 @@ export class DuskWorld extends Minigame {
     };
   }
 
-  // ------------------------------------------------------------------------------------------------ the frame
-
   tick(dt: number, time: number): void {
     const arcade = this.arcade, m = this.march, sound = this.soundIn;
     this.rings.update(dt);
@@ -723,7 +663,6 @@ export class DuskWorld extends Minigame {
       m.step(dt);
       for (const e of m.events.splice(0)) this.onEvent(e);
       this.gone = m.distance;
-      // the gates as they come into sight: what to say about the first, and about the first pair that is all trouble
       for (const gate of m.gates) {
         if (gate.taken || gate.ahead > 34) continue;
         if (!this.told.gate) {
@@ -737,7 +676,6 @@ export class DuskWorld extends Minigame {
       }
     }
 
-    // ---- the flock: as many as the rules say, each hurrying after its place ----
     const count = m ? m.count : 0, radius = flockRadius(Math.max(1, count)), sprites = this.sprites;
     while (sprites.length > count) {
       const lost = sprites.pop()!;
@@ -746,7 +684,6 @@ export class DuskWorld extends Minigame {
     const leadX = m ? m.x : 0;
     while (sprites.length < count) sprites.push({ x: leadX + this.rng.range(-0.4, 0.4), z: 0.2 + this.rng.range(-0.3, 0.3), grow: m && m.time > 0.2 ? 0 : 1, phase: this.rng.range(0, 6.28), keen: this.rng.range(7, 15) });
     sprites.forEach((s, i) => {
-      // a sunflower's seeds: the place of the i-th of n, the front of the huddle level with the flock's mark
       const r = radius * Math.sqrt((i + 0.5) / count), a = i * 2.39996;
       s.x = damp(s.x, leadX + r * Math.sin(a), s.keen, dt);
       s.z = damp(s.z, radius * 0.8 + 0.25 + r * Math.cos(a) * 0.9, s.keen, dt);
@@ -755,7 +692,6 @@ export class DuskWorld extends Minigame {
     this.flockX = damp(this.flockX, leadX, 6, dt);
     this.flockFlash = damp(this.flockFlash, 0, 4, dt);
 
-    // ---- what comes the other way ----
     if (m) for (const foe of m.foes) if (!this.foeViews.has(foe.id)) this.foeViews.set(foe.id, { flash: 0, grow: 0 });
     for (const view of this.foeViews.values()) {
       view.flash = damp(view.flash, 0, 9, dt);
@@ -763,7 +699,6 @@ export class DuskWorld extends Minigame {
     }
     for (const lantern of this.risen) lantern.y += lantern.pace * dt;
 
-    // ---- what is written over the picture ----
     if (m && this.flockEl) {
       const key = `${m.count}|${m.quick}|${Math.round(m.progress * 260)}|${m.maw ? Math.round((m.maw.hp / m.maw.maxHp) * 200) : -1}`;
       if (key !== this.hudKey) {
@@ -778,11 +713,9 @@ export class DuskWorld extends Minigame {
     this.moveCamera(time, radius);
   }
 
-  /** Where the flock is led: where the player points, or where a scripted leader would take it. */
   private lead(m: March): void {
     const arcade = this.arcade, pointer = arcade.pointer;
     if (arcade.auto) {
-      // a scripted leader makes up its mind about each gate once, as well as `autoSkill` says
       const gate = m.gates.find((g) => !g.taken);
       if (gate && !this.choice.has(gate.id)) this.choice.set(gate.id, this.rng.chance(arcade.autoSkill));
       m.lead = arcade.autoSkill <= 0 ? 0 : leadFor(m, gate ? this.choice.get(gate.id)! : true);
@@ -793,12 +726,10 @@ export class DuskWorld extends Minigame {
 
   private moveCamera(time: number, radius: number): void {
     const cam = this.cam, k = this.sweep, fx = this.flockX, m = this.march;
-    // behind and above the flock, far enough back to see all of it and a long way up the bridge
     _a.set(fx * 0.25, 4.0 + radius * 0.75, 5.4 + radius * 1.7);
     _s.set(fx * 0.4, 0.6, -6.0);
     switch (this.shot) {
       case 'meet':
-        // in front of them, looking back: the flock, Lumi, and the lit bridge they came by
         cam.eye.set(2.4 + Math.sin(time * 0.3) * 0.15, 1.35, -4.4);
         cam.target.set(-0.7, 0.75, 0.9);
         cam.fov = 40;
@@ -811,7 +742,6 @@ export class DuskWorld extends Minigame {
         cam.ease = k < 1 ? 30 : 5;
         break;
       case 'dawn': {
-        // up, to watch what the Gloom was go into the sky
         const far = m?.maw ? -m.maw.ahead : -12;
         cam.eye.set(lerp(_a.x, 0, k), lerp(_a.y, 3.0, k), lerp(_a.z, 8.6, k));
         cam.target.set(lerp(_s.x, 0, k), lerp(_s.y, 4.4 + 2.5 * k, k), lerp(_s.z, far, k));
@@ -844,7 +774,6 @@ export class DuskWorld extends Minigame {
     this.deckU.uGone.value = this.gone;
     this.deckU.uDawn.value = dawn;
 
-    // ---- the dusk, and the dawn that breaks it ----
     const dark = this.shot === 'dark' ? this.sweep : 0;
     this.look.exposure = lerp(0.6, 1.06, dawn) * (1 - 0.5 * dark);
     this.look.saturation = lerp(1.1, 1.3, dawn);
@@ -866,20 +795,16 @@ export class DuskWorld extends Minigame {
     this.fog.density = lerp(0.03, 0.0046, dawn) * (1 + dark);
     this.scenery.hemi.intensity = lerp(0.6, 1.3, dawn);
     this.scenery.key.intensity = lerp(1.5, 3.4, dawn);
-    // (the planet's light comes down the bridge from ahead: it is what draws the edge of everything coming up it)
     this.scenery.rim.intensity = lerp(4.2, 1.7, dawn);
 
-    // ---- lanterns down both sides: dark until the flock has gone by them ----
     this.litLanterns.begin();
     this.darkLanterns.begin();
     const row = LANTERNS * LANTERN_EVERY;
     for (let i = 0; i < LANTERNS; i++) for (const side of [-1, 1]) {
-      // the row runs from behind the flock to far up the bridge: a lantern gone by comes round again at the far end
       const along = (((i * LANTERN_EVERY + (side > 0 ? LANTERN_EVERY / 2 : 0) - this.gone) % row) + row) % row, z = BEHIND - 2 - along;
       _m.compose(_p.set(side * (DECK + 0.9), 1.3 + Math.sin(time * 0.9 + i * 1.7 + side) * 0.12, z), _q.identity(), _s.setScalar(2.0));
       (z > -3 || dawn > 0.5 ? this.litLanterns : this.darkLanterns).add(_m);
     }
-    // and those the Gloom was made of, going up
     for (const l of this.risen) {
       _m.compose(_p.set(l.x + Math.sin(time * 0.6 + l.phase) * 0.4, l.y, l.z), _q.identity(), _s.setScalar(1.4));
       this.litLanterns.add(_m);
@@ -887,12 +812,10 @@ export class DuskWorld extends Minigame {
     this.litLanterns.end();
     this.darkLanterns.end();
 
-    // ---- the flock ----
     this.flock.begin();
     const stride = this.marching ? 1 : 0.35;
     for (const s of this.sprites) {
       const hop = Math.max(0, Math.sin(time * 9.5 + s.phase)) * 0.13 * stride + (this.shot === 'after' ? Math.max(0, Math.sin(time * 6 + s.phase)) * 0.25 : 0);
-      // they look up the bridge, into the dusk (the models face +Z, so each is turned about)
       _m.compose(_p.set(s.x, hop, s.z), _q.setFromEuler(_e.set(0, Math.PI + Math.sin(time * 1.3 + s.phase) * 0.2, Math.sin(time * 9.5 + s.phase) * 0.06 * stride)), _s.setScalar(ease.outBack(s.grow)));
       this.flock.add(_m, _tint.setScalar(1 + this.flockFlash * 1.4));
     }
@@ -909,7 +832,6 @@ export class DuskWorld extends Minigame {
     this.shade.place(this.flockX, 0.3 - radius * 0.2, mid, 0);
     this.shade.mesh.scale.setScalar(radius * 2.6 + 0.6);
 
-    // ---- sparks ----
     const sparks = m?.sparks;
     for (let i = 0; i < this.sparkSize.length; i++) {
       const spark = this.marching ? sparks?.[i] : undefined;
@@ -923,7 +845,6 @@ export class DuskWorld extends Minigame {
     const g = this.sparkPoints.geometry;
     g.attributes.position!.needsUpdate = g.attributes.aSize!.needsUpdate = true;
 
-    // ---- gloomlings and brutes ----
     this.lings.begin();
     this.brutes.begin();
     let maw: Foe | null = null;
@@ -935,7 +856,6 @@ export class DuskWorld extends Minigame {
       const view = this.foeViews.get(foe.id);
       if (!view) continue;
       const big = foe.kind === 'brute', waddle = Math.sin(time * (big ? 3.2 : 6.5) + foe.phase);
-      // struck, it swells and goes pale with the light in it; a brute shrinks as it is relit
       const s = ease.outCubic(view.grow) * (1 + 0.16 * view.flash) * (big ? BRUTE_SCALE * (0.82 + 0.18 * (foe.hp / foe.maxHp)) : LING_SCALE);
       _m.compose(_p.set(foe.x, Math.abs(waddle) * (big ? 0.06 : 0.1), -foe.ahead), _q.setFromEuler(_e.set(0, waddle * 0.14, waddle * (big ? 0.07 : 0.12))), _s.set(s, s * (1 - 0.1 * view.flash), s));
       (big ? this.brutes : this.lings).add(_m, _tint.setScalar(1.5 + view.flash * 3.2));
@@ -943,7 +863,6 @@ export class DuskWorld extends Minigame {
     this.lings.end();
     this.brutes.end();
 
-    // ---- the Gloom ----
     const body = this.maw, gone = this.mawGone;
     body.visible = !!maw && gone < 1;
     this.mawShade.mesh.visible = body.visible;
@@ -954,7 +873,6 @@ export class DuskWorld extends Minigame {
       body.position.set(maw.x + Math.sin(time * 0.8) * 0.15, 0, -maw.ahead);
       body.rotation.set(0, Math.sin(time * 0.6) * 0.08, Math.sin(time * 1.1) * 0.03);
       body.scale.set(s, s * (1 - 0.04 * flash), s);
-      // the light going into it shows in its heart: fainter at first, and then it cannot be kept in
       this.mawGlow.value = this.mawGlowFull * (0.6 + 5 * relit * relit + 2.5 * flash + 14 * gone);
       this.mawHalo.position.set(body.position.x, 2.5, -maw.ahead + 1.6);
       this.mawHalo.scale.setScalar(3 + 6 * relit + 12 * gone);
@@ -962,7 +880,6 @@ export class DuskWorld extends Minigame {
       this.mawShade.place(body.position.x, 0.6, -maw.ahead, 0);
     } else this.mawGlow.value = this.mawGlowFull;
 
-    // ---- gates: each pair of the rules is given one of the three that are drawn ----
     const live = m ? m.gates : [];
     for (const view of this.gates) if (view.id && !live.some((gate) => gate.id === view.id)) view.id = 0;
     for (const gate of live) {
@@ -977,7 +894,6 @@ export class DuskWorld extends Minigame {
       }
       view.group.position.set(0, 0, -gate.ahead);
       for (const [half, side] of [[view.left, 'left'], [view.right, 'right']] as const) {
-        // gone through, the one taken flares and both go out; before that they brighten as they come near
         half.show = damp(half.show, gate.taken ? 0 : 1, gate.taken ? 7 : 3, dt);
         half.flash = damp(half.flash, 0, 3.5, dt);
         const worth = m ? worthOf(m.count, m.quick, gate[side]) : 0;
@@ -985,15 +901,12 @@ export class DuskWorld extends Minigame {
         half.film.material.uniforms.uShow!.value = half.show * (0.75 + 0.25 * Math.sin(time * 3 + (side === 'left' ? 0 : 2)));
         half.film.material.uniforms.uFlash!.value = half.flash;
         half.label.mesh.material.opacity = clamp01(half.show * 1.2);
-        // (the picture is turned down in the dusk: the words are written brighter to make up for it)
         half.label.mesh.material.color.setScalar(lerp(1.9, 1.0, dawn));
-        // (the better of the two stands a little taller: a help, not an answer)
         half.label.mesh.scale.set(LABEL_WIDE * (best ? 1.06 : 1), LABEL_WIDE * (300 / 420) * (best ? 1.06 : 1), 1);
       }
     }
     for (const view of this.gates) view.group.visible = view.id !== 0;
 
-    // ---- the word over the flock ----
     const pop = this.pop.panel.mesh, life = this.pop.life;
     pop.visible = life > 0;
     if (pop.visible) {
@@ -1003,7 +916,6 @@ export class DuskWorld extends Minigame {
       pop.material.opacity = clamp01(life * 2.2);
     }
 
-    // ---- Lumi stays where the march began, and is left behind ----
     if (this.shot === 'march') this.lumi.root.position.set(-2.0, 0, 1.2 + this.gone);
     this.lumi.root.visible = this.lumi.root.position.z < BEHIND;
   }

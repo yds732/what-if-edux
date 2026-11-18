@@ -21,12 +21,9 @@ import { BALL_RADIUS, TABLE, v, type Contact, type Side } from './physics';
 import { PlayerBot, REACH, type Swing } from './player';
 import { TO_WIN, gamePoint, matchWinner, serverFor, starsFor, type Score } from './rules';
 
-/** The court is the top of a dais: everything in the game is placed from there, this far above the island's turf. */
 const LIFT = 0.11;
 const H = TABLE.height, HALF_L = TABLE.length / 2, HALF_W = TABLE.width / 2;
-/** Where Kai stands along the table. */
 const KAI_Z = -1.92;
-/** From the middle of the blade back to where a hand holds the bat, and the same for the model lying flat: its blade is toward -Z. */
 const GRIP = 0.135, BLADE_Z = -0.05, HALF_THICK = 0.023;
 
 const CYAN = new THREE.Color(0.45, 0.84, 1.0);
@@ -34,9 +31,8 @@ const GOLD = new THREE.Color(1.0, 0.72, 0.3);
 const WHITE = new THREE.Color(1, 0.97, 0.9);
 const AMBER = new THREE.Color(1.0, 0.62, 0.22);
 
-const LINES_VS = /* glsl */ `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-/** The lines of the table, drawn in light on the stone: the edge all round, the centre line, and a glow that answers each bounce. */
-const LINES_FS = /* glsl */ `
+const LINES_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+const LINES_FS = `
 uniform float uPulse; uniform vec2 uSize; uniform vec3 uColor;
 varying vec2 vUv;
 void main(){
@@ -50,7 +46,7 @@ void main(){
   ${GLSL_OUTPUT}
 }`;
 
-const NET_VS = /* glsl */ `
+const NET_VS = `
 uniform float uShake, uShakeX, uTime;
 varying vec2 vUv;
 void main(){
@@ -61,7 +57,7 @@ void main(){
   p.z += sin(uTime * 46.0 + p.x * 9.0) * uShake * (0.012 + 0.03 * near) * uv.y;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
-const NET_FS = /* glsl */ `
+const NET_FS = `
 uniform vec3 uColor; uniform float uShake;
 varying vec2 vUv;
 void main(){
@@ -78,7 +74,6 @@ type Phase = 'idle' | 'serveYou' | 'serveKai' | 'live' | 'dead';
 
 interface PointResult {
   readonly winner: Side;
-  /** A clean winner: the other side never touched it. */
   readonly clean: boolean;
 }
 
@@ -92,7 +87,6 @@ const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _plane = new THREE.Plane();
 
-/** The turn that lays a bat (blade toward its own -Z, faces toward +-Y) with its blade along `blade` and its face toward `face`. */
 const batTurn = (out: THREE.Quaternion, blade: THREE.Vector3, face: THREE.Vector3): THREE.Quaternion => {
   _z.copy(blade).normalize().negate();
   _y.copy(face).addScaledVector(_z, -face.dot(_z)).normalize();
@@ -100,39 +94,25 @@ const batTurn = (out: THREE.Quaternion, blade: THREE.Vector3, face: THREE.Vector
   return out.setFromRotationMatrix(_m.makeBasis(_x, _y, _z));
 };
 
-/**
- * Moonlight Rally: table tennis against Kai, on a dais under Haven's planet. First to seven.
- *
- * The player's bat follows the pointer across their end of the table and rises by itself to the height of the ball,
- * so the game is getting there, and how the bat is moving when it does: pushed forward through the ball it drives,
- * drawn across it places the ball wide. Every shot is solved to land where it was aimed (see physics.ts); a ball
- * goes astray only off the edge of the blade or from swinging flat out.
- */
 export class RallyWorld extends Minigame {
   readonly id = 'rally' as const;
   readonly soundscape = 'arcadeRally' as const;
   readonly score: Score = { you: 0, kai: 0 };
   phase: Phase = 'idle';
-  /** Times each bat has met the ball this game. */
   readonly hits = { you: 0, kai: 0 };
 
   private stage!: Stage;
-  /** Everything placed from the dais top: the table, the ball, the bats, the people. */
   private readonly court3d = new THREE.Group();
   private readonly bursts = new Bursts(1400);
   private readonly rings = new Rings(12);
   private readonly rng = new Rng(7107);
-  /** The game itself: the ball, the rules and Kai's play. This class draws it and gives it the player's bat. */
   private readonly court = new Court(new Rng(7108), new Rng(2080), {
     contact: (contact) => this.onContact(contact),
     struck: (by, power, clean) => this.onStruck(by, power, clean),
     decided: (winner) => this.onDecided(winner),
   });
-  /** The scripted player's hands, when a test is at the controls. */
   private readonly bot = new PlayerBot(new Rng(4242));
 
-  // ---- the ball ----
-  /** Where the ball is in the world: what everyone watches. */
   private readonly ballWorld = new THREE.Vector3();
   private readonly ballMesh = new THREE.Group();
   private readonly ballSpin = new THREE.Group();
@@ -144,7 +124,6 @@ export class RallyWorld extends Minigame {
   private serveClock = 0;
   private heat = 0;
 
-  // ---- the player's bat ----
   private readonly bat = new THREE.Group();
   private readonly batAt = new THREE.Vector3(0, H + 0.2, 1.75);
   private readonly batWant = new THREE.Vector3(0, H + 0.2, 1.75);
@@ -153,7 +132,6 @@ export class RallyWorld extends Minigame {
   private swing = 0;
   private punch = 0;
 
-  // ---- Kai ----
   private kai!: Character;
   private readonly kaiBat = new THREE.Group();
   private readonly kaiBatAt = new THREE.Vector3(-0.3, H + 0.1, KAI_Z + 0.36);
@@ -167,7 +145,6 @@ export class RallyWorld extends Minigame {
   private lumi!: Character;
   private nova!: Character;
 
-  // ---- the court ----
   private readonly linesU = { uPulse: { value: 0 }, uSize: { value: new THREE.Vector2(TABLE.width, TABLE.length) }, uColor: { value: CYAN.clone().multiplyScalar(1.5) } };
   private readonly netU = { uShake: { value: 0 }, uShakeX: { value: 0 }, uTime: { value: 0 }, uColor: { value: CYAN.clone() } };
   private board!: Panel;
@@ -183,8 +160,6 @@ export class RallyWorld extends Minigame {
     this.restFocus = 5;
   }
 
-  // ------------------------------------------------------------------------------------------------ building
-
   async build(ctx: BuildContext): Promise<void> {
     const scene = this.scene, q = ctx.quality;
     this.stage = await buildStage(ctx, this, {
@@ -195,11 +170,9 @@ export class RallyWorld extends Minigame {
     this.court3d.position.y = LIFT;
     scene.add(this.court3d);
 
-    // ---- the dais the table stands on: Haven's star, half as big again ----
     const S = 1.6, daisTall = (await sizeOf(ctx, 'dais'))[1];
     await dress(ctx, scene, 'dais', [[0, LIFT - daisTall * S, 0, 18, S]]);
 
-    // ---- the table: the model is the slab and its legs; the lines and the net are drawn here, exactly to size ----
     const table = await ctx.assets.instance('pp-table');
     table.rotation.y = Math.PI / 2;
     this.court3d.add(table);
@@ -210,9 +183,7 @@ export class RallyWorld extends Minigame {
     this.court3d.add(lines);
     this.buildNet();
 
-    // ---- the ball: a bead of warm light ----
     const core = new THREE.Mesh(new THREE.SphereGeometry(BALL_RADIUS, 24, 16), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.93, 0.78).multiplyScalar(1.9) }));
-    // a faint band, so that its spin can be seen
     const band = new THREE.Mesh(new THREE.TorusGeometry(BALL_RADIUS * 1.01, BALL_RADIUS * 0.12, 6, 28), new THREE.MeshBasicMaterial({ color: GOLD.clone().multiplyScalar(2.6) }));
     this.ballSpin.add(core, band);
     this.ballMesh.add(this.ballSpin, makeHalo(0xffd9a0, 0.34, 0.55));
@@ -222,11 +193,8 @@ export class RallyWorld extends Minigame {
     }
     this.court3d.add(this.ballMesh, this.shadow.mesh, this.rings.group);
     this.batTrail.uniforms.uGain.value = 0;
-    // sparks and trails are drawn in the world itself: they turn to face the camera, which is placed there
     scene.add(this.bursts.points, this.trail.mesh, this.batTrail.mesh);
 
-    // ---- bats: the player's, and Kai's in his own amber ----
-    // (their rubber is a deep cobalt that the evening would turn black: it is given a little light of its own)
     const lit = (model: THREE.Object3D, paint: (m: THREE.MeshStandardMaterial) => void): THREE.Object3D => {
       for (const m of ownMaterials(model)) {
         paint(m);
@@ -241,7 +209,6 @@ export class RallyWorld extends Minigame {
     this.court3d.add(this.bat);
     this.kaiBat.add(lit(await ctx.assets.instance('pp-paddle'), (m) => repaint(m, 0.63, 0.08, 0.13)));
 
-    // ---- Kai, and the two who watch ----
     this.kai = this.addPerson('kai', await Character.create(ctx, CAST.kai, 'kai'));
     this.lumi = this.addPerson('lumi', await Character.create(ctx, CAST.lumi, 'lumi'));
     this.nova = this.addPerson('nova', await Character.create(ctx, CAST.nova, 'nova'));
@@ -255,13 +222,11 @@ export class RallyWorld extends Minigame {
     this.kai.place(0, 0, KAI_Z, 0);
     this.lumi.place(-2.25, 0, -1.0, 1.15).lookAtPoint(this.ballWorld);
     this.nova.place(2.3, 0, -1.25, -1.15).lookAtPoint(this.ballWorld);
-    // the bat rides in his right hand: its blade carries on from his forearm, its face is his palm
     this.kaiBat.quaternion.setFromRotationMatrix(_m.makeBasis(_x.set(0, 0, 1), _y.set(1, 0, 0), _z.set(0, 1, 0)));
     this.kaiBat.position.set(0, -0.05, 0).sub(_a.set(0, 0, GRIP).applyQuaternion(this.kaiBat.quaternion));
     this.kai.rig.bones.handR.add(this.kaiBat);
     this.kai.onPose = () => reachArm(this.kai, 'R', this.kaiWrist, _a.set(-0.5, -1, -0.4), this.kaiHand);
 
-    // ---- the scoreboard: a pane of light hung over Kai's end ----
     this.board = new Panel(900, 300, { world: true });
     this.board.mesh.scale.set(3.0, 1.0, 1);
     this.board.mesh.position.set(0, 2.42, -5.4);
@@ -269,7 +234,6 @@ export class RallyWorld extends Minigame {
     this.board.mesh.material.alphaTest = 0.02;
     this.court3d.add(this.board.mesh);
 
-    // ---- lamp posts at the corners of the dais, and crystals in the grass beyond ----
     const lampTall = (await sizeOf(ctx, 'lamp-post'))[1];
     const posts: Spot[] = [];
     for (const [i, [x, z]] of ([[-3.1, -2.6], [3.1, -2.6], [-3.1, 2.6], [3.1, 2.6]] as const).entries()) {
@@ -349,8 +313,6 @@ export class RallyWorld extends Minigame {
     });
   }
 
-  // ------------------------------------------------------------------------------------------------ the match
-
   override reset(): void {
     this.score.you = this.score.kai = 0;
     this.hits.you = this.hits.kai = 0;
@@ -372,7 +334,6 @@ export class RallyWorld extends Minigame {
     const arcade = this.arcade, { hud, audio } = arcade.game;
     const level = LEVELS[this.level]!;
     this.bot.skill = arcade.autoSkill;
-    // ---- the way in: round the table from the side, to the player's end ----
     this.sweep = 0;
     arcade.game.reach('rally.intro');
     this.kai.play('wave');
@@ -395,7 +356,6 @@ export class RallyWorld extends Minigame {
       this.paintBoard();
       const done = matchWinner(this.score) !== null;
       this.celebrate(point, done);
-      // the last point is watched in slow motion
       if (done) {
         this.timeScale = 0.35;
         await arcade.wait(0.9);
@@ -403,14 +363,12 @@ export class RallyWorld extends Minigame {
       }
       await arcade.wait(done ? 0.8 : 1.35);
       if (!done && gamePoint(this.score) === 'you' && this.rng.chance(0.7)) arcade.bark(RALLY.gamePoint, 1.4);
-      // the card of controls has done its work once a point has been played
       hud.setHint(null);
     }
     hud.setHint(null);
     arcade.hint(null);
     this.phase = 'idle';
 
-    // ---- the end: whoever won, Kai is gracious about it ----
     const won = matchWinner(this.score) === 'you';
     this.lastWon = won;
     arcade.game.reach(won ? 'rally.won' : 'rally.lost');
@@ -430,7 +388,6 @@ export class RallyWorld extends Minigame {
 
   private lastWon = false;
 
-  /** One point, from the serve to whoever wins it. */
   private async rally(server: Side): Promise<PointResult> {
     const arcade = this.arcade;
     this.result = null;
@@ -446,7 +403,6 @@ export class RallyWorld extends Minigame {
     return this.result!;
   }
 
-  /** What follows a point: light, sound, and something kind from someone. */
   private celebrate(point: PointResult, last: boolean): void {
     const arcade = this.arcade, { audio, app } = arcade.game;
     const yours = point.winner === 'you';
@@ -463,7 +419,6 @@ export class RallyWorld extends Minigame {
       this.kai.play('handToChest').setMood('happy');
     }
     if (last) return;
-    // someone says something about most points
     const pool = yours ? (this.rng.chance(0.55) ? RALLY.yours : RALLY.lumiYours) : this.rng.chance(0.6) ? RALLY.his : RALLY.lumiHis;
     if (this.rng.chance(0.8)) arcade.bark(this.rng.pick(pool), 1.3);
   }
@@ -478,8 +433,6 @@ export class RallyWorld extends Minigame {
       }, () => undefined);
     }
   }
-
-  // ------------------------------------------------------------------------------------------------ the frame
 
   tick(dt: number, time: number): void {
     const arcade = this.arcade, { input, audio } = arcade.game, pointer = arcade.pointer;
@@ -498,7 +451,6 @@ export class RallyWorld extends Minigame {
     const swing = (offX: number, offY: number): Swing => (arcade.auto ? this.bot.swing(offX, offY, court.brain.x) : { offX, offY, across: this.batVel.x, drive: this.swing });
     switch (this.phase) {
       case 'serveYou': {
-        // the ball waits over the bat for the player to send it
         this.serveClock += dt;
         ball.p = v(this.batAt.x, this.batAt.y + 0.2 + Math.sin(time * 3) * 0.012, this.batAt.z - 0.06);
         const go = arcade.auto ? this.serveClock > 0.7 : this.serveClock > 0.25 && (pointer.pressed || input.pressed.has('advance') || input.pressed.has('interact'));
@@ -515,7 +467,6 @@ export class RallyWorld extends Minigame {
         break;
       }
       case 'serveKai': {
-        // Kai holds it up, lets it drop, and serves
         this.serveClock += dt;
         const toss = clamp01((this.serveClock - 0.7) / 0.55);
         ball.p = v(court.brain.x - 0.3, H + 0.34 + Math.sin(toss * Math.PI) * 0.22, this.kaiZ + 0.42);
@@ -545,7 +496,6 @@ export class RallyWorld extends Minigame {
     this.moveKai(dt);
     this.moveCamera();
 
-    // ---- the ball as it is drawn ----
     const p = ball.p, speed = Math.hypot(ball.v.x, ball.v.y, ball.v.z);
     this.ballMesh.position.set(p.x, p.y, p.z);
     this.ballMesh.visible = this.phase !== 'idle' && !(this.phase === 'dead' && this.deadFor > 1.6);
@@ -555,7 +505,6 @@ export class RallyWorld extends Minigame {
     const over = Math.abs(p.x) <= HALF_W && Math.abs(p.z) <= HALF_L;
     this.shadow.place(p.x, p.y - BALL_RADIUS, p.z, over ? H : 0);
     this.shadow.mesh.visible = this.ballMesh.visible;
-    // the faster it flies, the hotter its trail
     this.heat = damp(this.heat, this.phase === 'live' ? clamp01((speed - 5.2) / 4.5) : 0, 6, dt);
     this.trail.uniforms.uColor.value.copy(CYAN).lerp(AMBER, this.heat);
     this.trail.uniforms.uGain.value = this.phase === 'live' || this.phase === 'dead' ? 1.6 + 2.6 * this.heat : 0;
@@ -566,17 +515,14 @@ export class RallyWorld extends Minigame {
     return _c.set(p.x, p.y + LIFT, p.z);
   }
 
-  /** The point is over: the ball stays in the world a moment longer, bouncing away. */
   private onDecided(winner: Side): void {
     const rally = this.court.rally;
-    // clean: the loser never got a bat to the ball after the winner struck it
     this.result = { winner, clean: rally.lastHitter === winner && rally.received <= 1 && rally.length > 1 };
     this.phase = 'dead';
     this.deadFor = 0;
     this.bot.rest();
   }
 
-  /** Light and sound for a bat meeting the ball. `power` 0..1. */
   private onStruck(by: Side, power: number, clean: boolean): void {
     const { audio, app } = this.arcade.game, ball = this.court.ball;
     this.hits[by]++;
@@ -598,13 +544,11 @@ export class RallyWorld extends Minigame {
     }
   }
 
-  /** Light and sound for the ball meeting the table, the net or the ground. */
   private onContact(contact: Contact): void {
     const { audio } = this.arcade.game, ball = this.court.ball, p = ball.p;
     const at = this.worldOf(p).clone();
     const speed = Math.hypot(ball.v.x, ball.v.y, ball.v.z);
     if (contact === 'table') {
-      // a ball rolling to a stop makes no sound worth hearing
       if (speed < 0.5) return;
       audio.sfx('ballTable', { at, gain: clamp(0.35 + speed * 0.09, 0.3, 1.1), pitch: 1 + this.rng.range(-0.06, 0.06) });
       this.rings.emit(_a.set(p.x, H + 0.004, p.z), 0.3 + speed * 0.04, CYAN, 0.42);
@@ -618,38 +562,29 @@ export class RallyWorld extends Minigame {
     } else if (speed > 0.6) audio.sfx('ballOut', { at, gain: this.deadFor > 0.4 ? 0.4 : 0.9 });
   }
 
-  // ------------------------------------------------------------------------------------------------ the player
-
   private movePlayerBat(dt: number): void {
     const arcade = this.arcade, pointer = arcade.pointer, input = arcade.game.input;
     const want = this.batWant, court = this.court;
     const mine = court.live && court.rally.lastHitter === 'kai';
     if (arcade.auto) {
-      // a scripted player: a stand-in for a person, as good as its skill
       this.bot.update(dt, court.ball, mine, court.rally.awaitingServeBounce());
       want.set(this.bot.x, want.y, this.bot.z);
     } else if (input.xrRay) {
-      // in a headset the bat is in the hand: a little ahead of the controller
       want.copy(input.xrRay.origin).addScaledVector(input.xrRay.direction, 0.14);
       want.y -= LIFT;
     } else if (pointer.active) {
-      // on a screen the pointer slides the bat over a level plane at the player's end
       _plane.set(_a.set(0, 1, 0), -(LIFT + H + 0.2));
       const hit = pointer.onPlane(_plane, _b);
       if (hit) want.set(clamp(hit.x, -REACH.x, REACH.x), want.y, clamp(hit.z, REACH.near, REACH.far));
     }
-    // and it rises to the height the ball will pass at: the player's job is to be there, and to swing
     if (!input.xrRay) want.y = damp(want.y, court.batHeight(want.z) ?? H + 0.2, mine ? 16 : 6, dt);
     const before = _a.copy(this.batAt);
     this.batAt.x = damp(this.batAt.x, want.x, 30, dt);
     this.batAt.y = damp(this.batAt.y, want.y, 30, dt);
     this.batAt.z = damp(this.batAt.z, want.z, 30, dt);
     if (dt > 0) this.batVel.lerp(_b.subVectors(this.batAt, before).multiplyScalar(1 / dt), 1 - Math.exp(-22 * dt));
-    // the hardest it has been pushed forward lately: a swing is judged by its best moment, not its last
     this.swing = Math.max(this.swing * Math.exp(-8 * dt), -this.batVel.z);
 
-    // ---- as it is drawn: blade up, leaning out to the side it is on, turned in toward the table ----
-    // (its rubber face is turned to the player, who only ever sees it from behind)
     const side = clamp(this.batAt.x * 1.1, -1, 1);
     batTurn(this.bat.quaternion, _b.set(side * 0.5 + this.batVel.x * 0.05, 1, 0.12 - this.punch * 0.5), _c.set(this.batAt.x * 0.3, -0.12 - this.punch * 0.4, 1));
     this.bat.position.copy(this.batAt);
@@ -658,9 +593,6 @@ export class RallyWorld extends Minigame {
     this.batTrail.uniforms.uGain.value = 0.9 * fast;
   }
 
-  // ------------------------------------------------------------------------------------------------ Kai
-
-  /** After he has hit: the bat carries on through the ball for a moment. */
   private startFollow(): void {
     const p = this.court.ball.p;
     this.follow = 0.26;
@@ -671,7 +603,6 @@ export class RallyWorld extends Minigame {
   private moveKai(dt: number): void {
     const brain = this.court.brain, plan = brain.plan, bat = this.kaiBatAt;
     const before = _a.copy(bat);
-    // a short ball draws him forward to the table
     const forwardTo = plan ? clamp(plan.at.z - 0.62, KAI_Z - 0.1, KAI_Z + 0.42) : KAI_Z;
     this.kaiZ = damp(this.kaiZ, forwardTo, 5, dt);
     const root = this.kai.root.position;
@@ -682,19 +613,16 @@ export class RallyWorld extends Minigame {
 
     const ready = _b.set(root.x - 0.31, H + 0.09, this.kaiZ + 0.36);
     if (this.follow > 0) {
-      // through the ball, up and across
       this.follow -= dt;
       const k = 1 - Math.max(0, this.follow) / 0.26;
       bat.copy(this.followFrom).add(_c.set(0.22, 0.26, 0.5).multiplyScalar(ease.outCubic(k)));
     } else if (plan) {
       const left = plan.time - brain.clock, hit = _c.set(plan.at.x, plan.at.y, plan.at.z);
       if (left > 0.15) {
-        // drawing back behind where the ball will be
         const back = hit.add(_x.set(-0.1, -0.07, -0.38));
         const k = 1 - Math.exp(-(left > 0.4 ? 5 : 14) * dt);
         bat.lerp(left > 0.42 ? back.lerp(ready, 0.45) : back, k);
       } else {
-        // and through it: wherever the bat has got to, it is on the ball as the ball arrives
         bat.lerp(hit, clamp01(dt / Math.max(left, dt)));
       }
     } else if (this.phase === 'serveKai') {
@@ -702,24 +630,18 @@ export class RallyWorld extends Minigame {
     } else bat.lerp(ready, 1 - Math.exp(-7 * dt));
     if (dt > 0) this.kaiVel.lerp(_x.subVectors(bat, before).multiplyScalar(1 / dt), 1 - Math.exp(-18 * dt));
 
-    // the blade stands up out of his hand and faces down the table, closing over the ball as he swings through
     const swing = clamp(this.kaiVel.z / 5, -0.4, 1);
     batTurn(this.kaiBatTurn, _x.set(-0.42 + this.kaiVel.x * 0.04, 1, -0.1 + swing * 0.55), _y.set(0.1, 0.2 - swing * 0.35, 1));
-    // the hand that would hold a bat lying so, and the wrist that hand hangs from
     this.kaiHand.copy(this.kaiBatTurn).multiply(_q.copy(this.kaiBat.quaternion).invert());
     this.kaiWrist.set(0, 0, GRIP).applyQuaternion(this.kaiBatTurn).add(bat).add(_x.set(0, 0.05, 0).applyQuaternion(this.kaiHand));
     this.kaiWrist.y += LIFT;
     this.kai.lookAtPoint(this.phase === 'idle' ? this.arcade.game.playerEye : this.ballWorld);
   }
 
-  // ------------------------------------------------------------------------------------------------ the camera
-
   private moveCamera(): void {
     const cam = this.cam, ball = this.court.ball.p;
-    // the player's end: a little above and behind the bat, leaning with it
     const eye = _a.set(this.batAt.x * 0.2, LIFT + 1.74, 3.08), target = _b.set(ball.x * 0.1 + this.batAt.x * 0.05, LIFT + 0.8, -0.5);
     if (this.sweep < 1) {
-      // arriving: in from the side and round to the player's end
       const k = this.sweep, a = (1 - k) * 1.25;
       eye.set(Math.sin(a) * 4.6, LIFT + 1.74 + (1 - k) * 0.8, Math.cos(a) * (3.08 + (1 - k) * 1.2));
       target.set(0, LIFT + 0.8, -0.5 * k);

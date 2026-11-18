@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { Rng } from '../../src/core/math';
 import { Board, Game, LEVELS, PRISM, SIZE, adjacent, bestMove, type Gem, type Kind, type Power, type Wave } from '../../src/arcade/lanterns/board';
 
-/** Lays a board out from a picture: rows top to bottom, a digit for each jewel's kind. */
 const lay = (board: Board, rows: string[], powers: Record<string, Power> = {}): void => {
   let id = 9000;
   rows.forEach((row, r) => {
@@ -25,7 +24,6 @@ const noLines = (board: Board): boolean => {
   return true;
 };
 
-// a board with nothing lined up: kinds 0..3 in a pattern that never puts three alike in a line; 4 is used to build cases
 const QUIET = ['0123012', '2301230', '0123012', '2301230', '0123012', '2301230', '0123012'];
 
 describe('a board', () => {
@@ -48,13 +46,11 @@ describe('a board', () => {
 
   it('clears a line of three, drops what is above it, and fills from the top', () => {
     const board = new Board(new Rng(2));
-    // the 4 at (2, 1) slides down to join the two 4s on the bottom row
     lay(board, QUIET.slice(0, 5).concat(['2341230', '4413012']));
     const waves = board.swap({ x: 2, y: 1 }, { x: 2, y: 0 })!;
     expect(waves).not.toBeNull();
     expect(kindsOf(waves[0]!).slice(0, 3)).toEqual([4, 4, 4]);
     expect(waves[0]!.cleared.filter((c) => c.gem.kind === 4).every((c) => c.y === 0 && c.x <= 2)).toBe(true);
-    // three columns each took one new jewel from over the board
     expect(waves[0]!.falls.filter((f) => f.fromY >= SIZE).length).toBeGreaterThanOrEqual(3);
     expect(noLines(board)).toBe(true);
     for (let x = 0; x < SIZE; x++) expect(board.cells[x]!.filter(Boolean)).toHaveLength(SIZE);
@@ -79,7 +75,6 @@ describe('a board', () => {
 
   it('leaves a burst where a line across meets a line up', () => {
     const board = new Board(new Rng(5));
-    // moving the 4 at (2, 3) down to (2, 2) completes the row 4 4 _ and the column below it
     lay(board, ['0123012', '2301230', '0123012', '2341230', '4403012', '2341230', '0143012']);
     const waves = board.swap({ x: 2, y: 3 }, { x: 2, y: 2 })!;
     expect(waves[0]!.made[0]).toMatchObject({ x: 2, y: 2, gem: { power: 'burst' } });
@@ -101,7 +96,6 @@ describe('a board', () => {
   });
 });
 
-/** Plays a whole level and says how it went. `care` 1 always takes the best swap in sight; 0 takes any. */
 const run = (level: number, seed: number, care: number): { won: boolean; left: number; stars: number; chain: number } => {
   const rng = new Rng(seed), game = new Game(LEVELS[level]!, new Rng(seed * 7 + 1));
   for (let i = 0; i < 200 && !game.over; i++) {

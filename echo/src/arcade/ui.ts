@@ -4,18 +4,12 @@ import type { Hud } from '../ui/Hud';
 import { Widget } from '../ui/Panel';
 import { displayFont, font, glass, spaced, sparkle, wrap, type Theme } from '../ui/draw';
 
-/** Margin kept around every panel for its glow, as on the story's own HUD. */
 export const PAD = 26;
 
 export type Paint = (ctx: CanvasRenderingContext2D, w: number, h: number, el: UiEl) => void;
 
-/**
- * One panel of a game's interface: a score, a button, a meter. It is placed from an edge or the centre of the
- * screen, so it keeps its place when the window changes shape; give it `onClick` and it is a button.
- */
 export class UiEl {
   readonly widget: Widget;
-  /** Which part of the screen it hangs from (-1 left or bottom, 0 centre, 1 right or top), and how far from there in layout pixels. */
   private ax = 0;
   private ay = 0;
   private dx = 0;
@@ -23,9 +17,7 @@ export class UiEl {
   hover = false;
   disabled = false;
   onClick: (() => void) | null = null;
-  /** A key that presses it. */
   key: Action | null = null;
-  /** Grows from 0 to 1 while the pointer rests on it: buttons light up by it. */
   glow = 0;
   private readonly detach: () => void;
 
@@ -61,12 +53,10 @@ export class UiEl {
 
   layout(): void {
     const { w, h } = this.layer.hud.size, panel = this.widget.panel;
-    // an edge is where the panel's own edge goes, less the margin it keeps for its glow
     this.widget.x = this.ax * (w / 2 - panel.width / 2 + PAD) + this.dx;
     this.widget.y = this.ay * (h / 2 - panel.height / 2 + PAD) + this.dy;
   }
 
-  /** Whether a point in layout pixels is on the panel itself (not its glow margin). */
   contains(x: number, y: number): boolean {
     const panel = this.widget.panel;
     return Math.abs(x - this.widget.x) <= panel.width / 2 - PAD && Math.abs(y - this.widget.y) <= panel.height / 2 - PAD;
@@ -78,12 +68,9 @@ export class UiEl {
   }
 }
 
-/** A game's interface on the story's HUD: flat over the picture on a screen, on the floating sheet in a headset. */
 export class UiLayer {
   readonly els = new Set<UiEl>();
-  /** The pointer is on a button: the game under it should not act on the press. */
   hovering = false;
-  /** Called when the pointer moves onto a button, and when one is pressed: the arcade makes the sounds. */
   onHover: (() => void) | null = null;
   onPress: (() => void) | null = null;
 
@@ -97,13 +84,11 @@ export class UiLayer {
     return new UiEl(this, width, height, paint);
   }
 
-  /** Takes every panel down: a game leaves nothing of its interface behind. */
   clear(): void {
     for (const el of [...this.els]) el.remove();
     this.hovering = false;
   }
 
-  /** Places the panels and turns the pointer and keys into presses. Call once a frame, before the game reads its input. */
   update(dt: number): void {
     const input = this.input;
     const at = this.hud.pointerAt();
@@ -135,7 +120,6 @@ export class UiLayer {
       }
     }
     if (hit && clicked) {
-      // the press is spent here: it must not also swing a bat or swap a gem
       input.pressed.delete('primary');
       input.released.delete('primary');
       this.press(hit);
@@ -148,9 +132,6 @@ export class UiLayer {
   }
 }
 
-// ---------------------------------------------------------------------------------------------------- painters
-
-/** A button: a pane of glass with a label, lit while pointed at. `hint` is a key cap's worth of text on its right. */
 export const paintButton = (label: string, opts: { primary?: boolean; hint?: string; size?: number } = {}): Paint => (ctx, w, h, el) => {
   const theme = el.layer.theme;
   const x = PAD, y = PAD, bw = w - PAD * 2, bh = h - PAD * 2, k = el.glow;
@@ -173,7 +154,6 @@ export const paintButton = (label: string, opts: { primary?: boolean; hint?: str
   ctx.globalAlpha = 1;
 };
 
-/** A short line of instruction in a slim pane: what to do now, in the words for the device in hand. */
 export const paintHint = (text: () => string): Paint => (ctx, w, h, el) => {
   const theme = el.layer.theme;
   ctx.font = font(500, 17);
@@ -187,7 +167,6 @@ export const paintHint = (text: () => string): Paint => (ctx, w, h, el) => {
   ctx.fillText(text(), w / 2 + 8, h / 2 + 1, wide - 44);
 };
 
-/** Something said over the game: who, in their colour, and the words as far as they have been spoken. */
 export const paintBark = (line: () => { name: string; color: string; text: string }): Paint => (ctx, w, h, el) => {
   const theme = el.layer.theme, { name, color, text } = line();
   ctx.font = font(700, 12.5);
@@ -207,7 +186,6 @@ export const paintBark = (line: () => { name: string; color: string; text: strin
   ctx.fillText(text, x + 18 + nameWide + 14, h / 2 + 1, wide - nameWide - 44);
 };
 
-/** A row of stars, `earned` of them lit. `k` 0..1 brings them in one after another. */
 export const paintStars = (ctx: CanvasRenderingContext2D, cx: number, cy: number, earned: number, theme: Theme, k = 1, size = 26): void => {
   for (let i = 0; i < 3; i++) {
     const x = cx + (i - 1) * size * 2.5, shown = clamp01(k * 3 - i);
@@ -219,7 +197,6 @@ export const paintStars = (ctx: CanvasRenderingContext2D, cx: number, cy: number
       ctx.shadowColor = theme.accent;
       ctx.shadowBlur = 18;
       ctx.fillStyle = theme.accent;
-      // each star lands a little large and settles
       sparkle(ctx, x, cy, size * (1 + 0.35 * (1 - shown)));
       ctx.shadowBlur = 0;
     }
@@ -227,7 +204,6 @@ export const paintStars = (ctx: CanvasRenderingContext2D, cx: number, cy: number
   ctx.globalAlpha = 1;
 };
 
-/** The card that ends a session: how it went, the stars it earned, and a line about it. */
 export const paintResult = (data: { heading: string; summary: string; stars: number; reveal: () => number }): Paint => (ctx, w, h, el) => {
   const theme = el.layer.theme;
   glass(ctx, PAD, PAD, w - PAD * 2, h - PAD * 2, theme, { glow: 1.2, borderWidth: 2 });
@@ -245,7 +221,6 @@ export const paintResult = (data: { heading: string; summary: string; stars: num
   wrap(ctx, data.summary, w - PAD * 2 - 70).slice(0, 2).forEach((line, i) => ctx.fillText(line, w / 2, PAD + 206 + i * 26));
 };
 
-/** Small caps over a large number: a score, a count of moves. */
 export const paintStat = (label: () => string, value: () => string, opts: { align?: 'left' | 'center' | 'right'; accent?: boolean } = {}): Paint => (ctx, w, h, el) => {
   const theme = el.layer.theme, align = opts.align ?? 'center';
   glass(ctx, PAD, PAD, w - PAD * 2, h - PAD * 2, theme, { glow: 0.5 });
