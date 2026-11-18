@@ -91,7 +91,7 @@ export const monday = async (game: Game): Promise<void> => {
   const guide = haven.companion;
   haven.showCompanion(true);
   guide.setAlert(true);
-  labelLumi(game, haven, MONDAY.birthdayLabel);
+  labelLumi(game, haven, null);
   refreshSideTasks(game);
   player.canMove = true;
   d.objective(MONDAY.objectiveLumi);
@@ -107,16 +107,16 @@ export const monday = async (game: Game): Promise<void> => {
   await tickStreak(game, haven);
   player.canMove = true;
 
-  // ---- the tour: Lumi leads, the player follows ----
+  // ---- the tour ----
   game.reach('monday.tour');
   await lumiTour(game, haven);
 
-  // ---- free time: talk to Lumi about its birthday, find it a gem, or take the headset off ----
+  // ---- free time: Lumi asks for a gift, find it a gem, or take the headset off ----
   await havenFreeTime(game, haven);
   await d.fadeOut(1.4);
 };
 
-/** Free time in Haven after the tour, until the player takes the headset off. Lumi's birthday is there to find. */
+/** Free time in Haven after the tour, until the player takes the headset off. */
 const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, input, state } = game;
   const guide = haven.companion;
@@ -125,7 +125,7 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
     d.objective(MONDAY.objectiveFree);
     let action: 'talk' | 'gem' | 'give' | 'off' | null = null;
     const items: Interactable[] = [];
-    if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptBirthday, enabled: true, use: () => (action = 'talk') });
+    if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptTalk, enabled: true, use: () => (action = 'talk') });
     if (state.lumiGift === 'carrying') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive, enabled: true, use: () => (action = 'give') });
     if (state.lumiGift === 'asked') for (const position of haven.gems) items.push({ position, radius: 0.55, reach: 2.6, prompt: MONDAY.promptGem, enabled: true, use: () => (action = 'gem') });
     for (const item of items) game.interaction.add(item);
@@ -155,7 +155,7 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       player.canMove = false;
       guide.mode = 'still';
       player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
-      await d.play(MONDAY.birthday);
+      await d.play(MONDAY.askGift);
       state.lumiGift = 'asked';
       refreshSideTasks(game);
       guide.mode = 'roam';

@@ -9,7 +9,7 @@ export interface StoryState {
   tuesdayChoice: 'meet' | 'haven' | null;
   thursdayChoice: 'help' | 'haven' | null;
   policyChoice: Policy | null;
-  /** Lumi's birthday present: not asked for yet, asked for, a gem in hand, or given. */
+  /** Lumi's gift: not asked for yet, asked for, a gem in hand, or given. */
   lumiGift: 'none' | 'asked' | 'carrying' | 'given';
   // ---- what Haven does to keep the player, counted so the end can show it back to them. Not a score. ----
   /** Days in a row spent with Lumi, the best run, whether a break is still to be mentioned, and whether one ever happened. */

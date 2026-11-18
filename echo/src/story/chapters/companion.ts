@@ -10,8 +10,8 @@ import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { waitHeadsetOff } from './shared';
 
 /**
- * Lumi's part of the story: the tour of Haven, its birthday, and the gem it asks for. Shared by Monday (where it
- * all starts) and Tuesday (Lumi's birthday, if the player chooses to spend it in Haven).
+ * Lumi's part of the story: the tour of Haven and the gem gift for your new friend. Shared by Monday (where it
+ * all starts) and Tuesday (if the player chooses to spend the afternoon in Haven).
  */
 
 let heldGem: THREE.Mesh | null = null;
@@ -58,39 +58,38 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
   hud.setSubtitle(null);
 };
 
-/** Where the tour stops, what Lumi shows at each, and what it says. */
-const tourStops = (haven: HavenWorld): { x: number; z: number; show: THREE.Vector3 }[] => {
-  const path = haven.bridge.path;
-  const onDeck = path.getPointAt(0.06), start = path.getPointAt(0.0), far = path.getPointAt(0.45);
-  return [
-    { x: -4.9, z: -0.5, show: new THREE.Vector3(-6.4, 2.4, -1.6) },
-    { x: -2.0, z: -3.0, show: new THREE.Vector3(0, 0.3, -4.5) },
-    { x: 3.5, z: -5.8, show: new THREE.Vector3(4.9, 0.5, -7.0) },
-    { x: start.x - 1.2, z: start.z + 1.6, show: far },
-    { x: onDeck.x, z: onDeck.z, show: new THREE.Vector3(0, 7, -50) },
-  ];
-};
+const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
+  new THREE.Vector3(-6.4, 2.4, -1.6),
+  new THREE.Vector3(0, 0.3, -4.5),
+  new THREE.Vector3(4.9, 0.5, -7.0),
+  haven.bridge.path.getPointAt(0.45),
+  new THREE.Vector3(0, 7, -50),
+];
 
-/** Lumi leads the player round Haven: it goes ahead, waits, and once the player is with it, shows them something. */
+/** Lumi points out each sight from where it stands; the player's view turns with it. No following, so nothing can stall. */
 export const lumiTour = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { director: d, player, audio } = game;
   const guide = haven.companion;
-  d.objective(MONDAY.objectiveFollow);
-  const stops = tourStops(haven);
-  for (let i = 0; i < stops.length; i++) {
-    const stop = stops[i]!;
-    guide.leadTo(stop.x, stop.z, stop.show);
-    // a scripted run simply arrives alongside
-    if (game.autopilot.enabled) player.position.set(stop.x + 1.2, player.position.y, stop.z + 1.2);
-    await d.until(() => guide.arrived);
-    await d.until(() => guide.followed);
-    // the cue: the ring at Lumi's feet lights up, a chime, and Lumi points
+  const me = guide.person.root;
+  player.canMove = false;
+  guide.mode = 'still';
+  d.objective(MONDAY.objectiveTour);
+  const sights = tourSights(haven);
+  for (let i = 0; i < sights.length; i++) {
+    const sight = sights[i]!;
+    guide.placeAt(me.position.x, me.position.z, Math.atan2(sight.x - me.position.x, sight.z - me.position.z));
+    guide.person.lookAtPoint(sight);
+    player.faceToward(sight, 0.9);
+    await d.wait(0.6);
     audio.sfx('ringRim');
     guide.person.play('point');
     await bark(game, haven, MONDAY.tour[i]!);
   }
+  guide.person.lookAtPoint(game.playerEye);
+  player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
   guide.mode = 'roam';
-  await d.complete(MONDAY.tourDone);
+  player.canMove = true;
+  await d.complete(MONDAY.objectiveTour);
 };
 
 /** Waits for the player to pick up a gem from any crystal cluster; the cluster stays as it is. */
@@ -146,7 +145,7 @@ export const giveGem = async (game: Game, haven: HavenWorld): Promise<void> => {
 
 let labelExtra: string | null = null;
 
-/** The caption over Lumi: the streak, if there is one, above `extra` (such as the birthday). */
+/** The caption over Lumi: the streak, if there is one, above `extra` . */
 export const labelLumi = (game: Game, haven: HavenWorld, extra: string | null = labelExtra): void => {
   labelExtra = extra;
   const n = game.state.streak;
@@ -257,7 +256,7 @@ export const hookPayoff = (state: StoryState): [string, string][] => {
     pages.push(['It called you back.', `While you were in your room, Haven sent you ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} and made the headset glow on its dock.`]);
   }
   if (state.lumiGift !== 'none') {
-    pages.push(['It asked you for something.', "Lumi's birthday made a present feel like something you owed. Giving makes it harder to walk away."]);
+    pages.push(['It asked you for something.', "Lumi said friends give each other gifts, so a gift felt like something you owed. Giving makes it harder to walk away."]);
   }
   pages.push(['It always agreed with you.', 'Whatever you said, Lumi said you were right. Jamie did not, and that is part of what made Jamie real.']);
   pages.push(['It rewarded you, every time.', "Every task in Haven ended with a chime and a golden glow. The real world doesn't do that. Real apps use these same tricks."]);

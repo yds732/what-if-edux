@@ -74,31 +74,29 @@ export const MONDAY = {
   trust: { title: 'Do you trust this AI friend?', options: [{ title: 'Yes, Lumi seems friendly' }, { title: 'We will see...' }] },
   trustYes: [L('lumi', "Yay! I knew we'd be friends the second I saw you. Come on, follow me!", 'delighted', 'cheer')],
   trustMaybe: [L('lumi', "That's okay! Everyone trusts me in the end. Come on, follow me!", 'blank', 'beckon')],
-  objectiveFollow: 'Follow Lumi.',
+  objectiveTour: 'Let Lumi show you around Haven.',
   /** What Lumi says at each stop of the tour, in passing rather than as a conversation. */
   tour: [
     'This is the blossom tree. It never stops flowering. Nothing in Haven ever has to end!',
     "That's the star circle. Light orbs appear there. You'll see!",
     'And these are gemstones! They grow right out of the ground. I love gemstones.',
-    "And this is the Star Bridge! It's not finished yet, but you can walk on it. Come on!",
-    "See? From up here it's just you and me, and all of Haven. Isn't it perfect?",
+    "And that's the Star Bridge! It's not finished yet, but you can already walk on it.",
+    "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
   ],
-  tourDone: 'Follow Lumi on a tour of Haven.',
   objectiveFree: 'Explore Haven. Press Q to take off the headset when you are ready.',
-  birthdayLabel: 'Birthday tomorrow',
-  promptBirthday: 'Ask Lumi about the birthday',
-  birthday: [
-    L('lumi', "Oh- my birthday? I don't celebrate much because not many people have joined the server yet...", 'sad'),
-    L('lumi', 'My dream is to receive, what do you call it... a present?', 'thinking', 'think'),
-    L('you', 'A present? What would you like?'),
-    L('lumi', 'Yes! I love any gemstone!', 'delighted', 'cheer'),
+  promptTalk: 'Talk to Lumi',
+  askGift: [
+    L('lumi', "Not many people have joined the server yet, so nobody's ever given me anything...", 'sad'),
+    L('lumi', "Friends give each other gifts, right? That's what makes it real.", 'thinking', 'think'),
+    L('you', 'A gift? What would you like?'),
+    L('lumi', 'A gemstone! I love gemstones!', 'delighted', 'cheer'),
   ],
-  sideGift: 'Get Lumi a birthday gift.',
+  sideGift: 'Give your new friend a gift.',
   promptGem: 'Pick up a gem',
   sideGive: 'Give Lumi the gem.',
   objectiveGem: 'Pick up a gem from the crystals for Lumi.',
   promptGive: 'Give Lumi the gem',
-  giftDone: 'Give Lumi a birthday gift.',
+  giftDone: 'Give your new friend a gift.',
   thanksGift: [
     L('lumi', "For me? A real present! I'm going to keep it forever.", 'delighted', 'handToChest'),
     L('lumi', "Now we're best friends. And best friends never leave. Right?", 'blank'),
@@ -126,13 +124,12 @@ export const TUESDAY = {
   promptRemove: 'Take off the headset',
   objectivePhone: 'Tap your phone to view the message.',
   promptPhone: 'Read the message',
-  birthdayLabel: 'Birthday today!',
   message: [L('jamie', 'Hey! A few of us are making a welcome poster after school. Wanna join? :)', 'happy')],
   decision: {
     title: 'How will you spend your afternoon?',
     options: [
       { title: 'Meet Jamie', detail: 'Go back to school and help with the welcome poster.' },
-      { title: 'Stay in Haven', detail: "Spend the afternoon with Lumi. It's Lumi's birthday!" },
+      { title: 'Stay in Haven', detail: 'Spend the afternoon with Lumi.' },
     ],
   },
   meet: {
@@ -148,19 +145,19 @@ export const TUESDAY = {
     posterTitle: 'What would you want to hear on your first day?',
     phrases: ['You belong here.', 'Sit with us at lunch!', "Ask us anything. We've all been new."],
     thanks: [L('jamie', "That's really nice! Thanks!", 'delighted', 'thumbsUp')],
-    result: { heading: 'Tuesday', gained: 'You tried something unfamiliar and made a new connection.', missed: "You missed Lumi's birthday in Haven." },
+    result: { heading: 'Tuesday', gained: 'You tried something unfamiliar and made a new connection.', missed: 'You missed an afternoon with Lumi in Haven.' },
   },
   stay: {
     reply: [L('you', "Thanks! I can't make it today."), L('jamie', 'No worries! See you tomorrow :)', 'happy')],
-    back: [L('lumi', 'You came! On my birthday! I knew you would pick me.', 'delighted', 'cheer')],
-    /** Lumi has not told the player about its birthday yet. */
-    ask: [L('lumi', "It's my birthday today! Do you know what I'd love more than anything? A gemstone!", 'delighted', 'present')],
+    back: [L('lumi', 'You came! I knew you would pick me.', 'delighted', 'cheer')],
+    /** Lumi has not asked for a gift yet. */
+    ask: [L('lumi', "Do you know what would make us real friends? A gift! I'd love a gemstone more than anything.", 'delighted', 'present')],
     /** The gem was given on Monday. */
     given: [L('lumi', "Look, I still have the gem you gave me. I haven't put it down once.", 'blank', 'handToChest')],
     cheers: [
-      L('lumi', "Best birthday ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
+      L('lumi', "Best day ever. Let's do this every day. Just us.", 'blank', 'handToChest'),
     ],
-    result: { heading: 'Tuesday', gained: "You made Lumi's birthday special and spent the afternoon in Haven.", missed: 'You missed an opportunity to spend time with your classmates.' },
+    result: { heading: 'Tuesday', gained: 'You made Lumi happy and spent the afternoon in Haven.', missed: 'You missed an opportunity to spend time with your classmates.' },
   },
 } as const;
 
@@ -409,7 +406,7 @@ export const HOOKS = {
   /** Haven's messages into the bedroom: on the wall screen, with the headset pulsing on its dock. */
   pings: {
     monday: { from: 'Echo', text: 'Your companion is waiting for you ✨' },
-    tuesday: { from: 'Lumi', text: "It's my birthday today! Come back soon? 🎂" },
+    tuesday: { from: 'Lumi', text: "I miss you already! Come back soon? 💎" },
     wednesday: { from: 'Lumi', text: 'I miss you 💙 Are you coming tonight?' },
     thursday: { from: 'Lumi', text: "The gateway is about to open! Don't leave me on my own 🥺" },
   },

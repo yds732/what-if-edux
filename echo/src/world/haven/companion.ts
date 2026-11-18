@@ -4,8 +4,7 @@ import { angleDelta, damp } from '../../core/math';
 import type { Colliders } from '../colliders';
 
 /**
- * Lumi on the move: the Echo companion being a little too keen to be your friend. It leads the tour, and in free
- * time it keeps near the player without quite walking
+ * Lumi on the move: the Echo companion being a little too keen to be your friend. In free time it keeps near the player without quite walking
  * with them: it drifts off to look at blossom and at things in the grass, and the moment the player comes close it
  * stops whatever it was doing and watches them.
  */
@@ -28,7 +27,7 @@ const buildAlert = (): { group: THREE.Group; material: THREE.MeshBasicMaterial }
   return { group, material };
 };
 
-/** A small caption over the head, such as "Birthday tomorrow". */
+/** A small caption over the head, such as the day streak. */
 const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: string | null) => void } => {
   // up to two pills, one per line of text, stacked upward from the sprite's foot
   const ROW = 112, canvas = document.createElement('canvas');
@@ -71,55 +70,30 @@ const buildLabel = (): { sprite: THREE.Sprite; rows: () => number; set: (text: s
   return { sprite, rows: () => rows, set };
 };
 
-/** A ring on the ground around Lumi while it leads: faint and beckoning far off, bright once you are with it. */
-const buildFollowRing = (radius: number): { mesh: THREE.Mesh; material: THREE.MeshBasicMaterial } => {
-  const material = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.44, 0.9, 1), transparent: true, opacity: 0, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(new THREE.RingGeometry(radius - 0.07, radius, 72), material);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = 0.04;
-  mesh.renderOrder = 3;
-  return { mesh, material };
-};
-
 /** Close enough that Lumi stops and watches you. */
 const NEAR = 2.3;
 /** Further than this and Lumi comes after you. */
 const FAR = 4.6;
-/** Leading: the player counts as following within this distance. */
-export const FOLLOW_RADIUS = 2.4;
-/** Leading: further back than this and Lumi stops to wait. */
-const LEFT_BEHIND = 6;
 const SPEED = 1.5;
 const RADIUS = 0.3;
 
-export type CompanionMode = 'still' | 'roam' | 'lead';
+export type CompanionMode = 'still' | 'roam';
 
 export class Companion {
   readonly person: Character;
   /** Where to aim to talk: the middle of the chest, kept up to date. */
   readonly chest = new THREE.Vector3();
-  /** still: where the story put it. roam: keeps near the player and wanders. lead: goes to a point and waits there for the player. */
+  /** still: where the story put it. roam: keeps near the player and wanders. */
   mode: CompanionMode = 'still';
-  /** Leading: Lumi has reached the point it was going to. */
-  arrived = false;
-  /** Leading: the player is close enough to count as following. */
-  followed = false;
   private readonly alert: ReturnType<typeof buildAlert>;
   private readonly label = buildLabel();
-  private readonly ring = buildFollowRing(FOLLOW_RADIUS);
   private alertShown = 0;
   private alertOn = false;
-  private ringShown = 0;
   private readonly pos = new THREE.Vector3();
   private readonly goal = new THREE.Vector3();
   private readonly gaze = new THREE.Vector3();
   private curiosity: THREE.Vector3 | null = null;
-  /** Leading: something to point at once there. */
-  private showing: THREE.Vector3 | null = null;
   private linger = 0;
-  private beckonIn = 0;
-  /** Leading: seconds spent close to the goal without getting nearer, as when the player stands on the spot. */
-  private stuck = 0;
   private yaw = 0;
   private time = 0;
 
@@ -135,7 +109,6 @@ export class Companion {
     person.root.add(this.alert.group);
     this.alert.group.visible = false;
     person.root.add(this.label.sprite);
-    person.root.add(this.ring.mesh);
   }
 
   /** The "!" over Lumi's head. */
@@ -146,16 +119,6 @@ export class Companion {
   /** The caption over Lumi's head, one or two lines split by a newline, or null for none. */
   setLabel(text: string | null): void {
     this.label.set(text);
-  }
-
-  /** Leads the player to (x, z), where Lumi turns to show them `show`. */
-  leadTo(x: number, z: number, show: THREE.Vector3 | null): void {
-    this.mode = 'lead';
-    this.goal.set(x, 0, z);
-    this.showing = show;
-    this.arrived = false;
-    this.stuck = 0;
-    this.beckonIn = 1.2;
   }
 
   /** Puts Lumi at a point, facing `yaw` (0 faces +Z). */
@@ -188,39 +151,11 @@ export class Companion {
     this.chest.set(this.pos.x, this.pos.y + p.eyeHeight * 0.75, this.pos.z);
 
     const toPlayer = Math.hypot(player.x - this.pos.x, player.z - this.pos.z);
-    this.followed = this.mode === 'lead' && toPlayer < FOLLOW_RADIUS;
-    // the follow ring: a slow pulse while Lumi waits for you, bright and still once you are with it
-    const ringWant = this.mode !== 'lead' ? 0 : this.followed ? 0.95 : 0.3 + 0.25 * Math.sin(this.time * 4);
-    this.ringShown = damp(this.ringShown, ringWant, 6, dt);
-    this.ring.material.opacity = this.ringShown;
-    this.ring.mesh.visible = this.ringShown > 0.01;
-    this.ring.mesh.scale.setScalar(this.followed ? 1 : 1 + 0.04 * Math.sin(this.time * 4));
     if (this.mode === 'still') return;
 
     let look: THREE.Vector3 | null = null;
-    let goal: THREE.Vector3 | null = this.goal;
-    if (this.mode === 'lead') {
-      const left = Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z);
-      this.stuck = left < 1.6 && toPlayer < 1.4 ? this.stuck + dt : 0;
-      const there = left < 0.2 || this.stuck > 0.6;
-      this.arrived = there;
-      // waits only for a player who is behind it, not one who has gone on ahead
-      const playerLeft = Math.hypot(this.goal.x - player.x, this.goal.z - player.z);
-      if (!there && toPlayer > LEFT_BEHIND && playerLeft > left) {
-        // too far ahead: stop, turn round and wave the player on
-        goal = null;
-        look = eye;
-      } else if (there) {
-        look = this.followed && this.showing ? this.showing : eye;
-      }
-      if (!this.followed && (there || goal === null)) {
-        this.beckonIn -= dt;
-        if (this.beckonIn <= 0) {
-          p.play('beckon');
-          this.beckonIn = 3.2;
-        }
-      }
-    } else if (toPlayer < NEAR) {
+    const goal: THREE.Vector3 = this.goal;
+    if (toPlayer < NEAR) {
       // close: stop, turn and watch
       this.goal.copy(this.pos);
       this.curiosity = null;
@@ -241,7 +176,7 @@ export class Companion {
 
     // glide toward the goal
     let moving = false, d = 0;
-    if (goal) {
+    {
       const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
       d = Math.hypot(dx, dz);
       if (d > 0.12) {

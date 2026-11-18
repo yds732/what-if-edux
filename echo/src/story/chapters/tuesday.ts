@@ -14,7 +14,7 @@ export const tuesday = async (game: Game): Promise<void> => {
   const haven = (await d.enter('haven', HAVEN.spawn)) as HavenWorld;
   haven.setVariant('arrival');
   haven.showCompanion(true);
-  labelLumi(game, haven, TUESDAY.birthdayLabel);
+  labelLumi(game, haven, null);
   haven.companion.person.lookAtPoint(game.playerEye);
   // a gem carried over from Monday waits until there is a free hand for it
   holdGem(game, false);
@@ -172,7 +172,7 @@ const stayInHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
   haven.bridge.rings.forEach((ring) => ring.setState('lit', true));
   const guide = haven.companion;
   haven.showCompanion(true, { x: 0.6, z: 1.6, yaw: Math.PI });
-  labelLumi(game, haven, TUESDAY.birthdayLabel);
+  labelLumi(game, haven, null);
   guide.mode = 'still';
   player.canMove = true;
   game.reach('tuesday.lumi');
