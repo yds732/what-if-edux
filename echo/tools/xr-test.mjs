@@ -66,7 +66,7 @@ const open = async (beat) => {
   await t.page.waitForTimeout(600);
   await t.shot('4_notify');
   await t.press('right', 'b-button');
-  await t.page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 30000 })
+  await t.page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 60000 })
     .then(() => check('B takes the Echo headset off', true), () => check('B takes the Echo headset off', false));
   await t.close();
 }

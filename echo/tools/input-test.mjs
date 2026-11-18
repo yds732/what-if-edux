@@ -9,8 +9,9 @@
 //   6. Tuesday: take the headset off with Q, open the phone, click a choice card with the mouse.
 //   7. Friday: pause mid-scene, restart the day, toggle pause with P, go back to the title and begin again.
 //   8. The mouse: a click captures it, moving it looks around, losing it pauses, a decision frees and retakes it.
-// Sections 1 to 7 turn the view by setting the player's heading, so that they do not depend on where a mouse
-// happens to be; section 8 is the mouse itself.
+//   9. Thursday in Haven: off the meadow, onto the bridge and along it to where the story goes on.
+// Sections 1 to 7 and 9 turn the view by setting the player's heading, so that they do not depend on where a
+// mouse happens to be; section 8 is the mouse itself.
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
@@ -155,8 +156,8 @@ const open = async (query) => {
   await t.beat('monday.walk');
   await page.waitForTimeout(700);
   const from = await t.at();
-  // out from behind the desk, up the aisle between the columns, and across to the mark at the front
-  const route = [[1.4, 3.8], [1.4, -2.3], [1.0, -2.8]];
+  // out from behind the desk to the aisle down the middle of the room, and up it to the mark at the front
+  const route = [[0.2, 3.3], [0.1, -2.2], [0.1, -2.8]];
   let arrived = true;
   for (const [x, z] of route) arrived = arrived && (await t.walk(x, z));
   await t.shot('4_front');
@@ -355,6 +356,30 @@ const open = async (query) => {
   await page.mouse.click(card.x, card.y);
   await page.waitForTimeout(900);
   check('the click that chooses also takes the mouse back', (await page.evaluate(() => window.__game.state.policyChoice)) === 'combined' && (await locked()) === 'view', `choice ${await page.evaluate(() => window.__game.state.policyChoice)}, lock ${await locked()}`);
+  await t.close();
+}
+
+// ------------------------------------------------------------------------------------------- 9. Thursday, onto the bridge
+{
+  const t = await open('?chapter=thursday&auto=1&speed=6&handover=thursday.festival&dpr=1&q=low');
+  const { page } = t;
+  await t.beat('thursday.festival', 180000);
+  // the welcome is read through, and then the walk is the player's
+  for (let i = 0; i < 30 && !(await page.evaluate(() => window.__game.player.canMove && !window.__game.hud.subtitle)); i++) {
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(350);
+  }
+  // up the middle of the meadow, over its edge to the bridge's first tile, and along the bridge as it winds
+  const edge = await t.walk(0, -9.4, 0.6, 20000);
+  const tile = await t.walk(0, -12.3, 0.7, 10000);
+  const first = await t.at();
+  check('Thursday: the bridge can be walked onto from the meadow', edge && tile, `(${first.x.toFixed(1)}, ${first.z.toFixed(1)})`);
+  for (let k = 0.03; k <= 0.3001; k += 0.03) {
+    const at = await page.evaluate((u) => { const v = window.__game.app.world.bridge.path.getPointAt(u); return [v.x, v.z]; }, k);
+    await t.walk(at[0], at[1], 0.6, 8000);
+  }
+  await t.shot('9_bridge');
+  await t.beat('thursday.oneMore', 8000).then(() => check('Thursday: walking out along the bridge moves the story on', true), () => check('Thursday: walking out along the bridge moves the story on', false));
   await t.close();
 }
 

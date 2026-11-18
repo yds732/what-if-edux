@@ -468,7 +468,10 @@ export class HavenWorld extends World {
     this.floating.update(time, frame.pixelHeight);
     this.shootingStars.update(dt, frame.camera);
     this.bridge.update(dt, time);
-    if (this.companion.person.root.visible) this.companion.update(dt, _player.set(frame.camera.position.x, 0, frame.camera.position.z), frame.camera.position, frame.camera);
+    if (this.companion.person.root.visible) {
+      frame.camera.getWorldPosition(_eye);
+      this.companion.update(dt, _player.set(_eye.x, 0, _eye.z), _eye, frame.camera);
+    }
     this.gateway.update(dt, time);
     if (this.bonusRing.group.visible) {
       const p = HAVEN.bonusRing;
@@ -507,4 +510,5 @@ export class HavenWorld extends World {
 
 const _p = new THREE.Vector3();
 const _player = new THREE.Vector3();
+const _eye = new THREE.Vector3();
 const _white = new THREE.Color(1, 0.97, 0.9);
