@@ -157,7 +157,7 @@ export class App {
     }
     if (inHeadset) {
       r.toneMappingExposure = look.exposure;
-      r.setRenderTarget(null);
+      // WebXRManager has already bound the headset's framebuffer for this frame.
       r.render(world.scene, this.camera);
     } else {
       this.fx.focus += ((this.focus ?? world.restFocus) - this.fx.focus) * (1 - Math.exp(-3 * this.lastDt));

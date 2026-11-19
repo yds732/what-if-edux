@@ -64,6 +64,10 @@ const open = async (beat) => {
 {
   const t = await open('thursday.oneMore');
   const { page } = t;
+  check('story renders into the headset framebuffer', await page.evaluate(() => {
+    const r = window.__game.app.renderer;
+    return r.xr.isPresenting && r.getRenderTarget()?.isXRRenderTarget === true;
+  }));
   await page.evaluate(() => window.__xrDevice.controllers.right.position.set(0.22, 1.15, -0.3));
   // the day's last lines play out first: B counts once the story asks for the headset to come off
   const asked = await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 }).then(() => true, () => false);
