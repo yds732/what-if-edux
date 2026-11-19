@@ -172,7 +172,7 @@ export class Input {
   }
 
   private onTouch(e: TouchEvent): void {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this.gesture();
     this.setMode('touch');
     const w = this.canvas.clientWidth;
@@ -215,7 +215,7 @@ export class Input {
     }
   }
   private onTouchEnd(e: TouchEvent): void {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this.gesture();
     for (const t of Array.from(e.changedTouches)) {
       if (t.identifier === this.stickId) {
