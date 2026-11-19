@@ -194,8 +194,8 @@ const open = async (query) => {
   const { page } = t;
   await t.beat('thursday.oneMore');
   // the day's last lines play out first: Q counts once the story asks for the headset to come off
-  await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 })
-    .then(() => check('Thursday: a prompt asks for the headset to come off, naming the key', true), () => check('Thursday: a prompt asks for the headset to come off, naming the key', false));
+  await page.waitForFunction(() => { const h = window.__game.hud; return h.objective.widget.visible && h.objectiveText.includes('Press Q'); }, undefined, { timeout: 30000 });
+  check('Thursday: the objective names the headset key', true);
   await page.keyboard.press('KeyQ');
   // Are you sure you want to leave Haven? The only answer is 1, Yes
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
@@ -208,8 +208,16 @@ const open = async (query) => {
   await t.face(...phone);
   await page.waitForTimeout(400);
   await page.keyboard.press('KeyE');
-  // Jamie's messages arrive one by one in the opened phone; a thought is then held on screen before the choice
-  await t.beat('thursday.message', 60000).then(() => check('Thursday: E on the phone opens the message', true), () => check('Thursday: E on the phone opens the message', false));
+  await page.waitForFunction(() => window.__game.worlds.bedroom.holoTarget === 1);
+  const firstMessage = await page.evaluate(() => window.__game.worlds.bedroom.hologram.texture.version);
+  // The first of Jamie's four messages is already on the phone.
+  for (let next = 1; next < 4; next++) {
+    await page.mouse.click(640, 360);
+    await page.waitForFunction((version) => window.__game.worlds.bedroom.hologram.texture.version === version, firstMessage + next, { timeout: 1200 });
+  }
+  await page.keyboard.press('Space');
+  await t.beat('thursday.message', 1200);
+  check('Thursday: each click advances one phone message immediately and Space finishes the thread', true);
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 30000 }).catch(() => undefined);
   await page.waitForTimeout(900);
   // the mouse is free while a choice is up: point at the second card and click it

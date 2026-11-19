@@ -57,12 +57,13 @@ export const lerpLook = (out: Look, a: Look, b: Look, k: number): Look => {
 };
 
 export interface WorldWipe {
-  scene: THREE.Scene;
+  projection: THREE.Matrix4;
   radius: number;
   softness: number;
   color: THREE.Color;
 }
 
+export const WIPE_DISTANCE = 6;
 const DIM_DEPTH = 0.46;
 
 export interface ScreenFx {
@@ -103,23 +104,36 @@ vec3 mainColor(vec2 uv){ return sane(texture2D(tScene, uv).rgb) * mix(1.0, textu
 ${DEPTH_GLSL}
 #ifdef WIPE
 ${GLSL_NOISE}
-uniform sampler2D tAlt, tAltDepth; uniform float uWave, uWaveSoft, uWaveMax, uTime; uniform vec3 uWaveColor; uniform mat4 uCamWorld;
+uniform sampler2D tAlt; uniform float uWave, uWaveSoft, uTime; uniform vec3 uWaveColor; uniform mat4 uCamWorld, uToCapture;
 vec3 sceneColor(vec2 uv){
-  float z = -viewZ(texture2D(tAltDepth, uv).x);
-  vec3 vp = vec3((uv * 2.0 - 1.0) * uInvProj * z, -z);
-  float dist = min(length(vp), uWaveMax);
-  vec3 wp = (uCamWorld * vec4(vp, 1.0)).xyz;
-  float n = fbm3(wp * 2.2 + vec3(0.0, uTime * 0.35, 0.0)) - 0.5;
-  float m = smoothstep(uWave - uWaveSoft, uWave, dist + n * uWaveSoft * 1.6);   // 1: the outgoing world still stands here
-  vec3 a = sane(texture2D(tAlt, uv).rgb);
-  float rim = 4.0 * m * (1.0 - m);
-  float sparks = step(0.82, vnoise3(wp * 14.0 + uTime)) * rim;
-  return mix(mainColor(uv), a, m) + uWaveColor * (rim * rim * 1.6 + sparks * 2.5);
+  vec3 ray = vec3((uv * 2.0 - 1.0) * uInvProj, -1.0);
+  vec4 clip = uToCapture * vec4(ray, 0.0);
+  vec3 color = mainColor(uv);
+  if (clip.w > 0.0 && all(lessThanEqual(abs(clip.xy), vec2(clip.w)))) {
+    vec4 old = texture2D(tAlt, 0.5 + 0.5 * clip.xy / clip.w);
+    vec3 wp = (uCamWorld * vec4(normalize(ray) * old.a, 1.0)).xyz;
+    float n = fbm3(wp * 2.2 + vec3(0.0, uTime * 0.35, 0.0)) - 0.5;
+    float m = smoothstep(uWave - uWaveSoft, uWave, old.a + n * uWaveSoft * 1.6);
+    float rim = 4.0 * m * (1.0 - m);
+    float sparks = step(0.82, vnoise3(wp * 14.0 + uTime)) * rim;
+    color = mix(color, sane(old.rgb), m) + uWaveColor * (rim * rim * 1.6 + sparks * 2.5);
+  }
+  return color;
 }
 #else
 #define sceneColor mainColor
 #endif
 `;
+
+// Keep the outgoing colour and its distance together so the dissolve needs only one texture.
+const CAPTURE_FS = `
+uniform sampler2D tScene, tDepth; varying vec2 vUv;
+${DEPTH_GLSL}
+void main(){
+  vec3 ray = vec3((vUv * 2.0 - 1.0) * uInvProj, -1.0);
+  float dist = length(ray) * -viewZ(texture2D(tDepth, vUv).r);
+  gl_FragColor = vec4(texture2D(tScene, vUv).rgb, min(dist, ${WIPE_DISTANCE.toFixed(1)}));
+}`;
 
 const AO_FS = `
 uniform sampler2D tDepth; uniform vec2 uTexel; uniform float uRadius; varying vec2 vUv;
@@ -261,6 +275,7 @@ export class PostPipeline {
   private readonly quadScene = new THREE.Scene();
   private readonly quadCam = new THREE.Camera();
   private readonly white: THREE.DataTexture;
+  private readonly compileTarget = new THREE.WebGLRenderTarget(1, 1, HALF_FLOAT);
 
   private rtMain: THREE.WebGLRenderTarget | null = null;
   private rtAlt: THREE.WebGLRenderTarget | null = null;
@@ -273,9 +288,9 @@ export class PostPipeline {
   private readonly sceneU = { tScene: { value: null as THREE.Texture | null }, tAO: { value: null as THREE.Texture | null }, uAO: { value: 0 } };
   private readonly wipeU = {
     ...this.depthU,
-    tAlt: { value: null as THREE.Texture | null }, tAltDepth: { value: null as THREE.Texture | null },
-    uWave: { value: 0 }, uWaveSoft: { value: 1 }, uWaveMax: { value: 60 }, uTime: { value: 0 },
-    uWaveColor: { value: new THREE.Color() }, uCamWorld: { value: new THREE.Matrix4() },
+    tAlt: { value: null as THREE.Texture | null },
+    uWave: { value: 0 }, uWaveSoft: { value: 1 }, uTime: { value: 0 },
+    uWaveColor: { value: new THREE.Color() }, uCamWorld: { value: new THREE.Matrix4() }, uToCapture: { value: new THREE.Matrix4() },
   };
   private readonly finalU = {
     tBloom: { value: null as THREE.Texture | null }, uBloom: { value: 0.08 }, uSaturation: { value: 1 }, uContrast: { value: 0 },
@@ -286,6 +301,7 @@ export class PostPipeline {
   };
 
   private readonly mAO: THREE.ShaderMaterial;
+  private readonly mCapture: THREE.ShaderMaterial;
   private readonly mAOBlur: THREE.ShaderMaterial;
   private readonly mShafts: THREE.ShaderMaterial;
   private readonly black: THREE.DataTexture;
@@ -313,6 +329,7 @@ export class PostPipeline {
     const mk = (fragmentShader: string, uniforms: Record<string, THREE.IUniform>, defines: Record<string, string> = {}) =>
       new THREE.ShaderMaterial({ vertexShader: FULLSCREEN_VS, fragmentShader, uniforms, defines, depthTest: false, depthWrite: false, toneMapped: false });
 
+    this.mCapture = mk(CAPTURE_FS, { ...this.depthU, tScene: { value: null }, tDepth: { value: null } });
     this.mAO = mk(AO_FS, { ...this.depthU, tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uRadius: { value: 0.35 } });
     this.mAOBlur = mk(AO_BLUR_FS, { tA: { value: null }, uDir: { value: new THREE.Vector2() } });
     this.mShafts = mk(SHAFT_FS, { ...this.depthU, tScene: { value: null }, tDepth: { value: null }, uLight: { value: new THREE.Vector2() }, uSkyFrom: { value: 100 } });
@@ -363,11 +380,11 @@ export class PostPipeline {
   }
 
   private disposeTargets(): void {
-    for (const t of [this.rtMain, this.rtAlt, this.rtAO, this.rtAO2, this.rtShafts, ...this.blooms.flat()]) {
+    for (const t of [this.rtMain, this.rtAO, this.rtAO2, this.rtShafts, ...this.blooms.flat()]) {
       t?.depthTexture?.dispose();
       t?.dispose();
     }
-    this.rtMain = this.rtAlt = this.rtAO = this.rtAO2 = this.rtShafts = null;
+    this.rtMain = this.rtAO = this.rtAO2 = this.rtShafts = null;
     this.blooms = [];
   }
 
@@ -377,19 +394,32 @@ export class PostPipeline {
     this.renderer.render(this.quadScene, this.quadCam);
   }
 
-  private altTarget(): THREE.WebGLRenderTarget {
-    if (!this.rtAlt) {
-      const depth = new THREE.DepthTexture(this.width, this.height);
-      depth.minFilter = depth.magFilter = THREE.NearestFilter;
-      this.rtAlt = new THREE.WebGLRenderTarget(this.width, this.height, { ...HALF_FLOAT, depthBuffer: true, depthTexture: depth });
-    }
-    return this.rtAlt;
+  captureWipe(camera: THREE.PerspectiveCamera, yawChange: number): THREE.Matrix4 {
+    const main = this.rtMain!;
+    this.rtAlt ??= new THREE.WebGLRenderTarget(main.width, main.height, HALF_FLOAT);
+    this.rtAlt.setSize(main.width, main.height);
+    this.mCapture.uniforms.tScene!.value = main.texture;
+    this.mCapture.uniforms.tDepth!.value = main.depthTexture;
+    this.run(this.mCapture, this.rtAlt);
+    this.renderer.setRenderTarget(null);
+    this.wipeU.tAlt.value = this.rtAlt.texture;
+    return camera.projectionMatrix.clone().multiply(new THREE.Matrix4().extractRotation(camera.matrixWorldInverse)).multiply(new THREE.Matrix4().makeRotationY(-yawChange));
   }
 
-  releaseWipe(): void {
-    this.rtAlt?.depthTexture?.dispose();
-    this.rtAlt?.dispose();
-    this.rtAlt = null;
+  compileScene(scene: THREE.Object3D, camera: THREE.Camera): Promise<unknown> {
+    const r = this.renderer, previous = r.getRenderTarget();
+    try {
+      if (!r.xr.isPresenting) r.setRenderTarget(this.compileTarget);
+      return r.compileAsync(scene, camera);
+    } finally {
+      r.setRenderTarget(previous);
+    }
+  }
+
+  async prepareWipe(): Promise<void> {
+    const capture = new THREE.Mesh(this.quad.geometry, [this.mCapture, this.mDown0.wipe]);
+    const final = new THREE.Mesh(this.quad.geometry, this.mFinal.wipe);
+    await Promise.all([this.compileScene(capture, this.quadCam), this.renderer.compileAsync(final, this.quadCam)]);
   }
 
   render(f: FrameInput): void {
@@ -404,19 +434,14 @@ export class PostPipeline {
 
     const variant = f.wipe ? 'wipe' : 'plain';
     if (f.wipe) {
-      const alt = this.altTarget();
-      r.setRenderTarget(alt);
-      r.clear();
-      r.render(f.wipe.scene, camera);
+      camera.updateWorldMatrix(true, false);
       const u = this.wipeU;
-      u.tAlt.value = alt.texture;
-      u.tAltDepth.value = alt.depthTexture;
       u.uWave.value = f.wipe.radius;
       u.uWaveSoft.value = f.wipe.softness;
-      u.uWaveMax.value = Math.min(camera.far * 0.9, 6);
       u.uTime.value = f.time;
       u.uWaveColor.value.copy(f.wipe.color);
       u.uCamWorld.value.copy(camera.matrixWorld);
+      u.uToCapture.value.multiplyMatrices(f.wipe.projection, camera.matrixWorld);
     }
 
     f.prepass?.(r, camera);
@@ -529,6 +554,8 @@ export class PostPipeline {
 
   dispose(): void {
     this.disposeTargets();
+    this.rtAlt?.dispose();
+    this.compileTarget.dispose();
     this.white.dispose();
     this.black.dispose();
     this.quad.geometry.dispose();

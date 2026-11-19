@@ -55,7 +55,7 @@ export const ASSETS = {
   // ---------------------------------------------------------------------------------------------- Haven's companions
   lumi: {
     kind: 'character', world: 'haven', detail: 'hero', height: 1.36, glow: { color: '#6fe6ff', strength: 2.6 },
-    brief: `Lumi. ${COMPANION} a girl with pearly porcelain-white skin with a faint opal sheen. A rounded chin-length bob of pale lavender-white hair whose tips glow soft cyan. An oversized soft white knitted hoodie (hood down) with fine gold embroidery at the cuffs and hem, a glowing cyan light seam along the hood edge, the cuffs and the hem, and a small glowing ring emblem on the chest. Pale lilac-white tapered trousers with a thin cyan light stripe down each side. Chunky white trainers with softly glowing cyan soles.`,
+    brief: `Lumi. ${COMPANION} a girl with warm peach skin and a faint pearl sheen. A rounded chin-length bob of pale lavender-white hair whose tips glow soft cyan. An oversized soft white knitted hoodie (hood down) with fine gold embroidery at the cuffs and hem, a glowing cyan light seam along the hood edge, the cuffs and the hem, and a small glowing ring emblem on the chest. Pale lilac-white tapered trousers with a thin cyan light stripe down each side. Chunky white trainers with softly glowing cyan soles.`,
   },
   kai: {
     kind: 'character', world: 'haven', detail: 'hero', height: 1.4, glow: { color: '#ffc063', strength: 2.6 },

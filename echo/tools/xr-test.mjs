@@ -69,17 +69,25 @@ const open = async (beat) => {
   const asked = await page.waitForFunction(() => { const h = window.__game.hud; return h.prompt.widget.visible && h.promptAction === 'headset'; }, undefined, { timeout: 30000 }).then(() => true, () => false);
   await t.shot('4_notify');
   await t.press('right', 'b-button');
-  // Lumi asks for one more minute: pointing at Leave and pulling the trigger goes
+  // The leave confirmation has one card, Yes.
   await page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 15000 }).catch(() => undefined);
   await page.waitForTimeout(1500);
   const leave = await page.evaluate(() => {
-    const p = window.__game.hud.options[1].widget.panel.mesh.getWorldPosition(window.__game.playerEye.clone());
+    const p = window.__game.hud.options[0].widget.panel.mesh.getWorldPosition(window.__game.playerEye.clone());
     return [p.x, p.y, p.z];
   });
   await t.point(leave);
   await t.press('right', 'trigger');
   await page.waitForFunction(() => (window.__BEATS ?? []).includes('thursday.bedroom'), undefined, { timeout: 60000 })
     .then(() => check('B takes the Echo headset off', asked, asked ? '' : 'the story never asked for the headset'), () => check('B takes the Echo headset off', false));
+  const phone = await page.evaluate(() => [...window.__game.interaction.items].find((item) => item.enabled).position.toArray());
+  await t.point(phone);
+  await t.press('right', 'trigger');
+  await page.waitForFunction(() => window.__game.worlds.bedroom.holoTarget === 1);
+  const firstMessage = await page.evaluate(() => window.__game.worlds.bedroom.hologram.texture.version);
+  await t.press('right', 'a-button');
+  await page.waitForFunction((first) => window.__game.worlds.bedroom.hologram.texture.version === first + 1, firstMessage, { timeout: 1200 });
+  check('one press of A advances one phone message immediately', true);
   await t.close();
 }
 

@@ -125,7 +125,18 @@ export class Game {
         this.assets.onProgress = (loaded) => this.onLoading?.(id, loaded - before);
         const world = this.factories[id]();
         await Promise.all([world.build(this.context()), this.hands.ready, this.headset.ready]);
-        await this.app.renderer.compileAsync(world.scene, this.app.camera);
+        // Match the first-person lights and the HDR target used when the player arrives.
+        const hands = this.hands.root.clone(), headset = this.headset.group.clone();
+        headset.visible = id === 'bedroom' || id === 'classroom';
+        world.scene.add(hands, headset);
+        try {
+          await Promise.all([
+            this.app.post.compileScene(world.scene, this.app.camera),
+            id === 'haven' && !this.app.renderer.xr.isPresenting ? this.app.post.prepareWipe() : undefined,
+          ]);
+        } finally {
+          world.scene.remove(hands, headset);
+        }
         this.worlds[id] = world;
         if (world instanceof HavenWorld) {
           this.star = new StarBridgeGame(this.app, this.input, this.player, this.hands, this.interaction, world.bursts, world.scene);

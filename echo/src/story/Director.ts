@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Game, WorldId } from '../app/Game';
 import { ease, type Ease } from '../core/math';
-import { lerpLook, makeLook } from '../render/PostPipeline';
+import { lerpLook, makeLook, WIPE_DISTANCE } from '../render/PostPipeline';
 import type { ChoiceOption } from '../ui/Hud';
 import { cameraYaw, type Anchor, type World } from '../world/World';
 import { DAYS, SPEAKERS, type Line } from './script';
@@ -10,7 +10,6 @@ import { glowScreenEdges } from '../ui/dom/taskGlow';
 const _head = new THREE.Vector3();
 
 const TYPE_SPEED = 46;
-const UP = new THREE.Vector3(0, 1, 0);
 
 export class Director {
   autoAdvance = true;
@@ -210,45 +209,41 @@ export class Director {
     return world;
   }
 
-  async wipeTo(id: WorldId, anchor: Anchor, eyeHeight?: number): Promise<World> {
+  async wipeTo(id: WorldId, anchor: Anchor, onArrival?: () => void): Promise<World> {
     const { app, player, audio } = this.game;
     const from = app.world;
     const to = await this.game.ensureWorld(id);
+    const arrive = (): void => {
+      this.game.setWorld(to);
+      player.teleport(anchor);
+      onArrival?.();
+    };
     if (!from || app.renderer.xr.isPresenting) {
       await this.fadeOut(0.5, 0xe8f0ff);
-      this.game.setWorld(to);
-      player.teleport(anchor, eyeHeight);
+      arrive();
       await this.fadeIn(0.9);
       return to;
     }
     const delta = cameraYaw(anchor) - player.yaw;
-    const moved = player.position.clone().applyAxisAngle(UP, delta);
-    from.scene.rotation.y = delta;
-    from.scene.position.copy(anchor.position).sub(moved);
-    from.scene.updateMatrixWorld(true);
+    const toReal = to.theme !== 'haven';
+    const wipe = { projection: app.post.captureWipe(app.camera, delta), radius: 0, softness: 2.4, color: new THREE.Color(toReal ? 0x9fd0ff : 0xffc27a).multiplyScalar(2.2) };
     const pitch = player.pitch;
-    this.game.setWorld(to);
-    player.teleport(anchor, eyeHeight);
+    app.wipe = wipe;
+    arrive();
     player.pitch = pitch;
 
-    const reach = Math.min(app.camera.far * 0.9, 90) + 6;
-    const wipe = { scene: from.scene, radius: 0, softness: 2.4, color: new THREE.Color(to.theme === 'haven' ? 0xffc27a : 0x9fd0ff).multiplyScalar(2.2) };
-    app.wipe = wipe;
+    const reach = WIPE_DISTANCE + 2 * wipe.softness;
     app.lookOverride = this.blend;
     lerpLook(this.blend, from.look, to.look, 0);
     audio.sfx('wipe');
-    const toReal = to.theme !== 'haven';
     try {
-      await this.tween(toReal ? 1.8 : 3.1, (k) => {
-        wipe.radius = toReal ? reach * (0.1 * k + 0.9 * k * k) : reach * (0.06 * k + 0.94 * k * k * k);
-        lerpLook(this.blend, from.look, to.look, Math.min(1, k * (toReal ? 2.2 : 1.6)));
+      await this.tween(toReal ? 0.65 : 1.05, (k) => {
+        wipe.radius = reach * k;
+        lerpLook(this.blend, from.look, to.look, k);
       }, ease.linear);
     } finally {
       app.wipe = null;
       app.lookOverride = null;
-      from.scene.rotation.y = 0;
-      from.scene.position.set(0, 0, 0);
-      from.scene.updateMatrixWorld(true);
     }
     return to;
   }
