@@ -133,14 +133,13 @@ const havenFreeTime = async (game: Game, haven: HavenWorld): Promise<void> => {
       break;
     }
     d.objective(MONDAY.objectiveFree);
-    let action: 'talk' | 'gem' | 'give' | null = null;
+    let action: 'talk' | 'gem' | 'give' | null = state.lumiGift === 'none' ? 'talk' : null;
     const items: Interactable[] = [];
-    if (state.lumiGift === 'none') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptTalk, enabled: true, use: () => (action = 'talk') });
     if (state.lumiGift === 'carrying') items.push({ position: guide.chest, radius: 0.45, reach: 2.8, prompt: MONDAY.promptGive, enabled: true, use: () => (action = 'give') });
     if (state.lumiGift === 'asked') for (const position of haven.gems) items.push({ position, radius: 0.55, reach: 2.6, prompt: MONDAY.promptGem, enabled: true, use: () => (action = 'gem') });
     for (const item of items) game.interaction.add(item);
     let held = 0;
-    try {
+    if (!action) try {
       await d.until((dt) => {
         held += dt;
         if (action) return true;

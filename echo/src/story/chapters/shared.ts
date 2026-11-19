@@ -45,7 +45,7 @@ export const waitHeadsetOff = async (game: Game, prompt: string): Promise<void> 
   try {
     await game.director.until((dt) => {
       held += dt;
-      hud.setPrompt(prompt, 'headset');
+      if (input.mode !== 'mouse') hud.setPrompt(prompt, 'headset');
       if (game.autopilot.enabled) return held > 0.6;
       if (input.pressed.has('headset')) return true;
       return input.mode === 'touch' && held > 0.5 && input.released.has('primary') && input.wasTap;

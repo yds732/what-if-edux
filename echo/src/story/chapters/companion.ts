@@ -37,6 +37,7 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
   let shown = 0, voiced = 0;
   await d.until((dt) => {
     shown = Math.min(text.length, shown + dt * 46);
+    if (d.advancePressed()) shown = text.length;
     while (voiced < Math.floor(shown)) {
       const ch = text[voiced] ?? ' ';
       if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice('lumi', ch);
@@ -46,7 +47,17 @@ export const bark = async (game: Game, haven: HavenWorld, text: string, linger =
     return shown >= text.length;
   });
   haven.companion.person.setTalking(0);
-  await d.wait(linger + text.length * 0.02);
+  hud.setSubtitleProgress(text.length, true);
+  let held = 0;
+  const reading = linger + text.length * 0.02;
+  await d.until((dt) => {
+    held += dt;
+    if (d.advancePressed()) {
+      audio.sfx('advance');
+      return true;
+    }
+    return held > reading;
+  });
   hud.setSubtitle(null);
 };
 
@@ -237,11 +248,14 @@ export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: s
   return stop;
 };
 
-export const hookPayoff = (state: StoryState): [string, string][] => {
+export const hookPayoff = (state: StoryState): string[] => {
   const days = state.streakBest > 0 ? `a streak of ${state.streakBest} ${state.streakBest === 1 ? 'day' : 'days'}` : 'a streak';
-  const pings = state.pings > 0 ? `, sent ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} to call you back while you were in your room,` : '';
-  return [[
-    'It worked hard to keep you there.',
-    `Lumi sounded sad every time you tried to leave, kept count of your days together with ${days} you would not want to break${pings} and rewarded every task with a chime and a golden glow. Real apps use these same tricks to keep you coming back.`,
-  ]];
+  return [
+    '• Lumi sounded sad every time you tried to leave.',
+    `• It kept count of your days together: ${days} you would not want to break.`,
+    ...(state.pings > 0 ? [`• It sent ${state.pings} ${state.pings === 1 ? 'message' : 'messages'} to call you back while you were in your room.`] : []),
+    '• It rewarded every task with a chime and a golden glow.',
+    '',
+    'Real apps use these same tricks to keep you coming back.',
+  ];
 };

@@ -51,7 +51,6 @@ export class App {
   private lastFrameAt = 0;
   private lastDt = 1 / 60;
   private sizeDirty = true;
-  private loadScale = 1;
 
   constructor(opts: AppOptions) {
     this.canvas = opts.canvas;
@@ -98,12 +97,6 @@ export class App {
     this.sizeDirty = true;
   }
 
-  setLoadScale(scale: number): void {
-    if (scale === this.loadScale) return;
-    this.loadScale = scale;
-    this.sizeDirty = true;
-  }
-
   private resize(): void {
     if (this.renderer.xr.isPresenting) return;
     this.sizeDirty = false;
@@ -115,7 +108,7 @@ export class App {
     const bw = w * dpr, bh = h * dpr;
     const cap = Math.min(1, Math.sqrt(this.quality.maxPixels / (bw * bh)));
     const floor = this.governor.isFixed ? 0 : Math.min(1, 0.85 / dpr);
-    const scale = Math.max(floor * this.loadScale, cap * this.governor.scale * this.loadScale);
+    const scale = Math.max(floor, cap * this.governor.scale);
     this.post.setSize(bw * scale, bh * scale);
     this.camera.aspect = w / h;
     this.info.scale = scale;

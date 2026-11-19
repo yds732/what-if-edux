@@ -210,7 +210,7 @@ export class Arcade {
     return this.load(id, MINIGAMES[id]);
   }
 
-  async play(id: MinigameId, back: Anchor, scape: Soundscape): Promise<void> {
+  async play(id: MinigameId, back: Anchor, scape: Soundscape, opts: { once?: boolean } = {}): Promise<'done' | 'interrupted'> {
     const game = this.game, { director: d, app, player, hud, input, audio, interaction, hands } = game;
     const info = MINIGAMES[id];
     const from = app.world;
@@ -236,6 +236,7 @@ export class Arcade {
     hud.setControlsTip(false);
     this.active = world;
     audio.setSoundscape(world.soundscape, 1.2);
+    let cut = false;
     try {
       for (let again = true; again; ) {
         again = false;
@@ -251,12 +252,13 @@ export class Arcade {
           const outcome = await world.play();
           if ((world as { interrupted?: boolean }).interrupted) {
             this.last = null;
+            cut = true;
             continue;
           }
           this.last = outcome;
           this.plays[id] = (this.plays[id] ?? 0) + 1;
           this.record(id, outcome);
-          again = await this.finish(outcome);
+          again = await this.finish(outcome, opts.once === true);
         } catch (e) {
           if (!isCancelled(e) || d.signal.aborted) throw e;
           again = this.restartWanted;
@@ -267,10 +269,21 @@ export class Arcade {
         }
         if (again) await d.fadeOut(0.35, info.color);
       }
-      audio.sfx('portalExit');
-      await d.fadeOut(0.45, info.color);
+      if (!cut) {
+        audio.sfx('portalExit');
+        await d.fadeOut(0.45, info.color);
+      }
     } finally {
       this.reset();
+    }
+    if (cut) {
+      hud.setReticleVisible(true);
+      hud.setControlsTip(true);
+      player.canLook = true;
+      interaction.enabled = true;
+      input.flush();
+      input.capturePointer();
+      return 'interrupted';
     }
     game.setWorld(from);
     player.teleport(back);
@@ -284,6 +297,7 @@ export class Arcade {
     audio.setSoundscape(scape, 1.2);
     app.fx.kick = 0.6;
     await d.fadeIn(0.9);
+    return 'done';
   }
 
   restart(): void {
@@ -324,14 +338,14 @@ export class Arcade {
     }
   }
 
-  private async finish(outcome: Outcome): Promise<boolean> {
+  private async finish(outcome: Outcome, once = false): Promise<boolean> {
     const { audio } = this.game;
     let reveal = 0, pick: boolean | null = null;
     const card = this.ui.add(560 + PAD * 2, 250 + PAD * 2, paintResult({ heading: outcome.won ? 'You won!' : 'So close', summary: outcome.summary, stars: outcome.stars, reveal: () => reveal })).at(0, 0, 0, 78).show();
     const again = this.ui.add(250 + PAD * 2, 56 + PAD * 2, paintButton('Play again', { primary: true, hint: '1' })).at(0, 0, -135, -112);
-    const leave = this.ui.add(250 + PAD * 2, 56 + PAD * 2, paintButton('Back to Haven', { hint: '2' })).at(0, 0, 135, -112);
+    const leave = this.ui.add(250 + PAD * 2, 56 + PAD * 2, paintButton(once ? 'Continue' : 'Back to Haven', { primary: once, hint: once ? '1' : '2' })).at(0, 0, once ? 0 : 135, -112);
     again.key = 'choice1';
-    leave.key = 'choice2';
+    leave.key = once ? 'choice1' : 'choice2';
     again.onClick = () => (pick = true);
     leave.onClick = () => (pick = false);
     audio.sfx(outcome.won ? 'arcadeWin' : 'arcadeLose');
@@ -342,7 +356,7 @@ export class Arcade {
       card.repaint();
       while (landed < outcome.stars && k * 3 >= landed + 0.5) audio.sfx('arcadeStar', { pitch: 1 + 0.12 * landed++ });
     }, ease.linear);
-    again.show();
+    if (!once) again.show();
     leave.show();
     if (this.auto) this.wait(1.2).then(() => (pick ??= false), () => undefined);
     await this.until(() => pick !== null);
