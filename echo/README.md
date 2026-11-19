@@ -34,7 +34,7 @@ The site deploys itself: every push to `main` that touches `echo/` runs `.github
 
 Open **ECHO – Between Two Worlds** in MANI and choose **Test** to play. The editor opens in Haven with the simulation paused. Both releases use the game in `src/`. The MANI file embeds the game code, styles, fonts and keystrokes. It loads models and pictures from the web release over HTTPS and imports the matching Three.js version from jsDelivr.
 
-Run `npm run build:mani` to generate `mani/dist/scene.html`. Run `npm run verify -- MANI` to build and exercise the single file in Chrome, including headset emulation. Publish gameplay changes to the existing MANI project (`ECHO_Between_Two_Worlds_20261120_053813`) after deploying any changed assets to Vercel. Pull the current scene first and preserve its editor change table when updating it. Vercel deploys and MANI project updates are separate releases.
+Run `npm run build:mani` to generate `mani/dist/scene.html`. Run `npm run verify -- MANI` to build and exercise the single file in Chrome, including headset emulation. Publish gameplay changes to the existing MANI project (`ECHO_Between_Two_Worlds_20261120_061734`) after deploying any changed assets to Vercel. Pull the current scene first and preserve its editor change table when updating it. Vercel deploys and MANI project updates are separate releases.
 
 ## Haven Arcade
 
