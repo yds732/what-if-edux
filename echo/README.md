@@ -28,7 +28,7 @@ Graphics start on a tier picked for the device (headsets and phones low; tablets
 
 WebXR needs a secure origin: the deployed site has one; a copy you host needs HTTPS (or `localhost`) for *Play in VR* to appear in a headset's browser. To try a Quest against the dev server on your own machine, connect it by USB, run `adb reverse tcp:5173 tcp:5173`, and open `http://localhost:5173` in the headset's browser.
 
-To redeploy the site, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the `echo-two-worlds` project (it is deployed with the Vercel CLI, not from GitHub; `vercel.json` holds the build settings). The upload is about 97 MB, nearly all of it models (the arcade's are 15 MB of that); Vercel's Hobby plan accepts up to 100 MB from the CLI, so on that plan there is room for very little more.
+The site deploys itself: every push to `main` that touches `echo/` runs `.github/workflows/deploy-echo.yml`, which deploys to Vercel using the `VERCEL_TOKEN` repository secret (`vercel.json` holds the build settings). To deploy by hand instead, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the project. The upload is about 97 MB, nearly all of it models (the arcade's are 15 MB of that); Vercel's Hobby plan accepts up to 100 MB from the CLI, so on that plan there is room for very little more.
 
 ## Haven Arcade
 
