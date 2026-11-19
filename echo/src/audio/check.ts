@@ -6,7 +6,6 @@ import type { SfxName } from './GameAudio';
 import { MAX_ONE_SHOTS, Mixer, type Space } from './mixer';
 import { SFX } from './sfx';
 import { dB } from './synth';
-import { VOICES, loadKeySamples, syllablePitch } from './voices';
 import { WebAudio } from './WebAudio';
 
 const RATE = 48000;
@@ -75,28 +74,28 @@ interface Take {
 
 let lastRender: AudioBuffer | null = null;
 
-const render = async (seconds: number, script: (audio: WebAudio, time: number, frame: number) => boolean | void, frameSeconds = FRAME): Promise<Take> => {
+const render = async (seconds: number, script: (audio: WebAudio, time: number, frame: number) => boolean | void | Promise<void>, frameSeconds = FRAME): Promise<Take> => {
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * RATE), RATE);
   const audio = new WebAudio();
   audio.unlock(ctx);
   const camera = cameraAt();
   let failure: unknown = null;
-  const frame = (i: number): void => {
+  const frame = async (i: number): Promise<void> => {
     try {
-      if (script(audio, i * frameSeconds, i) !== false) audio.update(frameSeconds, camera);
+      if (await script(audio, i * frameSeconds, i) !== false) audio.update(frameSeconds, camera);
     } catch (e) {
       failure ??= e;
     }
   };
   const stopAt = (i: number): void => {
     if (i * frameSeconds >= seconds) return;
-    void ctx.suspend(i * frameSeconds).then(() => {
-      frame(i);
+    void ctx.suspend(i * frameSeconds).then(async () => {
+      await frame(i);
       stopAt(i + 1);
       void ctx.resume();
     });
   };
-  frame(0);
+  await frame(0);
   stopAt(1);
   const buffer = await ctx.startRendering();
   lastRender = buffer;
@@ -277,28 +276,39 @@ const SAMPLE_LINES: Record<SpeakerId, Line> = {
   riley: FRIDAY.voices[6],
 };
 
-const TYPE_SPEED = 46;
-
 const voice = async (speaker: SpeakerId): Promise<Row> => {
-  await loadKeySamples(new OfflineAudioContext(1, 1, 48000));
-  const text = SAMPLE_LINES[speaker].text, frameSeconds = 1 / 60, seconds = round(text.length / TYPE_SPEED + 1.5, 2);
-  let typed = 0, spoken = 0;
-  const pitches: number[] = [];
-  const { buffer, audio } = await render(seconds, (a, t, frame) => {
-    if (frame === 0 && VOICES[speaker].kind === 'haven') a.engine?.setSpace('haven', 0);
-    for (const shown = Math.min(text.length, Math.floor(t * TYPE_SPEED)); typed < shown; typed++) {
-      const ch = text[typed] ?? ' ';
-      if (typed % 3 !== 0 || !/[a-z0-9]/i.test(ch)) continue;
-      a.voice(speaker, ch);
-      pitches.push(syllablePitch(speaker, ch));
-      spoken++;
+  const seconds = 12, line = SAMPLE_LINES[speaker];
+  const ctx = new OfflineAudioContext(2, seconds * RATE, RATE);
+  const audio = new WebAudio();
+  audio.unlock(ctx);
+  const speech = audio.voice(line);
+  await speech?.ready;
+  lastRender = await ctx.startRendering();
+  const r = row('voice', speaker, measure(lastRender), seconds, line.text);
+  if (r.active < 0.45) r.problems.push('no audible phrase');
+  if (!speech?.done) r.problems.push('line did not finish');
+  return expectFaultless(expectPeak(r, [-18, -2]), audio);
+};
+
+const voiceControls = async (): Promise<Row> => {
+  const seconds = 10;
+  let speech: ReturnType<WebAudio['voice']> = null;
+  const { buffer, audio } = await render(seconds, async (a, t, frame) => {
+    if (frame === 0) {
+      const skipped = a.voice(SAMPLE_LINES.teacher);
+      speech = a.voice(SAMPLE_LINES.lumi);
+      await Promise.all([skipped?.ready, speech?.ready]);
+      if (!skipped?.done) throw new Error('replaced dialogue is still active');
     }
-  }, frameSeconds);
-  const low = Math.min(...pitches), high = Math.max(...pitches);
-  const r = row('voice', speaker, measure(buffer), seconds, `${spoken} syllables, ${round(low, 0)}..${round(high, 0)} Hz around ${round(VOICES[speaker].base, 0)}`);
-  for (const ch of 'abcxyz019') if (syllablePitch(speaker, ch) !== syllablePitch(speaker, ch)) r.problems.push(`pitch of "${ch}" is not repeatable`);
-  if (!(low < VOICES[speaker].base && high > VOICES[speaker].base)) r.problems.push('the line does not move around the speaker\'s pitch');
-  return expectFaultless(expectPeak(r, speaker === 'you' ? [-26, -15] : [-19, -10]), audio);
+    at(0.7, t, FRAME, () => a.setPaused(true));
+    at(6.7, t, FRAME, () => a.setPaused(false));
+    at(8.2, t, FRAME, () => speech?.stop());
+  });
+  const r = row('voice', 'skip, pause and resume', measure(buffer), seconds);
+  if (measure(buffer, 2, 6.7).peak > -80) r.problems.push('speech is audible while paused');
+  if (measure(buffer, 6.9, 8.2).active < 0.5) r.problems.push('speech did not resume from the paused position');
+  if (measure(buffer, 9.5).peak > -60) r.problems.push('speech continued after skipping');
+  return expectFaultless(r, audio);
 };
 
 const charge = async (): Promise<Row> => {
@@ -367,16 +377,16 @@ const unity = async (): Promise<Row> => {
 const finale = async (): Promise<Row> => {
   const seconds = 12, frameSeconds = 1 / 60;
   const rockets = Array.from({ length: 18 }, (_, i) => ({ time: 3 + i / 3 + (i % 3) * 0.07, at: point(-24 + ((i * 37) % 48), 13 + ((i * 11) % 17), -58 + ((i * 23) % 40)) }));
-  const cheers: SpeakerId[] = ['kai', 'nova', 'lumi'];
-  let typed = 0;
-  const { buffer, audio } = await render(seconds, (a, t, frame) => {
+  const { buffer, audio } = await render(seconds, async (a, t, frame) => {
     if (frame === 0) a.setSoundscape('havenFestival', 1);
     at(2.9, t, frameSeconds, () => a.sfx('ringHit', { at: point(4, 6, -30) }));
     at(3, t, frameSeconds, () => a.sfx('gateOpen'));
     at(3, t, frameSeconds, () => a.sfx('bridgeComplete'));
     at(5.2, t, frameSeconds, () => a.sfx('cheer'));
     for (const rocket of rockets) at(rocket.time, t, frameSeconds, () => a.sfx('firework', { at: rocket.at }));
-    if (t > 5.4) for (const shown = Math.floor((t - 5.4) * TYPE_SPEED); typed < shown; typed++) if (typed % 3 === 0) a.voice(cheers[Math.floor(typed / 40) % 3]!, 'abcdefghij'[typed % 10]!);
+    if (frame === 324 || frame === 450 || frame === 540) {
+      await a.voice(TUESDAY.success[frame === 324 ? 0 : frame === 450 ? 1 : 2])?.ready;
+    }
     if (t > 4 && t < 9 && frame % 22 === 0) a.sfx('footstep', { gain: 0.7 });
   }, frameSeconds);
   const r = row('limits', 'festival finale, everything at once', measure(buffer), seconds, 'must stay under 0 dBFS');
@@ -431,7 +441,8 @@ export const live = async (): Promise<LiveReport> => {
 
   for (const name of ['uiSelect', 'objective', 'footstep', 'orbTake'] as const) audio.sfx(name);
   audio.sfx('ringHit', { at: point(6, 3, -20) });
-  for (const ch of 'hello') audio.voice('lumi', ch);
+  const speech = audio.voice(SAMPLE_LINES.lumi);
+  await speech?.ready;
   audio.setCharge(0.6);
   const playing = await listen(1.6, 0.6);
   audio.setCharge(0);
@@ -439,6 +450,7 @@ export const live = async (): Promise<LiveReport> => {
   audio.setPaused(true);
   gamePaused = true;
   const paused = await listen(1.2, 0.4);
+  if (!speech || speech.done) problems.push('paused dialogue ended early');
   audio.setPaused(false);
   gamePaused = false;
   audio.sfx('bridgeBuild');
@@ -468,7 +480,7 @@ export const missing = (): string[] => {
     audio.unlock();
     audio.setSoundscape('haven');
     audio.sfx('ringHit');
-    audio.voice('lumi', 'a');
+    audio.voice(SAMPLE_LINES.lumi);
     audio.setCharge(0.5);
     audio.update(1 / 60, cameraAt());
     audio.setVolume(0.5);
@@ -490,7 +502,8 @@ const PLAN: { name: string; run: () => Promise<Row> }[] = [
   { name: 'sfx footstep in haven', run: () => effect('footstep', 'haven') },
   { name: 'sfx options', run: options },
   { name: 'sfx placement', run: placement },
-  ...(Object.keys(VOICES) as SpeakerId[]).map((name) => ({ name: `voice ${name}`, run: () => voice(name) })),
+  ...(Object.keys(SAMPLE_LINES) as SpeakerId[]).map((name) => ({ name: `voice ${name}`, run: () => voice(name) })),
+  { name: 'voice controls', run: voiceControls },
   { name: 'charge', run: charge },
   { name: 'pause', run: pause },
   { name: 'story arrival', run: arrival },

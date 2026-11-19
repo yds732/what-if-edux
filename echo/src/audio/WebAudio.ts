@@ -1,15 +1,14 @@
 import type * as THREE from 'three';
 import { clamp01 } from '../core/math';
-import type { SpeakerId } from '../story/script';
+import type { Line } from '../story/script';
 import { Bed, LOOKAHEAD, SPACES } from './beds';
 import type { GameAudio, SfxName, SfxOptions, Soundscape } from './GameAudio';
 import { shape } from './instruments';
 import { Mixer } from './mixer';
 import { SFX } from './sfx';
 import { Patch, dB, mtof } from './synth';
-import { loadKeySamples, speak } from './voices';
+import { RecordedVoice } from './voices';
 
-const SYLLABLE_GAP = 0.045;
 const MIN_FADE = 0.05;
 const CHARGE_GLIDE = 0.05;
 
@@ -33,7 +32,7 @@ export class WebAudio implements GameAudio {
   private readonly fading: Bed[] = [];
   private charge: ChargeTone | null = null;
   private chargeLevel = 0;
-  private lastSyllable = -1;
+  private speech: RecordedVoice | null = null;
   faults = 0;
   lastFault = '';
 
@@ -47,7 +46,6 @@ export class WebAudio implements GameAudio {
         console.warn('ECHO: sound is unavailable on this device.', e);
         return;
       }
-      void loadKeySamples(this.mixer.ctx);
       this.mixer.setVolume(this.volume);
       if (this.paused) this.mixer.setPaused(true);
       const scape = this.scape;
@@ -63,9 +61,13 @@ export class WebAudio implements GameAudio {
     try {
       action(mixer);
     } catch (e) {
-      this.lastFault = `${what}: ${e instanceof Error ? e.message : String(e)}`;
-      if (this.faults++ === 0) console.warn(`ECHO: a sound failed (${this.lastFault}).`);
+      this.fault(what, e);
     }
+  }
+
+  private fault(what: string, error: unknown): void {
+    this.lastFault = `${what}: ${error instanceof Error ? error.message : String(error)}`;
+    if (this.faults++ === 0) console.warn(`ECHO: a sound failed (${this.lastFault}).`);
   }
 
   setSoundscape(scape: Soundscape, fadeSeconds = 1.5): void {
@@ -92,13 +94,14 @@ export class WebAudio implements GameAudio {
     });
   }
 
-  voice(speaker: SpeakerId, char: string): void {
-    this.run(`voice ${speaker}`, (mixer) => {
-      const now = mixer.ctx.currentTime;
-      if (now - this.lastSyllable < SYLLABLE_GAP) return;
-      this.lastSyllable = now;
-      mixer.play('voice', (p) => speak(p, speaker, char));
-    });
+  voice(line: Line, speed = 1): RecordedVoice | null {
+    this.speech?.stop();
+    const mixer = this.mixer;
+    if (!mixer || (mixer.ctx instanceof AudioContext && mixer.ctx.state !== 'running')) return null;
+    const speech = this.speech = new RecordedVoice(mixer, line, speed);
+    speech.setPaused(this.paused);
+    void speech.ready.catch((error) => this.fault(`voice ${line.who}`, error));
+    return speech;
   }
 
   setCharge(amount: number): void {
@@ -156,6 +159,7 @@ export class WebAudio implements GameAudio {
   setPaused(paused: boolean): void {
     if (paused === this.paused) return;
     this.paused = paused;
+    this.speech?.setPaused(paused);
     this.run('pause', (mixer) => {
       mixer.setPaused(paused);
       if (!paused) mixer.wake();

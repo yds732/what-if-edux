@@ -12,7 +12,7 @@ const STEPS = [
   ['types', 'npx tsc --noEmit'],
   ['unit tests', 'npx vitest run'],
   ['MANI single-file build, editor, story and VR', 'npm run build:mani && node mani/test.mjs'],
-  ['sound: every soundscape, effect and voice rendered and measured', 'node tools/audio-check.mjs'],
+  ['sound: all dialogue files, and every soundscape, effect and voice rendered and measured', 'node tools/assets/voices.mjs --check && node tools/audio-check.mjs'],
   ['story: the week on autopilot, three branch sets', 'node tools/e2e.mjs --speed=8'],
   ['story in an emulated headset', 'node tools/e2e.mjs --speed=8 --only=b --xr=1 --out=shots/e2e_xr'],
   ['keyboard and mouse', 'node tools/input-test.mjs'],

@@ -13,6 +13,14 @@ public/assets/        what the game loads: models per graphics tier, pictures, m
 
 ## Making or changing an asset
 
+Character dialogue is recorded from the story and arcade scripts. From `echo/`, generate missing MP3s with Node 24 and an env file containing `ELEVENLABS_API_KEY`.
+
+```sh
+node --env-file=../../../common/.env tools/assets/voices.mjs
+```
+
+The generator reuses existing clips in `public/assets/voices/`. To recast a speaker or change a line's delivery, remove the affected recordings and run it again.
+
 The keys are read from the environment; pass an env file to Node. Nothing prints them.
 
 ```sh

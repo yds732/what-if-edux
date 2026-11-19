@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Game, WorldId } from '../app/Game';
+import type { Character } from '../characters/Character';
 import { ease, type Ease } from '../core/math';
 import { lerpLook, makeLook, WIPE_DISTANCE } from '../render/PostPipeline';
 import type { ChoiceOption } from '../ui/Hud';
@@ -55,44 +56,62 @@ export class Director {
   }
 
   async say(line: Line, signal: AbortSignal = this.signal): Promise<void> {
-    const { hud, audio, app } = this.game;
-    const speaker = SPEAKERS[line.who];
+    const { app } = this.game;
     const person = app.world?.cast[line.who];
     app.focus = person ? person.headWorld(_head).distanceTo(this.game.playerEye) : null;
     if (person) {
       if (line.mood) person.setMood(line.mood);
       if (line.gesture) person.play(line.gesture);
-      person.setTalking(1);
       person.lookAtPoint(this.game.playerEye);
     }
+    await this.subtitle(line, person, signal);
+  }
+
+  async subtitle(line: Line, person?: Character, signal = this.signal, linger?: number): Promise<void> {
+    const { hud, audio } = this.game;
+    const speaker = SPEAKERS[line.who];
     hud.setSubtitle({ speaker: speaker.name, color: speaker.color, text: line.text });
+    const speech = audio.voice(line, this.game.speed);
     const total = line.text.length;
-    let shown = 0, voiced = 0;
-    {
+    let shown = 0;
+    try {
       await this.until((dt) => {
         shown = Math.min(total, shown + dt * TYPE_SPEED);
         if (this.advancePressed()) shown = total;
-        while (voiced < Math.floor(shown)) {
-          const ch = line.text[voiced] ?? ' ';
-          if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice(line.who, ch);
-          voiced++;
-        }
+        person?.setTalking(speech?.done ? 0 : 1);
         hud.setSubtitleProgress(shown, false);
         return shown >= total;
       }, signal);
+      hud.setSubtitleProgress(total, true);
+      let held = 0;
+      const reading = linger === undefined ? 0.85 + total * 0.04 : linger + total * 0.02;
+      await this.until((dt) => {
+        held += dt;
+        const finished = !speech || speech.done;
+        if (finished) person?.setTalking(0);
+        if (this.advancePressed()) {
+          audio.sfx('advance');
+          return true;
+        }
+        return finished && held > reading && (linger !== undefined || this.autoAdvance || this.auto);
+      }, signal);
+    } finally {
+      speech?.stop();
+      person?.setTalking(0);
     }
-    person?.setTalking(0);
-    hud.setSubtitleProgress(total, true);
+  }
+
+  async read(line: Line, seconds: number, minimum = 0): Promise<void> {
+    const speech = this.game.audio.voice(line, this.game.speed);
     let held = 0;
-    const reading = 0.85 + total * 0.04;
-    await this.until((dt) => {
-      held += dt;
-      if (this.advancePressed()) {
-        audio.sfx('advance');
-        return true;
-      }
-      return (this.autoAdvance || this.auto) && held > reading;
-    }, signal);
+    try {
+      await this.until((dt) => {
+        held += dt;
+        return (held >= minimum && this.advancePressed()) || (held >= seconds && (!speech || speech.done));
+      });
+    } finally {
+      speech?.stop();
+    }
   }
 
   async play(lines: readonly Line[]): Promise<void> {

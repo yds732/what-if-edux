@@ -68,6 +68,7 @@ export class Mixer {
     this.kit = new Kit(ctx, hall.input, room.input);
 
     this.buses = { music: gain(), ambience: gain(), sfx: gain(), voice: gain(), ui: gain() };
+    this.buses.voice.gain.value = dB(-6);
     this.buses.ui.connect(this.master);
     for (const bus of ['music', 'ambience', 'sfx', 'voice'] as const) {
       const node = this.buses[bus], toHall = gain(), toRoom = gain();

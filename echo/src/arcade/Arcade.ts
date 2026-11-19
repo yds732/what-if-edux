@@ -115,26 +115,27 @@ export class Arcade {
     this.barkLine = { name: speaker.name, color: speaker.color, text: '' };
     el.repaint();
     el.show();
-    let shown = 0, voiced = 0, held = 0;
+    const speech = audio.voice(line, this.game.speed);
+    const finish = (): void => {
+      speech?.stop();
+      person?.setTalking(0);
+      el.show(false);
+      this.barking = null;
+      session.removeEventListener('abort', end);
+    };
+    stop.signal.addEventListener('abort', finish, { once: true });
+    let shown = 0, held = 0;
     const total = line.text.length;
     app.tasks.until((dt) => {
       shown = Math.min(total, shown + dt * TYPE_SPEED);
-      while (voiced < Math.floor(shown)) {
-        const ch = line.text[voiced] ?? ' ';
-        if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice(line.who, ch);
-        voiced++;
-      }
       if (this.barkLine.text.length !== Math.floor(shown)) {
         this.barkLine.text = line.text.slice(0, Math.floor(shown));
         el.repaint();
       }
       if (shown < total) return false;
-      person?.setTalking(0);
-      return (held += dt) > hold;
-    }, stop.signal).then(() => el.show(false), () => undefined).finally(() => {
-      person?.setTalking(0);
-      session.removeEventListener('abort', end);
-    });
+      if (!speech || speech.done) person?.setTalking(0);
+      return (held += dt) > hold && (!speech || speech.done);
+    }, stop.signal).then(() => stop.abort(), () => undefined);
   }
 
   hitStop(seconds: number): void {
@@ -149,10 +150,7 @@ export class Arcade {
   }
 
   hush(): void {
-    if (!this.barking) return;
-    this.barking.abort();
-    this.barking = null;
-    this.barkEl?.show(false);
+    this.barking?.abort();
   }
 
   hint(text: string | { mouse: string; touch: string; xr: string } | null): void {

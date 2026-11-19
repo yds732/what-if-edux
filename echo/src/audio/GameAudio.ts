@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import type { SpeakerId } from '../story/script';
+import type { Line } from '../story/script';
 import type { ArcadeSfx } from './arcadeSfx';
 
 export type SfxName =
@@ -24,7 +24,7 @@ export interface GameAudio {
   unlock(): void;
   setSoundscape(scape: Soundscape, fadeSeconds?: number): void;
   sfx(name: SfxName, options?: SfxOptions): void;
-  voice(speaker: SpeakerId, char: string): void;
+  voice(line: Line, speed?: number): { readonly done: boolean; stop(): void } | null;
   setCharge(amount: number): void;
   update(dt: number, camera: THREE.Camera): void;
   setVolume(master: number): void;
@@ -35,7 +35,7 @@ export class NullAudio implements GameAudio {
   unlock(): void {}
   setSoundscape(): void {}
   sfx(): void {}
-  voice(): void {}
+  voice(): null { return null; }
   setCharge(): void {}
   update(): void {}
   setVolume(): void {}

@@ -32,7 +32,7 @@ The site deploys itself: every push to `main` that touches `echo/` runs `.github
 
 ## MANI Engine
 
-Open **ECHO – Between Two Worlds** in MANI and choose **Test** to play. The editor opens in Haven with the simulation paused. Both releases use the game in `src/`. The MANI file embeds the game code, styles, fonts and keystrokes. It loads models and pictures from the web release over HTTPS and imports the matching Three.js version from jsDelivr.
+Open **ECHO – Between Two Worlds** in MANI and choose **Test** to play. The editor opens in Haven with the simulation paused. Both releases use the game in `src/`. The MANI file embeds the game code, styles and fonts. It loads models, pictures and dialogue recordings from the web release over HTTPS and imports the matching Three.js version from jsDelivr.
 
 Run `npm run build:mani` to generate `mani/dist/scene.html`. Run `npm run verify -- MANI` to build and exercise the single file in Chrome, including headset emulation. Publish gameplay changes to the existing MANI project (`ECHO_Between_Two_Worlds_20261120_061734`) after deploying any changed assets to Vercel. Pull the current scene first and preserve its editor change table when updating it. Vercel deploys and MANI project updates are separate releases.
 
@@ -52,7 +52,7 @@ The companions are as they are in the story: nobody in Haven ever tells you that
 
 ## How it is put together
 
-The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, water, light and every effect are shaders, and Haven's meadow (its grass, reeds, blossom tree and floating lanterns) is drawn by code. Sound is synthesised, apart from eight recorded keystrokes that people in the real world "type" their lines with. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
+The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, water, light and every effect are shaders, and Haven's meadow (its grass, reeds, blossom tree and floating lanterns) is drawn by code. Each speaking character has a recorded ElevenLabs voice. Web Audio mixes the dialogue with synthesised music and effects. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
 
 | Path | What lives there |
 |---|---|

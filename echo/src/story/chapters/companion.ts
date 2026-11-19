@@ -4,7 +4,7 @@ import type { Interactable } from '../../player/Interaction';
 import { makeGem } from '../../world/haven/gem';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { glowScreenEdges } from '../../ui/dom/taskGlow';
-import { HOOKS, MONDAY, SPEAKERS } from '../script';
+import { HOOKS, MONDAY, SPEAKERS, type Line } from '../script';
 import type { StoryState } from '../state';
 import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { waitHeadsetOff } from './shared';
@@ -29,36 +29,9 @@ export const refreshSideTasks = (game: Game): void => {
   game.hud.setSideTasks(gift === 'asked' ? [MONDAY.sideGift] : gift === 'carrying' ? [MONDAY.sideGive] : []);
 };
 
-export const bark = async (game: Game, haven: HavenWorld, text: string, linger = 1.8): Promise<void> => {
-  const { hud, audio, director: d } = game;
-  const speaker = SPEAKERS.lumi;
-  hud.setSubtitle({ speaker: speaker.name, color: speaker.color, text });
-  haven.companion.person.setTalking(1);
-  let shown = 0, voiced = 0;
-  await d.until((dt) => {
-    shown = Math.min(text.length, shown + dt * 46);
-    if (d.advancePressed()) shown = text.length;
-    while (voiced < Math.floor(shown)) {
-      const ch = text[voiced] ?? ' ';
-      if (voiced % 3 === 0 && /[a-z0-9]/i.test(ch)) audio.voice('lumi', ch);
-      voiced++;
-    }
-    hud.setSubtitleProgress(shown, false);
-    return shown >= text.length;
-  });
-  haven.companion.person.setTalking(0);
-  hud.setSubtitleProgress(text.length, true);
-  let held = 0;
-  const reading = linger + text.length * 0.02;
-  await d.until((dt) => {
-    held += dt;
-    if (d.advancePressed()) {
-      audio.sfx('advance');
-      return true;
-    }
-    return held > reading;
-  });
-  hud.setSubtitle(null);
+const bark = async (game: Game, haven: HavenWorld, line: Line): Promise<void> => {
+  await game.director.subtitle(line, haven.companion.person, game.director.signal, 1.8);
+  game.director.hush();
 };
 
 const tourSights = (haven: HavenWorld): THREE.Vector3[] => [
@@ -161,7 +134,7 @@ export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> =
   audio.sfx('taskDone');
   glowScreenEdges('255, 160, 70');
   haven.bursts.emit(haven.companion.chest.clone().add(new THREE.Vector3(0, 0.9, 0)), { count: 40, color: new THREE.Color(1, 0.6, 0.2), color2: new THREE.Color(1, 0.9, 0.4), speed: 1.6, life: 0.9, size: 0.1, gravity: -0.3 });
-  await bark(game, haven, HOOKS.streakUp(state.streak));
+  await bark(game, haven, HOOKS.streakUp[state.streak - 2] ?? HOOKS.streakContinues);
 };
 
 export const breakStreak = (state: StoryState): void => {
@@ -224,23 +197,28 @@ export const echoTempts = (game: Game): (() => void) => {
   };
 };
 
-export const havenCalls = (game: Game, bedroom: BedroomWorld, message: { from: string; text: string }): (() => void) => {
+export const havenCalls = (game: Game, bedroom: BedroomWorld, message: Line | { from: string; text: string }): (() => void) => {
   const { audio, headset, app } = game;
+  const signal = game.director.signal;
   game.state.pings++;
-  bedroom.setPing(message);
+  bedroom.setPing('who' in message ? { from: SPEAKERS[message.who].name, text: message.text } : message);
   audio.sfx('notify', { gain: 0.55 });
+  const speech = 'who' in message ? audio.voice(message, game.speed) : null;
   let on = true, beat = 0;
   const stop = (): void => {
     if (!on) return;
     on = false;
+    speech?.stop();
+    signal.removeEventListener('abort', stop);
     bedroom.setPing(null);
     headset.setPower(0.25);
   };
+  signal.addEventListener('abort', stop, { once: true });
   void (async () => {
     while (on) {
       await app.tasks.tween(1.4, (k) => {
         if (on && app.world === bedroom) headset.setPower(0.3 + 0.7 * Math.sin(k * Math.PI));
-      });
+      }, undefined, signal);
       if (app.world !== bedroom) stop();
       else if (on && ++beat % 5 === 0) audio.sfx('notify', { gain: 0.4 });
     }

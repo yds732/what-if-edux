@@ -13,6 +13,12 @@ const root = 'http://127.0.0.1:' + server.address().port;
 const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 try {
   const page = await browser.newPage();
+  // Exercise the recordings from this checkout before they reach the web release.
+  const voiceBase = 'https://echo-between-two-worlds.vercel.app/assets/voices/';
+  await page.route(voiceBase + '*/*.mp3', route => route.fulfill({
+    path: 'public/assets/voices/' + route.request().url().slice(voiceBase.length),
+    contentType: 'audio/mpeg', headers: { 'Access-Control-Allow-Origin': '*' },
+  }));
   const errors = [];
   page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
   page.on('console', msg => { if (msg.type() === 'error') console.error(msg.text().slice(0, 450)); });
@@ -41,6 +47,7 @@ try {
   await page.goto(root + '/play?chapter=monday&auto=1&xr=emulate&q=low&speed=8');
   await page.waitForFunction(() => window.__game?.app.renderer.xr.isPresenting && window.__game.app.renderer.getRenderTarget()?.isXRRenderTarget && window.__game.app.info.triangles > 0, undefined, { timeout: 90000 });
   await page.waitForFunction(() => window.__BEATS?.includes('chapter:end'), undefined, { timeout: 420000 });
+  assert.equal(await page.evaluate(() => window.__game.audio.faults), 0);
   assert.deepEqual(errors, []);
   console.log('Standalone story rendered into the emulated headset and reached the ending.');
 } finally {

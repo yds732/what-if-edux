@@ -7,7 +7,7 @@ import { BEDROOM, type BedroomWorld, type ChatMessage } from '../../world/bedroo
 import { HAVEN, type HavenVariant, type HavenWorld } from '../../world/haven/HavenWorld';
 import type { Ring } from '../../world/haven/bridge';
 import type { Anchor } from '../../world/World';
-import { ORB_CONTROLS, TUESDAY } from '../script';
+import { ORB_CONTROLS, TUESDAY, type Line } from '../script';
 
 export const waitUse = (game: Game, spec: Pick<Interactable, 'position' | 'radius' | 'reach' | 'prompt' | 'onFocus'>): Promise<void> => {
   const d = game.director;
@@ -165,17 +165,12 @@ export const openPhone = async (game: Game, bedroom: BedroomWorld, prompt: strin
   game.player.faceToward(BEDROOM.hologram.clone().add(new THREE.Vector3(0, -0.3, 0)), 0.9);
 };
 
-export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[], add: readonly ChatMessage[], footer: { left: string; right: string } | null = null): Promise<void> => {
-  for (const m of add) {
-    thread.push(m);
+export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[], add: readonly Line<'you' | 'jamie'>[], footer: { left: string; right: string } | null = null): Promise<void> => {
+  for (const line of add) {
+    thread.push({ from: line.who, text: line.text });
     bedroom.setMessages(thread.slice(-4), footer);
-    game.audio.sfx(m.from === 'you' ? 'uiSelect' : 'notify', { gain: 0.6 });
-    let elapsed = 0;
-    const readingTime = game.autopilot.enabled ? 1.2 : 2.2 + m.text.length * 0.055;
-    await game.director.until((dt) => {
-      elapsed += dt;
-      return game.director.advancePressed() || elapsed >= readingTime;
-    });
+    game.audio.sfx(line.who === 'you' ? 'uiSelect' : 'notify', { gain: 0.6 });
+    await game.director.read(line, game.autopilot.enabled ? 1.2 : 2.2 + line.text.length * 0.055);
   }
 };
 

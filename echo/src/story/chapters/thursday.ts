@@ -8,7 +8,7 @@ import { MINIGAMES, MINIGAME_IDS, type MinigameId } from '../../arcade/registry'
 import { HUB } from '../../arcade/script';
 import { RallyWorld } from '../../arcade/rally/RallyWorld';
 import { HOOKS, MONDAY, THURSDAY } from '../script';
-import { chat, enterHaven, holdToRead, leaveHaven, liftHeadset, openPhone, stowHeadset, waitHeadsetOff, waitUse } from './shared';
+import { chat, enterHaven, leaveHaven, liftHeadset, openPhone, stowHeadset, waitHeadsetOff, waitUse } from './shared';
 import { breakStreak, echoTempts, havenCalls, labelLumi, tickStreak } from './companion';
 
 const gateUse = (game: Game, haven: HavenWorld, ids: readonly MinigameId[]): Promise<MinigameId> =>
@@ -100,12 +100,12 @@ export const thursday = async (game: Game): Promise<void> => {
   const thread: ChatMessage[] = [];
   const clash = { left: THURSDAY.clash.rehearsal, right: THURSDAY.clash.festival };
   const tempt = echoTempts(game);
-  await chat(game, bedroom, thread, THURSDAY.message.map((m) => ({ from: 'jamie' as const, text: m.text })), clash);
+  await chat(game, bedroom, thread, THURSDAY.message, clash);
   game.reach('thursday.message');
   player.faceToward(BEDROOM.dock.clone(), 1.3);
   await d.wait(1.5);
-  hud.setReflection([`“${THURSDAY.thought}”`]);
-  await holdToRead(game, 3.2, 7);
+  hud.setReflection([`“${THURSDAY.thought.text}”`]);
+  await d.read(THURSDAY.thought, game.autopilot.enabled ? 1.2 : 7, 3.2);
   hud.setReflection(null);
   await d.wait(0.5);
   player.faceToward(BEDROOM.hologram.clone(), 1.2);
@@ -128,8 +128,7 @@ export const thursday = async (game: Game): Promise<void> => {
 
 const helpJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[]): Promise<void> => {
   const { director: d, audio, player } = game;
-  const [you, thanks] = THURSDAY.help.reply;
-  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: thanks.text }]);
+  await chat(game, bedroom, thread, THURSDAY.help.reply);
   bedroom.setMessages(null);
   await d.wait(0.5);
   audio.sfx('holoOpen');
@@ -155,8 +154,7 @@ const helpJamie = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[
 
 const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMessage[]): Promise<void> => {
   const { director: d, audio, player, headset, arcade } = game;
-  const [you, reply] = THURSDAY.haven.reply;
-  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: reply.text }]);
+  await chat(game, bedroom, thread, THURSDAY.haven.reply);
   bedroom.setMessages(null);
   d.objective(MONDAY.objectiveWear);
   await waitUse(game, {

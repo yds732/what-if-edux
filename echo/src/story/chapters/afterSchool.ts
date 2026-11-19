@@ -13,13 +13,12 @@ export const jamieAsks = async (game: Game, bedroom: BedroomWorld): Promise<void
   hud.setToast(null);
   d.objective(null);
   const thread: ChatMessage[] = [];
-  await chat(game, bedroom, thread, [{ from: 'jamie', text: TUESDAY.message[0].text }]);
+  await chat(game, bedroom, thread, TUESDAY.message);
   game.reach('monday.decision');
   const pick = await d.choose(TUESDAY.decision.title, TUESDAY.decision.options);
   state.tuesdayChoice = pick === 0 ? 'meet' : 'haven';
   if (state.tuesdayChoice === 'meet') breakStreak(state);
-  const [you, jamieReply] = state.tuesdayChoice === 'meet' ? TUESDAY.meet.reply : TUESDAY.stay.reply;
-  await chat(game, bedroom, thread, [{ from: 'you', text: you.text }, { from: 'jamie', text: jamieReply.text }]);
+  await chat(game, bedroom, thread, state.tuesdayChoice === 'meet' ? TUESDAY.meet.reply : TUESDAY.stay.reply);
   await d.wait(0.6);
   bedroom.setMessages(null);
 };

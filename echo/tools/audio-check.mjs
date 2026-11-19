@@ -35,7 +35,10 @@ page.on('console', (m) => {
   if (m.type() === 'error' || m.type() === 'warning') consoleProblems.push(`${m.type()}: ${m.text().slice(0, 400)}`);
 });
 page.on('pageerror', (e) => consoleProblems.push(`exception: ${String(e.stack ?? e).slice(0, 800)}`));
-await page.goto('about:blank');
+await page.route('http://echo.test/', route => route.fulfill({ contentType: 'text/html', body: '<html></html>' }));
+await page.route('http://echo.test/assets/voices/*/*.mp3', route =>
+  route.fulfill({ path: path.join(root, 'public', new URL(route.request().url()).pathname), contentType: 'audio/mpeg' }));
+await page.goto('http://echo.test/');
 await page.addScriptTag({ content: code });
 
 const db = (v) => (v === null || !Number.isFinite(v) ? '  -inf' : v.toFixed(1).padStart(6));

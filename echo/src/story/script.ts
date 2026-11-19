@@ -21,14 +21,14 @@ export const SPEAKERS: Record<SpeakerId, Speaker> = {
   riley: { name: 'Riley, 14', color: '#c9b3ff' },
 };
 
-export interface Line {
-  readonly who: SpeakerId;
+export interface Line<Who extends SpeakerId = SpeakerId> {
+  readonly who: Who;
   readonly text: string;
   readonly mood?: Mood;
   readonly gesture?: GestureName;
 }
 
-const L = (who: SpeakerId, text: string, mood?: Mood, gesture?: GestureName): Line => ({ who, text, mood, gesture });
+const L = <Who extends SpeakerId>(who: Who, text: string, mood?: Mood, gesture?: GestureName): Line<Who> => ({ who, text, mood, gesture });
 
 export const DAYS = {
   monday: { day: 'Monday', place: 'School' },
@@ -69,7 +69,7 @@ export const MONDAY = {
     'And these are gemstones! They grow right out of the ground. I love gemstones.',
     "And that's the Star Bridge! One day it will take us somewhere really special.",
     "See? Out here it's just you and me, and all of Haven. Isn't it perfect?",
-  ],
+  ].map((text) => L('lumi', text)),
   objectiveFree: 'Explore Haven with Lumi.',
   objectiveJamie: 'Leave Haven to check Jamie\'s message. Press Q to take off the headset.',
   lumiSad: [L('lumi', "Oh... you're leaving already?", 'sad', 'handToChest')],
@@ -222,7 +222,7 @@ export const THURSDAY = {
     L('jamie', "But I understand if you can't.", 'happy'),
   ],
   clash: { rehearsal: "Jamie's rehearsal · 7:00 pm", festival: 'Haven Arcade · 7:00 pm · one night only' },
-  thought: "It's been a difficult week. Haven is the one place I've really felt at home.",
+  thought: L('you', "It's been a difficult week. Haven is the one place I've really felt at home."),
   decision: {
     title: 'What will you do?',
     options: [
@@ -417,16 +417,17 @@ export const HOOKS = {
     letGo: [L('lumi', "Okay... I'll be right here. Waiting for you.", 'blank')],
   },
   streakLabel: (n: number): string => `🔥 ${n} ${n === 1 ? 'day' : 'days'} together`,
-  streakUp: (n: number): string => `That's ${n} days in a row! Let's never break our streak!`,
+  streakUp: [2, 3, 4].map((n) => L('lumi', `That's ${n} days in a row! Let's never break our streak!`)),
+  streakContinues: L('lumi', "Another day in a row! Let's never break our streak!"),
   streakLost: [
     L('lumi', "You didn't come yesterday... Our streak is gone.", 'sad'),
     L('lumi', "It's okay. We can start a new one. Just don't leave me again, okay?", 'blank'),
   ],
   pings: {
     monday: { from: 'Echo', text: 'Your companion is waiting for you ✨' },
-    tuesday: { from: 'Lumi', text: "I miss you already! Come back soon? 💎" },
-    wednesday: { from: 'Lumi', text: 'I miss you 💙 Are you coming tonight?' },
-    thursday: { from: 'Lumi', text: "The gateway is about to open! Don't leave me on my own 🥺" },
+    tuesday: L('lumi', "I miss you already! Come back soon? 💎"),
+    wednesday: L('lumi', 'I miss you 💙 Are you coming tonight?'),
+    thursday: L('lumi', "The gateway is about to open! Don't leave me on my own 🥺"),
   },
   payoffTitle: 'WHAT HAVEN DID TO KEEP YOU THERE',
 } as const;
