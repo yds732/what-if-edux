@@ -171,12 +171,14 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   labelLumi(game, haven, null);
   const lumi = haven.cast.lumi!;
   game.reach('thursday.return');
+  faceMe(game, lumi);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 0.8);
   await d.play(THURSDAY.haven.back);
   await tickStreak(game, haven);
   const world = await arcadeWorld(game);
   world.resume = true;
   await arcade.play('rally', haven.arcade.gates.rally.back, 'havenFestival', { once: true });
+  faceMe(game, lumi);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 0.8);
   await d.play(THURSDAY.haven.next);
   d.objective(THURSDAY.haven.objectiveNext);
@@ -186,10 +188,17 @@ const returnToHaven = async (game: Game, bedroom: BedroomWorld, thread: ChatMess
   await arcade.play(next, haven.arcade.gates[next].back, 'havenFestival', { once: true });
   haven.fireworks(10, 4);
   audio.sfx('cheer');
+  faceMe(game, lumi);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 0.8);
   await d.play(THURSDAY.haven.cheers);
   await d.wait(0.6);
   await d.result(THURSDAY.haven.result);
+};
+
+const faceMe = (game: Game, who: { root: THREE.Object3D; place: (x: number, y: number, z: number, yaw: number) => unknown; lookAtPoint: (p: THREE.Vector3) => unknown }): void => {
+  const p = who.root.position, me = game.player.position;
+  who.place(p.x, p.y, p.z, Math.atan2(me.x - p.x, me.z - p.z));
+  who.lookAtPoint(game.playerEye);
 };
 
 const haven0 = (game: Game): HavenWorld => game.worlds.haven as HavenWorld;
