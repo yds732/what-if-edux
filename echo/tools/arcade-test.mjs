@@ -167,7 +167,19 @@ const SCENARIOS = {
     const t = await open('play=rally');
     check('rally: opens', await t.beat('rally.intro', 90000));
     check('rally: the introduction can be read through', await t.talkUntil('rally.ready'));
+    const holdsPaddle = () => t.page.evaluate(() => {
+      const { kai, kaiBat } = window.__game.arcade.active;
+      const [fingers, thumb] = kai.rightWrist.children;
+      return [fingers.children[0], thumb.children[0].children[0]].every((joint) => {
+        const p = kaiBat.worldToLocal(joint.getWorldPosition(kaiBat.position.clone()));
+        // Both pads must reach the wooden handle, which runs from 10 to 18.5 cm behind the blade centre.
+        const z = Math.max(0.1, Math.min(0.185, p.z));
+        return Math.hypot(p.x, p.y, p.z - z) < 0.035;
+      });
+    });
+    check('rally: Kai grips the handle with his fingers and thumb before the serve', await holdsPaddle());
     const result = await playRally(t, (x, y) => t.page.mouse.move(x, y), (x, y) => t.page.mouse.click(x, y), 60);
+    check('rally: the handle stays in Kai\'s hand through play', await holdsPaddle());
     await t.shot('rally-mouse');
     check('rally: a click serves', result.served >= 1, JSON.stringify(result));
     check('rally: the bat follows the mouse onto the ball', result.hits.you >= 3, JSON.stringify(result.hits));

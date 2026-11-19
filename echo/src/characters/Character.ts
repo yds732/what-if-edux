@@ -43,6 +43,8 @@ const _m = new THREE.Matrix4();
 export class Character {
   readonly root = new THREE.Group();
   readonly rig: Rig;
+  /** The rendered wrist joint, including the model's original finger bones. */
+  readonly rightWrist: THREE.Bone;
   readonly spec: CharacterSpec;
   readonly eyeHeight: number;
 
@@ -83,6 +85,7 @@ export class Character {
     this.head = new THREE.Group();
     const body = (this.body = new GeneratedBody(model));
     this.rig = body.rig;
+    this.rightWrist = body.mesh.skeleton.bones[model.entry.rig!.armR[2]!]!;
     this.root.add(body.root);
     const { centre, radius } = body.face;
     const toFace = new THREE.Matrix4().makeScale(1 / radius, 1 / radius, 1 / radius).multiply(_m.makeTranslation(-centre.x, -centre.y, -centre.z)).multiply(body.toCharacter);

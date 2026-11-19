@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Character } from '../../characters/Character';
 import { CAST } from '../../characters/cast';
-import { Rng, clamp, clamp01, damp, ease } from '../../core/math';
+import { DEG, Rng, clamp, clamp01, damp, ease } from '../../core/math';
 import { Bursts } from '../../render/Bursts';
 import { GLSL_OUTPUT } from '../../render/glsl';
 import { Panel } from '../../ui/Panel';
@@ -24,7 +24,7 @@ import { TO_WIN, gamePoint, matchWinner, serverFor, starsFor, type Score } from 
 const LIFT = 0.11;
 const H = TABLE.height, HALF_L = TABLE.length / 2, HALF_W = TABLE.width / 2;
 const KAI_Z = -1.92;
-const GRIP = 0.135, BLADE_Z = -0.05, HALF_THICK = 0.023;
+const GRIP = 0.145, BLADE_Z = -0.05, HALF_THICK = 0.023;
 
 const CYAN = new THREE.Color(0.45, 0.84, 1.0);
 const GOLD = new THREE.Color(1.0, 0.72, 0.3);
@@ -139,6 +139,8 @@ export class RallyWorld extends Minigame {
   private readonly kaiBat = new THREE.Group();
   private readonly kaiBatAt = new THREE.Vector3(-0.3, H + 0.1, KAI_Z + 0.36);
   private readonly kaiBatTurn = new THREE.Quaternion();
+  private readonly handTurnInBat = new THREE.Quaternion();
+  private readonly wristInBat = new THREE.Vector3();
   private readonly kaiHand = new THREE.Quaternion();
   private readonly kaiWrist = new THREE.Vector3();
   private readonly kaiVel = new THREE.Vector3();
@@ -225,9 +227,7 @@ export class RallyWorld extends Minigame {
     this.kai.place(0, 0, KAI_Z, 0);
     this.lumi.place(-2.25, 0, -1.0, 1.15).lookAtPoint(this.ballWorld);
     this.nova.place(2.3, 0, -1.25, -1.15).lookAtPoint(this.ballWorld);
-    this.kaiBat.quaternion.setFromRotationMatrix(_m.makeBasis(_x.set(0, 0, 1), _y.set(1, 0, 0), _z.set(0, 1, 0)));
-    this.kaiBat.position.set(0, -0.05, 0).sub(_a.set(0, 0, GRIP).applyQuaternion(this.kaiBat.quaternion));
-    this.kai.rig.bones.handR.add(this.kaiBat);
+    this.gripPaddle();
     this.kai.onPose = () => reachArm(this.kai, 'R', this.kaiWrist, _a.set(-0.5, -1, -0.4), this.kaiHand);
 
     this.board = new Panel(900, 300, { world: true });
@@ -261,6 +261,32 @@ export class RallyWorld extends Minigame {
 
     this.paintBoard();
     this.reset();
+  }
+
+  private gripPaddle(): void {
+    const bat = this.kaiBat, wrist = this.kai.rightWrist;
+    const hand = this.kai.rig.bones.handR, handTurn = hand.getWorldQuaternion(new THREE.Quaternion());
+    // Kai's four fingers share a knuckle chain. The thumb has its own opposing chain.
+    const [fingers, thumb] = wrist.children;
+    const curl = (joint: THREE.Object3D, axis: THREE.Vector3, degrees: number): void => {
+      axis.applyQuaternion(handTurn).applyQuaternion(joint.getWorldQuaternion(_q).invert());
+      joint.rotateOnAxis(axis, degrees * DEG);
+    };
+    curl(fingers!, _z.set(0, 0, 1), 56);
+    curl(fingers!.children[0]!, _z.set(0, 0, 1), 52);
+    curl(thumb!, _y.set(0, 1, 0), 43);
+    curl(thumb!.children[0]!, _y.set(0, 1, 0), 12);
+
+    // Seat the handle across the palm with the blade coming out between thumb and index.
+    batTurn(bat.quaternion, _a.set(-0.08, -0.36, 1), _b.set(-0.23, -1, 0));
+    bat.position.set(0.062, -0.063, 0.006).sub(_a.set(0, 0, GRIP).applyQuaternion(bat.quaternion));
+    bat.position.applyQuaternion(handTurn).add(wrist.getWorldPosition(_a));
+    bat.quaternion.premultiply(handTurn);
+    wrist.attach(bat);
+
+    // The ball supplies a blade target. Use this same grip to solve for the arm's wrist target.
+    bat.worldToLocal(hand.getWorldPosition(this.wristInBat));
+    this.handTurnInBat.copy(bat.getWorldQuaternion(_q)).invert().multiply(handTurn);
   }
 
   private buildNet(): void {
@@ -646,8 +672,8 @@ export class RallyWorld extends Minigame {
 
     const swing = clamp(this.kaiVel.z / 5, -0.4, 1);
     batTurn(this.kaiBatTurn, _x.set(-0.42 + this.kaiVel.x * 0.04, 1, -0.1 + swing * 0.55), _y.set(0.1, 0.2 - swing * 0.35, 1));
-    this.kaiHand.copy(this.kaiBatTurn).multiply(_q.copy(this.kaiBat.quaternion).invert());
-    this.kaiWrist.set(0, 0, GRIP).applyQuaternion(this.kaiBatTurn).add(bat).add(_x.set(0, 0.05, 0).applyQuaternion(this.kaiHand));
+    this.kaiHand.copy(this.kaiBatTurn).multiply(this.handTurnInBat);
+    this.kaiWrist.copy(this.wristInBat).applyQuaternion(this.kaiBatTurn).add(bat);
     this.kaiWrist.y += LIFT;
     this.kai.lookAtPoint(this.phase === 'idle' ? this.arcade.game.playerEye : this.ballWorld);
   }
