@@ -193,7 +193,7 @@ export class LanternWorld extends Minigame {
     Object.assign(this.look, { exposure: 0.98, bloom: 0.24, saturation: 1.28, vignette: 0.42 });
 
     const treeRng = new Rng(77);
-    const tree = buildBlossomTree(treeRng, Math.round(22000 * q.density));
+    const tree = buildBlossomTree(treeRng, Math.round(22000 * q.density), q.tier === 'low');
     tree.group.position.set(4.4, 0, -4.6);
     tree.group.scale.setScalar(1.2);
     scene.add(tree.group);

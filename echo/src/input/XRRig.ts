@@ -66,6 +66,7 @@ export class XRRig {
     const session = await xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor'] });
     app.renderer.xr.enabled = true;
     app.renderer.xr.setReferenceSpaceType('local-floor');
+    app.renderer.xr.setFramebufferScaleFactor(app.quality.tier === 'low' ? 0.9 : 1);
     app.renderer.xr.setFoveation(1);
     await app.renderer.xr.setSession(session);
     for (const w of this.wands) app.rig.add(w.ray, w.grip);

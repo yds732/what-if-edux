@@ -259,7 +259,7 @@ export class ClassroomWorld extends World {
       for (const e of [-1, 1]) b.box('satin', 0xe8eaed, [slab, under, deep - 0.02], at(e * (wide / 2 - slab / 2 - 0.01), under / 2, 0), { r: 0.004, rot });
       b.box('satin', 0xdadde2, [wide - 0.1, 0.44, 0.018], at(0, under - 0.22, 0), { rot });
       for (const f of [-1, 1]) b.box('glow', 0xa8dcff, [wide - 0.12, 0.005, 0.005], at(0, under - 0.004, f * (deep / 2 - 0.012)), { rot });
-      scene.add(teacherThings(at(0, top, 0), DESK.yaw));
+      scene.add(teacherThings(at(0, top, 0), DESK.yaw, ctx.quality.tier !== 'low'));
     }
 
     {
@@ -401,7 +401,7 @@ export class ClassroomWorld extends World {
     this.sun = new THREE.DirectionalLight(0xfff4e6, 3);
     this.sun.position.set(-12, 9, -3);
     this.sun.target.position.set(0, 0, 0);
-    this.sun.castShadow = ctx.quality.shadows;
+    this.sun.castShadow = ctx.quality.shadows && ctx.renderer.shadowMap.enabled;
     this.sun.shadow.mapSize.set(ctx.quality.shadowMapSize, ctx.quality.shadowMapSize);
     const sc = this.sun.shadow.camera;
     sc.left = -9; sc.right = 9; sc.top = 9; sc.bottom = -9; sc.near = 1; sc.far = 40;
@@ -428,6 +428,8 @@ export class ClassroomWorld extends World {
         const a = (k / 3) * TAU;
         panels.cyl('metal', 0x2a2a2a, 0.002, H - y, [x + Math.cos(a) * r, y, z + Math.sin(a) * r], { radial: 5 });
       }
+      // The shadowless preset uses the sky fill for the four desk lamps.
+      if (!this.sun.castShadow && r <= 1) continue;
       const light = new THREE.PointLight(LAMP_COLOR, RING_POWER * (r > 1 ? 1.2 : 1), 0, 2);
       light.position.set(x, y - 0.2, z);
       light.userData.power = light.intensity;
@@ -538,18 +540,19 @@ export class ClassroomWorld extends World {
 
   private applyMood(): void {
     const m = this.mood;
-    this.sun.intensity = m.sun;
+    // Without wall and blind shadows, the sun reaches the whole classroom.
+    this.sun.intensity = this.sun.castShadow ? m.sun : m.sun * 0.5;
     this.sun.color.setRGB(1.0, 0.96 - 0.38 * m.warm, 0.9 - 0.66 * m.warm);
     this.sun.position.set(-12, 9 - 6.2 * m.warm, -3 + 2 * m.warm);
     for (const l of this.lamps) l.intensity = (l.userData.power as number) * m.room;
     const daylight = m.sun / 4.4;
-    this.fill.intensity = 0.04 + 0.26 * daylight;
+    this.fill.intensity = 0.04 + 0.26 * daylight + (this.sun.castShadow ? 0 : 0.22 * m.room);
     this.fill.color.setRGB(0.95 + 0.05 * m.warm, 0.93 - 0.18 * m.warm, 0.9 - 0.4 * m.warm);
     (this.ceiling.material as THREE.MeshBasicMaterial).color.setScalar(0.08 + 2.2 * m.room);
     (this.border.material as THREE.MeshBasicMaterial).color.setScalar(0.1 + 2.4 * m.room);
     this.scene.environmentIntensity = 0.07 + 0.06 * m.room + 0.02 * m.warm;
     this.city.setNight(m.night);
-    this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (m.sun / 4.4) * (1.2 + 0.2 * m.warm));
+    this.beams.setSun(_sunDir.copy(this.sun.target.position).sub(this.sun.position), this.sun.color, (this.sun.intensity / 4.4) * (1.2 + 0.2 * m.warm));
     this.look.exposure = this.variant === 'viewer' ? 1.15 : 1.0;
     this.look.saturation = 1.06 + 0.16 * m.warm;
     this.look.highlightTint.setRGB(0.012 + 0.03 * m.warm, 0.006 + 0.01 * m.warm, -0.004 - 0.02 * m.warm);
@@ -788,7 +791,7 @@ export class ClassroomWorld extends World {
   }
 }
 
-const teacherThings = (origin: readonly [number, number, number], yaw: number): THREE.Group => {
+const teacherThings = (origin: readonly [number, number, number], yaw: number, refractGlass: boolean): THREE.Group => {
   const group = new THREE.Group();
   const add = (mesh: THREE.Mesh, x: number, y: number, z: number, shadows = true): THREE.Mesh => {
     mesh.position.set(x, y, z);
@@ -811,7 +814,7 @@ const teacherThings = (origin: readonly [number, number, number], yaw: number): 
   lanyard.scale.set(1, 1.35, 0.25);
 
   const vase = { x: -0.55, z: -0.1 };
-  add(new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.04, 0.17, 32), new THREE.MeshPhysicalMaterial({ color: 0xdfeff2, roughness: 0.05, transmission: 0.9, thickness: 0.01, transparent: true, opacity: 0.45 })), vase.x, 0.085, vase.z, false);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.04, 0.17, 32), new THREE.MeshPhysicalMaterial({ color: 0xdfeff2, roughness: 0.05, transmission: refractGlass ? 0.9 : 0, thickness: 0.01, transparent: true, opacity: 0.45, depthWrite: refractGlass })), vase.x, 0.085, vase.z, false);
   add(new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.038, 0.09, 24), new THREE.MeshStandardMaterial({ color: 0xbfe0e0, roughness: 0.1, transparent: true, opacity: 0.35 })), vase.x, 0.047, vase.z, false);
   const rng = new Rng(518), stem = std(0x4f7d3a, 0.7), petals = [0xf28fae, 0xffd166, 0xfdfdfb, 0xe85d75, 0xc39bd3];
   for (let i = 0; i < 9; i++) {

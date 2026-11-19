@@ -27,16 +27,17 @@ const BLADE_VS = `
 }
 `;
 
-export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null): THREE.Mesh => {
+export const buildGrass = (count: number, radius: number, rng: Rng, ground: (x: number, z: number) => { y: number; scale: number } | null, lowDetail: boolean): THREE.Mesh => {
   const blade = new THREE.BufferGeometry();
   const w = 0.028;
   const verts: number[] = [], idx: number[] = [], nor: number[] = [];
-  const profile = [1, 0.82, 0.5, 0];
+  const profile = lowDetail ? [1, 0.7, 0] : [1, 0.82, 0.5, 0];
   for (let i = 0; i < profile.length; i++) {
     const v = i / (profile.length - 1);
     verts.push(-w * profile[i]!, v, 0, w * profile[i]!, v, 0);
     nor.push(0, 0.35, 1, 0, 0.35, 1);
-    if (i < profile.length - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 2, i * 2 + 1, i * 2 + 3);
+    if (i < profile.length - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2);
+    if (i < profile.length - 2) idx.push(i * 2 + 2, i * 2 + 1, i * 2 + 3);
   }
   blade.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   blade.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
@@ -115,7 +116,7 @@ const PETAL_VS = `
 }
 `;
 
-export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
+export const buildBlossomTree = (rng: Rng, petalCount: number, lowDetail: boolean): Tree => {
   const group = new THREE.Group();
   const bark: THREE.BufferGeometry[] = [];
   const tips: { p: THREE.Vector3; r: number }[] = [];
@@ -169,7 +170,7 @@ export const buildBlossomTree = (rng: Rng, petalCount: number): Tree => {
       const p = tip.p.clone().add(off);
       puffs.push({ p, r });
       const core = r * 0.42;
-      const g = blob(core, core * 0.8, core, 3, (q) => {
+      const g = blob(core, core * 0.8, core, lowDetail ? 1 : 3, (q) => {
         q.multiplyScalar(1 + 0.16 * fbm3(q.x * 3 + p.x, q.y * 3, q.z * 3 + p.z, 2));
       });
       place(g, p);

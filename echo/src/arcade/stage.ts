@@ -98,7 +98,7 @@ export const buildStage = async (ctx: BuildContext, world: World, o: StageOption
       if (y === null || Math.hypot(x, z) > made.outline(Math.atan2(x, z)) * 0.95 || o.bare?.(x, z)) return null;
       return { y, scale: 1 };
     };
-    if (o.grass) scene.add(buildGrass(Math.round(o.grass * q.density), radius, rng.fork(), ground));
+    if (o.grass) scene.add(buildGrass(Math.round(o.grass * q.density), radius, rng.fork(), ground, q.tier === 'low'));
     if (o.flowers) {
       const colors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8fc8)];
       const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];

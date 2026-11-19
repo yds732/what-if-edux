@@ -132,7 +132,7 @@ export class BedroomWorld extends World {
     scene.add(buildPodChair(CHAIR.x, CHAIR.z, 30));
     this.holoDesk = buildHoloStation(1.25, deskTop, -2.22);
     scene.add(this.holoDesk.group);
-    scene.add(buildOrb(2.02, deskTop, -1.62));
+    scene.add(buildOrb(2.02, deskTop, -1.62, ctx.quality.tier !== 'low'));
     scene.add(buildBookStack(0.68, deskTop, -2.38, -8));
     await dress(ctx, scene, 'slate', [[DESK.x - 0.2, deskTop, DESK.z + 0.1, 12]]);
     this.dockGlow = glowOf(await dress(ctx, scene, 'dock', [[BEDROOM.dock.x, deskTop, BEDROOM.dock.z]]));
@@ -1102,12 +1102,12 @@ const buildHoloStation = (x: number, y: number, z: number): { group: THREE.Group
   };
 };
 
-const buildOrb = (x: number, y: number, z: number): THREE.Group => {
+const buildOrb = (x: number, y: number, z: number, refractGlass: boolean): THREE.Group => {
   const group = new THREE.Group();
   const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.03, 32), new THREE.MeshStandardMaterial({ map: oakGrain(), roughness: 0.5 }));
   foot.position.y = 0.015;
   const glassBall = new THREE.Mesh(new THREE.SphereGeometry(0.075, 40, 24), new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, roughness: 0.05, transmission: 0.9, thickness: 0.02, transparent: true, opacity: 0.35, clearcoat: 1, depthWrite: false,
+    color: 0xffffff, roughness: 0.05, transmission: refractGlass ? 0.9 : 0, thickness: 0.02, transparent: true, opacity: 0.35, clearcoat: 1, depthWrite: false,
   }));
   glassBall.position.y = 0.1;
   const core = new THREE.Mesh(new THREE.SphereGeometry(0.018, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(SCONCE_COLOR).multiplyScalar(3) }));

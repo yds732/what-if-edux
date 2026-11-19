@@ -182,7 +182,7 @@ export class HavenWorld extends World {
       const path = Math.abs(x) < 1.1 && z > -2.2 && z < 4.6 ? 0.5 : 1;
       return { y, scale: path };
     };
-    scene.add(buildGrass(Math.round(36000 * q.density), 13.5, rng.fork(), ground));
+    scene.add(buildGrass(Math.round(36000 * q.density), 13.5, rng.fork(), ground, q.tier === 'low'));
     const flowerColors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8a3d)];
     const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
     for (let i = 0; i < 400 && flowers.length < Math.round(110 * q.density); i++) {
@@ -215,7 +215,7 @@ export class HavenWorld extends World {
     }
     await ctx.step('haven: flora');
 
-    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density));
+    const tree = buildBlossomTree(rng.fork(), Math.round(30000 * q.density), q.tier === 'low');
     tree.group.position.copy(HAVEN.tree);
     tree.group.scale.setScalar(1.3);
     scene.add(tree.group);

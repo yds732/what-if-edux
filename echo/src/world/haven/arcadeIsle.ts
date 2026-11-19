@@ -215,7 +215,7 @@ export const buildArcadeIsle = async (ctx: BuildContext, scene: THREE.Scene, col
     for (const [sx, , sz] of spots) if (Math.hypot(x - sx, z - sz) < GATE.base + 0.05) return null;
     return { y, scale: Math.hypot(x, z) < 5 ? 0.6 : 1 };
   };
-  group.add(buildGrass(Math.round(13000 * q.density), ARCADE_ISLE.radius, rng.fork(), ground));
+  group.add(buildGrass(Math.round(13000 * q.density), ARCADE_ISLE.radius, rng.fork(), ground, q.tier === 'low'));
   const flowerColors = [new THREE.Color(0x3fe0b0), new THREE.Color(0x5fd8ff), new THREE.Color(0xffb347), new THREE.Color(0xff8fc8)];
   const flowers: { x: number; y: number; z: number; h: number; color: THREE.Color }[] = [];
   for (let i = 0; i < 300 && flowers.length < Math.round(60 * q.density); i++) {
