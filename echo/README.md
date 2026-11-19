@@ -6,7 +6,7 @@ Built for EduX 2026 UK, Track 4 (*Immersive Worlds for Future Citizenship*). The
 
 Runs in a desktop browser (mouse and keyboard), on phones and tablets (touch), and in a WebXR headset.
 
-**Play it:** https://echo-two-worlds.vercel.app
+**Play it:** https://echo-between-two-worlds.vercel.app
 
 ## Run it
 

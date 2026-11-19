@@ -2,7 +2,7 @@
 
 EduX 2026 UK, Track 4: *Immersive Worlds for Future Citizenship*.
 
-**Play it:** https://echo-two-worlds.vercel.app (desktop browser, phone, tablet or WebXR headset; no install, no account)
+**Play it:** https://echo-between-two-worlds.vercel.app (desktop browser, phone, tablet or WebXR headset; no install, no account)
 
 ## The problem
 
