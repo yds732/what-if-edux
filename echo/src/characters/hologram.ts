@@ -19,13 +19,13 @@ export const addHologram = (material: THREE.MeshStandardMaterial): Hologram => {
       .replace('#include <common>', '#include <common>\nuniform float uHolo, uHoloTime; uniform vec3 uHoloColor; varying float vHoloY;')
       .replace('#include <opaque_fragment>', `#include <opaque_fragment>
 if (uHolo > 0.0) {
-  // gaps climb the figure; between them, fine scan lines
-  if (fract(vHoloY * 9.0 - uHoloTime * 0.35) < 0.07 * uHolo) discard;
+  // A travelling band modulates the projection's light across a continuous surface.
+  float band = abs(fract(vHoloY * 9.0 - uHoloTime * 0.35) - 0.5);
   float scan = 0.5 + 0.5 * sin(vHoloY * 420.0 - uHoloTime * 9.0);
   float edge = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 2.0);
   float flicker = 0.93 + 0.07 * sin(uHoloTime * 37.0) * sin(uHoloTime * 11.3);
   float tone = dot(gl_FragColor.rgb, vec3(0.3, 0.5, 0.2));
-  vec3 light = uHoloColor * (0.22 + 0.9 * tone + 0.3 * scan + 1.9 * edge) * flicker;
+  vec3 light = uHoloColor * (0.22 + 0.9 * tone + 0.3 * scan + 1.9 * edge) * flicker * mix(0.80, 1.0, smoothstep(0.0, 0.07, band));
   gl_FragColor.rgb = mix(gl_FragColor.rgb, light, uHolo);
 }`);
   };

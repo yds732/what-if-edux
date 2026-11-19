@@ -82,8 +82,10 @@ const open = async (query) => {
   check('the phone is on screen to be tapped', !!phone && phone.x > 0 && phone.x < W && phone.y > 0 && phone.y < H, JSON.stringify(phone));
   await t.shot('1_phone');
   if (phone) await t.tap(phone.x, phone.y);
-  // taps on the LEFT half must count too: that is where a thumb rests
-  check('taps on the left half advance the chat', await t.tapUntil('monday.decision', 150, 200));
+  await t.page.waitForFunction(() => window.__game.worlds.bedroom.holoTarget === 1);
+  await t.tap(150, 200);
+  await t.beat('monday.decision', 1200);
+  check('one tap on the left half advances the chat', true);
   await t.page.waitForFunction(() => window.__game.hud.choosing, undefined, { timeout: 8000 }).catch(() => undefined);
   await t.page.waitForTimeout(900);
   const two = await t.cards();

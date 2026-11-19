@@ -63,7 +63,7 @@ export const thursday = async (game: Game): Promise<void> => {
   game.hands.pose('rest');
   player.canMove = true;
   audio.setSoundscape('havenFestival', 1.5);
-  await d.card('thursday');
+  await Promise.all([d.card('thursday'), game.ensureWorld('bedroom')]);
   game.reach('thursday.festival');
   const lumi = haven.cast.lumi!;
   haven.fireworks(4, 3);

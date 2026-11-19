@@ -60,7 +60,7 @@ export const wednesday = async (game: Game): Promise<void> => {
   restHeadset(game, BEDROOM.dock);
   player.canMove = true;
   audio.setSoundscape('bedroom', 1.5);
-  await d.card('wednesdayEvening');
+  await Promise.all([d.card('wednesdayEvening'), game.ensureWorld('haven')]);
   game.reach('wednesday.bedroom');
   await d.fadeIn(1.4);
   d.objective(WEDNESDAY.objectiveWear);
@@ -77,7 +77,6 @@ export const wednesday = async (game: Game): Promise<void> => {
   game.reach('wednesday.haven');
   const lumi = haven.cast.lumi!;
   lumi.lookAtPoint(game.playerEye);
-  await d.wait(1.2);
   player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.1);
   labelLumi(game, haven, null);
   await tickStreak(game, haven);

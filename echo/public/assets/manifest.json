@@ -1002,24 +1002,24 @@
     "jamie": {
       "kind": "character",
       "world": "real",
+      "height": 1.38,
       "tiers": {
         "high": {
           "file": "models/jamie.high.glb",
           "triangles": 90000,
-          "bytes": 1922484
+          "bytes": 1922384
         },
         "medium": {
           "file": "models/jamie.medium.glb",
           "triangles": 40000,
-          "bytes": 834940
+          "bytes": 834692
         },
         "low": {
           "file": "models/jamie.low.glb",
           "triangles": 15996,
-          "bytes": 352028
+          "bytes": 351580
         }
       },
-      "height": 1.38,
       "rig": {
         "hips": 0,
         "spine": 12,
@@ -1263,24 +1263,28 @@
     "lumi": {
       "kind": "character",
       "world": "haven",
+      "glow": {
+        "color": "#6fe6ff",
+        "strength": 2.6
+      },
+      "height": 1.36,
       "tiers": {
         "high": {
           "file": "models/lumi.high.glb",
           "triangles": 89998,
-          "bytes": 1828880
+          "bytes": 1839112
         },
         "medium": {
           "file": "models/lumi.medium.glb",
           "triangles": 39996,
-          "bytes": 831804
+          "bytes": 835580
         },
         "low": {
           "file": "models/lumi.low.glb",
           "triangles": 16000,
-          "bytes": 352456
+          "bytes": 356168
         }
       },
-      "height": 1.36,
       "rig": {
         "hips": 0,
         "spine": 1,
@@ -1307,10 +1311,6 @@
           29,
           30
         ]
-      },
-      "glow": {
-        "color": "#6fe6ff",
-        "strength": 2.6
       }
     },
     "mina": {

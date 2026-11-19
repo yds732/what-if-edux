@@ -84,7 +84,7 @@ export class App {
     this.world?.scene.remove(this.rig);
     this.world = world;
     world.scene.add(this.rig);
-    this.governor.reset();
+    if (!this.wipe) this.governor.reset();
     this.camera.near = world.near;
     this.camera.far = world.far;
     this.camera.updateProjectionMatrix();

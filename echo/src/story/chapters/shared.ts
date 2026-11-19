@@ -130,13 +130,14 @@ export const leaveHaven = async (game: Game, night: number): Promise<BedroomWorl
   await d.wait(0.4);
   app.fx.flash = 0.7;
   audio.setSoundscape('bedroom', 2);
-  await d.wipeTo('bedroom', BEDROOM.desk);
   const g = headset.group;
-  app.camera.add(g);
-  g.visible = true;
-  g.position.copy(FACE.position);
-  g.rotation.copy(FACE.rotation);
-  headset.setPower(0.6);
+  await d.wipeTo('bedroom', BEDROOM.desk, () => {
+    app.camera.add(g);
+    g.visible = true;
+    g.position.copy(FACE.position);
+    g.rotation.copy(FACE.rotation);
+    headset.setPower(0.6);
+  });
   hands.pose('cradle');
   await moveHeadset(game, CRADLE, 0.5);
   bedroom.scene.attach(g);
@@ -169,7 +170,12 @@ export const chat = async (game: Game, bedroom: BedroomWorld, thread: ChatMessag
     thread.push(m);
     bedroom.setMessages(thread.slice(-4), footer);
     game.audio.sfx(m.from === 'you' ? 'uiSelect' : 'notify', { gain: 0.6 });
-    await holdToRead(game, 0.9 + m.text.length * 0.03, 2.2 + m.text.length * 0.055);
+    let elapsed = 0;
+    const readingTime = game.autopilot.enabled ? 1.2 : 2.2 + m.text.length * 0.055;
+    await game.director.until((dt) => {
+      elapsed += dt;
+      return game.director.advancePressed() || elapsed >= readingTime;
+    });
   }
 };
 

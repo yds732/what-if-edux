@@ -17,6 +17,7 @@ import sharp from 'sharp';
 import { ASSETS, glowOf, isModel } from '../../assets/catalog.mjs';
 import { CACHE, PUBLIC_ASSETS, ensureDir } from './lib/env.mjs';
 import { readRig } from './lib/rig.mjs';
+import { finishJamie, finishLumi } from './lib/cast-finish.mjs';
 
 const args = process.argv.slice(2);
 const option = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
@@ -285,6 +286,8 @@ const one = async (id) => {
     const doc = await io.read(source);
     doc.setLogger(quiet);
     const before = triangles(doc);
+    if (id === 'lumi') await finishLumi(doc);
+    if (id === 'jamie') await finishJamie(doc);
     if (character) {
       entry.rig = readRig(doc);
       normaliseCharacter(doc, asset, entry.rig);

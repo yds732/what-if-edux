@@ -61,7 +61,7 @@ export const monday = async (game: Game): Promise<void> => {
   restHeadset(game, BEDROOM.dock);
   player.canMove = true;
   audio.setSoundscape('bedroom', 1.5);
-  await d.card('mondayHome');
+  await Promise.all([d.card('mondayHome'), game.ensureWorld('haven')]);
   game.reach('monday.bedroom');
   await d.fadeIn(1.4);
   d.objective(MONDAY.objectiveWear);
@@ -80,8 +80,7 @@ export const monday = async (game: Game): Promise<void> => {
 
   const lumi = haven.cast.lumi!;
   lumi.lookAtPoint(game.playerEye);
-  await d.wait(2.6);
-  player.faceToward(lumi.headWorld(new THREE.Vector3()), 1.4);
+  player.faceToward(lumi.headWorld(new THREE.Vector3()), 0.6);
 
   const guide = haven.companion;
   haven.showCompanion(true);
@@ -95,8 +94,7 @@ export const monday = async (game: Game): Promise<void> => {
   guide.mode = 'still';
   player.canMove = false;
   player.faceToward(guide.person.headWorld(new THREE.Vector3()), 0.6);
-  await d.complete(MONDAY.objectiveLumi);
-  await d.play(MONDAY.lumiHello);
+  await Promise.all([d.complete(MONDAY.objectiveLumi), d.play(MONDAY.lumiHello)]);
   const trust = await d.choose(MONDAY.trust.title, MONDAY.trust.options);
   await d.play(trust === 0 ? MONDAY.trustYes : MONDAY.trustMaybe);
   await tickStreak(game, haven);
