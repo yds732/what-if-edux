@@ -30,6 +30,12 @@ WebXR needs a secure origin: the deployed site has one; a copy you host needs HT
 
 The site deploys itself: every push to `main` that touches `echo/` runs `.github/workflows/deploy-echo.yml`, which deploys to Vercel using the `VERCEL_TOKEN` repository secret (`vercel.json` holds the build settings). To deploy by hand instead, run `npx vercel deploy --prod` in this folder, logged in to the Vercel account that owns the project. The upload is about 97 MB, nearly all of it models (the arcade's are 15 MB of that); Vercel's Hobby plan accepts up to 100 MB from the CLI, so on that plan there is room for very little more.
 
+## MANI Engine
+
+Open **ECHO – Between Two Worlds** in MANI and choose **Test** to play. The editor opens in Haven with the simulation paused. Both releases use the game in `src/`. The MANI file embeds the game code, styles, fonts and keystrokes. It loads models and pictures from the web release over HTTPS and imports the matching Three.js version from jsDelivr.
+
+Run `npm run build:mani` to generate `mani/dist/scene.html`. Run `npm run verify -- MANI` to build and exercise the single file in Chrome, including headset emulation. Publish gameplay changes to the existing MANI project (`ECHO_Between_Two_Worlds_20261120_053813`) after deploying any changed assets to Vercel. Pull the current scene first and preserve its editor change table when updating it. Vercel deploys and MANI project updates are separate releases.
+
 ## Haven Arcade
 
 Beside the week's story there is an arcade: an isle in Haven with five gates, each onto a small game of its own. **Haven Arcade** on the title screen goes there (so does the end screen); walk up to a gate and step through. Every game is played with one pointer and one button: the mouse, a finger, or a VR controller's ray and trigger. Each has three stages, moving on with every win, and keeps the most stars it has been won with on its gate.

@@ -2,6 +2,7 @@
 # (node_modules and .vercel are left behind by default.)
 shots
 dist
+mani/dist
 .chrome-profile
 *.log
 assets/.cache

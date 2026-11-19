@@ -158,6 +158,7 @@ export class ClassroomWorld extends World {
     const rng = new Rng(2080);
     await Promise.all(FUTURE_SCENES.map(async (id) => {
       const image = new Image();
+      image.crossOrigin = 'anonymous';
       image.src = `${import.meta.env.BASE_URL}assets/pictures/friday-${id}.webp`;
       await image.decode().then(() => this.sceneImages.set(id, image), () => undefined);
     }));

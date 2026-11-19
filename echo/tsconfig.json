@@ -14,5 +14,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "vite.config.ts"]
+  "include": ["src", "mani/entry.ts", "tests", "vite.config.ts"]
 }

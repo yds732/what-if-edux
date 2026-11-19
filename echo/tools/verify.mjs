@@ -11,6 +11,7 @@ const BASE = 'http://127.0.0.1:5173/';
 const STEPS = [
   ['types', 'npx tsc --noEmit'],
   ['unit tests', 'npx vitest run'],
+  ['MANI single-file build, editor, story and VR', 'npm run build:mani && node mani/test.mjs'],
   ['sound: every soundscape, effect and voice rendered and measured', 'node tools/audio-check.mjs'],
   ['story: the week on autopilot, three branch sets', 'node tools/e2e.mjs --speed=8'],
   ['story in an emulated headset', 'node tools/e2e.mjs --speed=8 --only=b --xr=1 --out=shots/e2e_xr'],
@@ -23,7 +24,7 @@ const STEPS = [
 ];
 
 const only = process.argv.slice(2).map((w) => w.toLowerCase());
-const steps = STEPS.filter(([name]) => only.length === 0 || only.some((w) => name.includes(w)));
+const steps = STEPS.filter(([name]) => only.length === 0 || only.some((w) => name.toLowerCase().includes(w)));
 if (steps.length === 0) {
   console.error(`no step matches: ${only.join(', ')}\nsteps: ${STEPS.map(([n]) => n).join(' | ')}`);
   process.exit(2);
