@@ -48,7 +48,8 @@ void main() {
   float n = 0.82 + 0.18 * sin(vWorld.y * 3.1 + vWorld.z * 2.3 + uTime * 0.35) * sin(vWorld.x * 1.7 - uTime * 0.21);
   // below the floor there is nothing to light
   float above = smoothstep(-0.02, 0.12, vWorld.y);
-  gl_FragColor = vec4(uColor * edge * fade * n * above * uStrength * 0.09, 1.0);${finish}
+  // Alpha attenuates the light after output conversion, including in the direct XR render.
+  gl_FragColor = vec4(uColor, edge * fade * n * above * uStrength * 0.09);${finish}
 }`;
 
 const DUST_VS = `
@@ -93,8 +94,8 @@ void main() {
   if (r > 0.5) discard;
   float soft = pow(1.0 - r * 2.0, 1.8);
   // in the shade a mote is barely there; in the sun it glints
-  float glow = mix(0.035, 1.0, vLit) * vTwinkle * uStrength;
-  gl_FragColor = vec4(uColor * soft * glow * 1.8, 1.0);${finish}
+  float glow = mix(0.035, 1.0, vLit) * vTwinkle;
+  gl_FragColor = vec4(uColor * uStrength * 1.8, soft * glow);${finish}
 }`;
 
 export const buildSunbeams = (rng: Rng, windows: readonly Window[], room: { min: THREE.Vector3; max: THREE.Vector3 }, density: number): Sunbeams => {

@@ -511,7 +511,7 @@ export class ClassroomWorld extends World {
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
       uniforms: { uShow: { value: 0 }, uTime: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform float uShow, uTime; varying vec2 vUv; void main(){ float lines = 0.75 + 0.25 * sin(vUv.y * 160.0 - uTime * 6.0); gl_FragColor = vec4(vec3(0.3, 0.62, 1.0) * pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.6) * lines * 0.34 * uShow, 1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
+      fragmentShader: 'uniform float uShow, uTime; varying vec2 vUv; void main(){ float lines = 0.75 + 0.25 * sin(vUv.y * 160.0 - uTime * 6.0); gl_FragColor = vec4(vec3(0.3, 0.62, 1.0), pow(clamp(1.0 - vUv.y, 0.0, 1.0), 1.6) * lines * 0.34 * uShow);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
     }));
     this.stageBeam.position.copy(CLASSROOM.stage);
     scene.add(this.stageBeam);
@@ -1014,7 +1014,7 @@ const holoScreens = (spots: readonly Spot[]): THREE.Group => {
   const parts: [THREE.BufferGeometry, THREE.Material][] = [
     [pane, new THREE.MeshBasicMaterial({ map: holoUi(), color: new THREE.Color().setScalar(1.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false })],
     [dot, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 0.85, 1.0).multiplyScalar(2.4) })],
-    [beam, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.55, 0.9).multiplyScalar(0.18), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })],
+    [beam, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 0.55, 0.9), opacity: 0.18, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })],
   ];
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1);
   for (const [geometry, material] of parts) {
