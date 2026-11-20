@@ -10,6 +10,7 @@ export interface StoryState {
   policyChoice: Policy | null;
   lumiGift: 'none' | 'asked' | 'carrying' | 'given';
   streak: number;
+  lastHavenDay: ChapterId | null;
   streakBest: number;
   streakLost: boolean;
   streakBroke: boolean;
@@ -20,8 +21,19 @@ export interface StoryState {
 
 export const freshState = (): StoryState => ({
   tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none',
-  streak: 0, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0,
+  streak: 0, lastHavenDay: null, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0,
 });
+
+const weekday = { monday: 1, wednesday: 3, thursday: 4, friday: 5 };
+
+export const recordHavenVisit = (state: StoryState, day: ChapterId | null): boolean => {
+  if (!day || state.lastHavenDay === day) return false;
+  const yesterday = state.lastHavenDay && weekday[state.lastHavenDay] === weekday[day] - 1;
+  state.streak = yesterday ? state.streak + 1 : 1;
+  state.streakBest = Math.max(state.streakBest, state.streak);
+  state.lastHavenDay = day;
+  return true;
+};
 
 interface Save {
   readonly version: 1;
@@ -45,7 +57,17 @@ export const loadProgress = (): { chapter: ChapterId; state: StoryState } | null
     if (!raw) return null;
     const save = JSON.parse(raw) as Partial<Save>;
     if (save.version !== 1 || !isChapter(save.chapter ?? null) || !save.state) return null;
-    return { chapter: save.chapter as ChapterId, state: { ...freshState(), ...save.state } };
+    const chapter = save.chapter as ChapterId;
+    const state = { ...freshState(), ...save.state };
+    if (save.state.lastHavenDay === undefined && state.streakBest > 0) {
+      // Older chapter saves counted each visit, including Monday's return trip.
+      state.lastHavenDay = chapter === 'friday' && state.thursdayChoice === 'haven' ? 'thursday'
+        : chapter === 'friday' || chapter === 'thursday' ? 'wednesday' : 'monday';
+      const longest = state.lastHavenDay === 'thursday' ? 2 : 1;
+      state.streak = Math.min(state.streak, longest);
+      state.streakBest = Math.min(state.streakBest, longest);
+    }
+    return { chapter, state };
   } catch {
     return null;
   }

@@ -5,7 +5,7 @@ import { makeGem } from '../../world/haven/gem';
 import type { HavenWorld } from '../../world/haven/HavenWorld';
 import { glowScreenEdges } from '../../ui/dom/taskGlow';
 import { HOOKS, MONDAY, SPEAKERS, type Line } from '../script';
-import type { StoryState } from '../state';
+import { recordHavenVisit, type StoryState } from '../state';
 import type { BedroomWorld } from '../../world/bedroom/BedroomWorld';
 import { waitHeadsetOff } from './shared';
 
@@ -122,13 +122,11 @@ export const labelLumi = (game: Game, haven: HavenWorld, extra: string | null = 
 
 export const tickStreak = async (game: Game, haven: HavenWorld): Promise<void> => {
   const { state, director: d, audio } = game;
+  if (!recordHavenVisit(state, game.chapter)) return;
   if (state.streakLost) {
     state.streakLost = false;
-    state.streak = 0;
     await d.play(HOOKS.streakLost);
   }
-  state.streak++;
-  state.streakBest = Math.max(state.streakBest, state.streak);
   labelLumi(game, haven);
   if (state.streak < 2) return;
   audio.sfx('taskDone');

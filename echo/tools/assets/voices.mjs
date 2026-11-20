@@ -8,14 +8,13 @@ import { ensureDir, key, ledger, PUBLIC_ASSETS } from './lib/env.mjs';
 
 const cast = {
   teacher: 'Xb7hH8MSUJpSbSDYk0k2', // Alice
-  lumi: 'cgSgspJ2msm6clMCkdW9', // Jessica
-  jamie: 'bIHbv24MWmeRgasZH58o', // Will
-  you: 'SAz9YHcvj6GT2YYXdXww', // River
-  kai: 'TX3LPaxmHKxFdv7VOQHJ', // Liam
-  nova: 'FGY2WhTYpPnrIDTdsKH5', // Laura
-  alex: 'IKne3meq5aSn9XLyUdCD', // Charlie
-  sam: 'EXAVITQu4vr4xnSDxMaL', // Sarah
-  riley: 'pFZP5JQG7iQjIQuC4Bku', // Lily
+  lumi: 'nDJIICjR9zfJExIFeSCN', // Emmaline — bright, curious companion
+  jamie: 'TOHdGJrknwd4eal0jqpE', // Archie — gentle, boyish classmate
+  kai: 'loY1uopAz31XyhAEhNSa', // Valf — playful arcade rival
+  nova: 'BlgEcC0TfWpBak7FmvHW', // Fena — spirited sprite keeper
+  alex: 'atemG3csutMIyK7AbS5c', // Quang Anh — bright, earnest
+  sam: 'sfEqHIAPrP82grzla9Ji', // Juvy — gentle, hesitant
+  riley: 'gyeuMTz1KvJp8hqXmFe9', // Michelle Queen — conversational British teen
 };
 
 const lines = new Map();
@@ -25,6 +24,7 @@ function collect(value) {
     Object.values(value).forEach(collect);
     return;
   }
+  if (value.who === 'you') return;
   if (!cast[value.who]) throw new Error(`No voice assigned for ${value.who}`);
   const name = voiceFile(value);
   if (lines.has(name) && lines.get(name).text !== value.text) throw new Error(`Two lines use ${name}`);

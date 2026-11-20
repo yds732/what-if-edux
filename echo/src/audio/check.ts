@@ -7,6 +7,7 @@ import { MAX_ONE_SHOTS, Mixer, type Space } from './mixer';
 import { SFX } from './sfx';
 import { dB } from './synth';
 import { WebAudio } from './WebAudio';
+import { loadKeys } from './voices';
 
 const RATE = 48000;
 const FRAME = 0.05;
@@ -264,19 +265,18 @@ const placement = async (): Promise<Row> => {
   return r;
 };
 
-const SAMPLE_LINES: Record<SpeakerId, Line> = {
+const SAMPLE_LINES: Record<Exclude<SpeakerId, 'you'>, Line> = {
   teacher: MONDAY.intro[0],
   jamie: WEDNESDAY.discussion[4],
   lumi: MONDAY.lumiHello[0],
   kai: TUESDAY.success[1],
   nova: TUESDAY.success[2],
-  you: WEDNESDAY.discussion[1],
   alex: FRIDAY.voices[0],
   sam: FRIDAY.voices[2],
   riley: FRIDAY.voices[6],
 };
 
-const voice = async (speaker: SpeakerId): Promise<Row> => {
+const voice = async (speaker: keyof typeof SAMPLE_LINES): Promise<Row> => {
   const seconds = 12, line = SAMPLE_LINES[speaker];
   const ctx = new OfflineAudioContext(2, seconds * RATE, RATE);
   const audio = new WebAudio();
@@ -288,6 +288,19 @@ const voice = async (speaker: SpeakerId): Promise<Row> => {
   if (r.active < 0.45) r.problems.push('no audible phrase');
   if (!speech?.done) r.problems.push('line did not finish');
   return expectFaultless(expectPeak(r, [-18, -2]), audio);
+};
+
+const playerTyping = async (): Promise<Row> => {
+  const { buffer, audio } = await render(4, async (a, _t, frame) => {
+    if (frame === 0) {
+      if (a.voice(WEDNESDAY.discussion[1]) !== null) throw new Error('Player line started a recording');
+      await loadKeys(a.engine!.ctx);
+    }
+    if (frame < 10) a.typeKey('echo'[frame % 4]!);
+  });
+  const r = row('voice', 'player typing', measure(buffer), buffer.duration);
+  if (audio.stats.voices || measure(buffer, 3).peak > -60) r.problems.push('typing continued after the line');
+  return expectFaultless(expectPeak(r, [-35, -10]), audio);
 };
 
 const voiceControls = async (): Promise<Row> => {
@@ -502,7 +515,8 @@ const PLAN: { name: string; run: () => Promise<Row> }[] = [
   { name: 'sfx footstep in haven', run: () => effect('footstep', 'haven') },
   { name: 'sfx options', run: options },
   { name: 'sfx placement', run: placement },
-  ...(Object.keys(SAMPLE_LINES) as SpeakerId[]).map((name) => ({ name: `voice ${name}`, run: () => voice(name) })),
+  ...(Object.keys(SAMPLE_LINES) as (keyof typeof SAMPLE_LINES)[]).map((name) => ({ name: `voice ${name}`, run: () => voice(name) })),
+  { name: 'voice player typing', run: playerTyping },
   { name: 'voice controls', run: voiceControls },
   { name: 'charge', run: charge },
   { name: 'pause', run: pause },

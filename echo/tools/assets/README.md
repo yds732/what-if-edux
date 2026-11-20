@@ -13,7 +13,7 @@ public/assets/        what the game loads: models per graphics tier, pictures, m
 
 ## Making or changing an asset
 
-Character dialogue is recorded from the story and arcade scripts. From `echo/`, generate missing MP3s with Node 24 and an env file containing `ELEVENLABS_API_KEY`.
+Non-player dialogue is recorded from the story and arcade scripts. Player lines use the typing samples in `src/audio/keys/`. From `echo/`, generate missing MP3s with Node 24 and an env file containing `ELEVENLABS_API_KEY`.
 
 ```sh
 node --env-file=../../../common/.env tools/assets/voices.mjs

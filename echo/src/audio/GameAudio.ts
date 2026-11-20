@@ -25,6 +25,7 @@ export interface GameAudio {
   setSoundscape(scape: Soundscape, fadeSeconds?: number): void;
   sfx(name: SfxName, options?: SfxOptions): void;
   voice(line: Line, speed?: number): { readonly done: boolean; stop(): void } | null;
+  typeKey(char: string): void;
   setCharge(amount: number): void;
   update(dt: number, camera: THREE.Camera): void;
   setVolume(master: number): void;
@@ -36,6 +37,7 @@ export class NullAudio implements GameAudio {
   setSoundscape(): void {}
   sfx(): void {}
   voice(): null { return null; }
+  typeKey(): void {}
   setCharge(): void {}
   update(): void {}
   setVolume(): void {}

@@ -52,7 +52,7 @@ The companions are as they are in the story: nobody in Haven ever tells you that
 
 ## How it is put together
 
-The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, water, light and every effect are shaders, and Haven's meadow (its grass, reeds, blossom tree and floating lanterns) is drawn by code. Each speaking character has a recorded ElevenLabs voice. Web Audio mixes the dialogue with synthesised music and effects. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
+The people, furniture and scenery are generated models: each was designed as a reference sheet with OpenAI's image model, turned into a 3D model (and, for people, rigged) by Tripo, then simplified and compressed for the browser. How that is done, and how to change or add one, is in [`tools/assets/README.md`](tools/assets/README.md). Skies, water, light and every effect are shaders, and Haven's meadow (its grass, reeds, blossom tree and floating lanterns) is drawn by code. Non-player characters have recorded ElevenLabs voices. Player dialogue uses the original typing sounds. Web Audio mixes the dialogue with synthesised music and effects. three.js is the only library the game runs on; IWER, a headset emulator, is fetched only if you ask for it with `?xr=emulate`.
 
 | Path | What lives there |
 |---|---|

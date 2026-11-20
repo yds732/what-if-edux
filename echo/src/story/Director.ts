@@ -76,8 +76,10 @@ export class Director {
     let shown = 0;
     try {
       await this.until((dt) => {
+        const previous = shown;
         shown = Math.min(total, shown + dt * TYPE_SPEED);
         if (this.advancePressed()) shown = total;
+        else this.typePlayerLine(line, previous, shown);
         person?.setTalking(speech?.done ? 0 : 1);
         hud.setSubtitleProgress(shown, false);
         return shown >= total;
@@ -106,11 +108,25 @@ export class Director {
     let held = 0;
     try {
       await this.until((dt) => {
+        const previous = held;
         held += dt;
+        this.typePlayerLine(line, previous * TYPE_SPEED, held * TYPE_SPEED);
         return (held >= minimum && this.advancePressed()) || (held >= seconds && (!speech || speech.done));
       });
     } finally {
       speech?.stop();
+    }
+  }
+
+  private typePlayerLine(line: Line, from: number, to: number): void {
+    if (line.who !== 'you') return;
+    const end = Math.min(line.text.length, Math.floor(to));
+    for (let i = Math.ceil(Math.floor(from) / 3) * 3; i < end; i += 3) {
+      const char = line.text[i]!;
+      if (/[a-z0-9]/i.test(char)) {
+        this.game.audio.typeKey(char);
+        return;
+      }
     }
   }
 

@@ -6,7 +6,7 @@ import { ResolutionGovernor, tierForGpu } from '../../src/app/quality';
 import { Rng, angleDelta, damp } from '../../src/core/math';
 import { Cancelled, Signal, Tasks } from '../../src/core/tasks';
 import { DAYS, FRIDAY, MONDAY, SPEAKERS, THURSDAY, TUESDAY, WEDNESDAY, type Line } from '../../src/story/script';
-import { CHAPTERS, freshState, isChapter } from '../../src/story/state';
+import { CHAPTERS, freshState, isChapter, loadProgress, recordHavenVisit } from '../../src/story/state';
 import { wrapText } from '../../src/ui/draw';
 import { Colliders } from '../../src/world/colliders';
 
@@ -204,7 +204,28 @@ describe('the script', () => {
 describe('story state', () => {
   it('starts with nothing decided and no score to keep', () => {
     expect(freshState()).toEqual({ tuesdayChoice: null, thursdayChoice: null, policyChoice: null, lumiGift: 'none',
-      streak: 0, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0 });
+      streak: 0, lastHavenDay: null, streakBest: 0, streakLost: false, streakBroke: false, leaveAsks: 0, stayedOn: 0, pings: 0 });
+  });
+  it('counts consecutive calendar days and ignores repeat visits within a day', () => {
+    const state = freshState();
+    expect(recordHavenVisit(state, 'monday')).toBe(true);
+    expect(recordHavenVisit(state, 'monday')).toBe(false);
+    expect(state.streak).toBe(1);
+    recordHavenVisit(state, 'wednesday');
+    expect(state.streak).toBe(1);
+    recordHavenVisit(state, 'thursday');
+    expect(recordHavenVisit(state, 'thursday')).toBe(false);
+    expect(state.streak).toBe(2);
+    expect(state.streakBest).toBe(2);
+  });
+  it('corrects older Wednesday saves that counted both Monday visits', () => {
+    const state = { ...freshState(), streak: 2, streakBest: 2, lastHavenDay: undefined };
+    vi.stubGlobal('localStorage', { getItem: () => JSON.stringify({ version: 1, chapter: 'wednesday', state }) });
+    try {
+      expect(loadProgress()?.state).toMatchObject({ lastHavenDay: 'monday', streak: 1, streakBest: 1 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
   it('knows the four days in order', () => {
     expect(CHAPTERS).toEqual(['monday', 'wednesday', 'thursday', 'friday']);

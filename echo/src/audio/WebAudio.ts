@@ -7,7 +7,7 @@ import { shape } from './instruments';
 import { Mixer } from './mixer';
 import { SFX } from './sfx';
 import { Patch, dB, mtof } from './synth';
-import { RecordedVoice } from './voices';
+import { loadKeys, RecordedVoice } from './voices';
 
 const MIN_FADE = 0.05;
 const CHARGE_GLIDE = 0.05;
@@ -33,6 +33,8 @@ export class WebAudio implements GameAudio {
   private charge: ChargeTone | null = null;
   private chargeLevel = 0;
   private speech: RecordedVoice | null = null;
+  private keys: AudioBuffer[] = [];
+  private lastKey = -Infinity;
   faults = 0;
   lastFault = '';
 
@@ -47,6 +49,7 @@ export class WebAudio implements GameAudio {
         return;
       }
       this.mixer.setVolume(this.volume);
+      void loadKeys(this.mixer.ctx).then(keys => { this.keys = keys; }, error => this.fault('typing', error));
       if (this.paused) this.mixer.setPaused(true);
       const scape = this.scape;
       this.scape = 'silence';
@@ -97,11 +100,22 @@ export class WebAudio implements GameAudio {
   voice(line: Line, speed = 1): RecordedVoice | null {
     this.speech?.stop();
     const mixer = this.mixer;
-    if (!mixer || (mixer.ctx instanceof AudioContext && mixer.ctx.state !== 'running')) return null;
-    const speech = this.speech = new RecordedVoice(mixer, line, speed);
+    if (line.who === 'you' || !mixer || (mixer.ctx instanceof AudioContext && mixer.ctx.state !== 'running')) return null;
+    const speech = this.speech = new RecordedVoice(mixer, { who: line.who, text: line.text }, speed);
     speech.setPaused(this.paused);
     void speech.ready.catch((error) => this.fault(`voice ${line.who}`, error));
     return speech;
+  }
+
+  typeKey(char: string): void {
+    this.run('typing', mixer => {
+      const now = mixer.ctx.currentTime;
+      const code = char.toLowerCase().charCodeAt(0);
+      const key = this.keys[(code * 5) % this.keys.length];
+      if (!key || now - this.lastKey < 0.045 || this.paused) return;
+      this.lastKey = now;
+      mixer.play('voice', p => p.play(key, p.t, 1.06).connect(p.mix(0.12)), { gain: dB(-12.5) });
+    });
   }
 
   setCharge(amount: number): void {
