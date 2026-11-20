@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Character } from '../../characters/Character';
+import { WalkCycle } from '../../characters/WalkCycle';
 import { angleDelta, damp } from '../../core/math';
 import type { Colliders } from '../colliders';
 
@@ -72,6 +73,7 @@ export class Companion {
   mode: CompanionMode = 'still';
   private readonly alert: ReturnType<typeof buildAlert>;
   private readonly label = buildLabel();
+  private readonly walk: WalkCycle;
   private alertShown = 0;
   private alertOn = false;
   private readonly pos = new THREE.Vector3();
@@ -91,6 +93,8 @@ export class Companion {
     private readonly colliders: Colliders,
   ) {
     this.person = person;
+    this.walk = new WalkCycle(person.rig);
+    person.walk = this.walk;
     this.alert = buildAlert();
     person.root.add(this.alert.group);
     this.alert.group.visible = false;
@@ -139,7 +143,10 @@ export class Companion {
     this.chest.set(this.pos.x, this.pos.y + p.eyeHeight * 0.75, this.pos.z);
 
     const toPlayer = Math.hypot(player.x - this.pos.x, player.z - this.pos.z);
-    if (this.mode === 'still') return;
+    if (this.mode === 'still') {
+      this.walk.update(0, dt);
+      return;
+    }
 
     let look: THREE.Vector3 | null = null;
     const goal: THREE.Vector3 = this.goal;
@@ -170,30 +177,31 @@ export class Companion {
       look = this.curiosity;
     }
 
-    let moving = false, d = 0;
-    {
-      const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
-      d = Math.hypot(dx, dz);
-      if (d > 0.12) {
-        const pace = this.mode === 'lead' ? (toPlayer < 3 ? 2.7 : 1.7) : SPEED;
-        const step = Math.min(d, pace * dt * Math.min(1, d / 0.6 + 0.25));
-        const next = { x: this.pos.x + (dx / d) * step, z: this.pos.z + (dz / d) * step };
-        this.colliders.resolve(next, RADIUS);
-        const px = next.x - player.x, pz = next.z - player.z, pd = Math.hypot(px, pz);
-        if (pd < 1.1 && pd > 1e-4) {
-          next.x = player.x + (px / pd) * 1.1;
-          next.z = player.z + (pz / pd) * 1.1;
-        }
-        this.pos.x = next.x;
-        this.pos.z = next.z;
-        moving = step > 1e-4;
+    let distance = 0;
+    const dx = goal.x - this.pos.x, dz = goal.z - this.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 0.12) {
+      const heading = Math.atan2(dx, dz);
+      this.yaw += angleDelta(this.yaw, heading) * (1 - Math.exp(-8 * dt));
+      const pace = this.mode === 'lead' ? (toPlayer < 3 ? 2.7 : 1.7) : SPEED;
+      const facing = Math.max(0, Math.cos(heading - this.yaw));
+      const step = Math.min(d, pace * dt * Math.min(1, d / 0.6 + 0.25) * facing);
+      const next = { x: this.pos.x + (dx / d) * step, z: this.pos.z + (dz / d) * step };
+      this.colliders.resolve(next, RADIUS);
+      const px = next.x - player.x, pz = next.z - player.z, pd = Math.hypot(px, pz);
+      if (pd < 1.1 && pd > 1e-4) {
+        next.x = player.x + (px / pd) * 1.1;
+        next.z = player.z + (pz / pd) * 1.1;
       }
+      distance = Math.hypot(next.x - this.pos.x, next.z - this.pos.z);
+      this.pos.x = next.x;
+      this.pos.z = next.z;
     }
+    this.walk.update(distance / p.root.scale.x, dt);
     this.pos.y = damp(this.pos.y, this.groundAt(this.pos.x, this.pos.z), 10, dt);
 
-    const faceTo = moving && d > 0.5 ? goal : look;
-    if (faceTo) {
-      const want = Math.atan2(faceTo.x - this.pos.x, faceTo.z - this.pos.z);
+    if (d <= 0.12 && look) {
+      const want = Math.atan2(look.x - this.pos.x, look.z - this.pos.z);
       this.yaw += angleDelta(this.yaw, want) * Math.min(1, dt * (look === eye ? 5 : 3));
     }
     p.place(this.pos.x, this.pos.y, this.pos.z, this.yaw);

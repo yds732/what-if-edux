@@ -37,6 +37,14 @@ describe('the ball', () => {
     expect(met[1]!.z).toBeGreaterThan(0);
   });
 
+  it('lets a low ball pass outside either net post', () => {
+    for (const side of [-1, 1]) {
+      const cross = (x: number) => stepBall({ p: v(side * x, TABLE.height + 0.08, 0.01), v: v(0, 0, -5), w: v() }, STEP);
+      expect(cross(TABLE.width / 2 - 0.04)).toBe('net');
+      expect(cross(TABLE.width / 2 + 0.04)).toBeNull();
+    }
+  });
+
   it('keeps its pace off the table with topspin and loses it with backspin', () => {
     const through = (spinX: number): number => {
       const ball: Ball = { p: v(0, REST + 0.25, 0.2), v: v(0, 0, -5), w: v(spinX, 0, 0) };
