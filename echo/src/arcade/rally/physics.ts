@@ -7,7 +7,7 @@ export interface V3 {
 export const v = (x = 0, y = 0, z = 0): V3 => ({ x, y, z });
 const copy = (a: V3): V3 => ({ x: a.x, y: a.y, z: a.z });
 
-export const TABLE = { length: 2.74, width: 1.525, height: 0.76, net: 0.1525, overhang: 0.1525 } as const;
+export const TABLE = { length: 2.74, width: 1.525, height: 0.76, net: 0.1525 } as const;
 export const BALL_RADIUS = 0.03;
 export const GRAVITY = 7.6;
 const DRAG = 0.14, MAGNUS = 0.0042;
@@ -46,7 +46,7 @@ export const stepBall = (b: Ball, dt: number, floor = 0): Contact | null => {
   if ((z0 > 0) !== (p.z > 0) && z0 !== 0) {
     const k = z0 / (z0 - p.z), y = y0 + (p.y - y0) * k, x = x0 + (p.x - x0) * k;
     const top = TABLE.height + TABLE.net;
-    if (Math.abs(x) <= TABLE.width / 2 + TABLE.overhang && y > TABLE.height - 0.02) {
+    if (Math.abs(x) <= TABLE.width / 2 && y > TABLE.height - 0.02) {
       if (y < top - BALL_RADIUS * 0.45) {
         p.z = Math.sign(z0) * 0.012;
         vel.z *= -0.16;

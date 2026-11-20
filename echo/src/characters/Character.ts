@@ -4,6 +4,7 @@ import type { Model } from '../assets/AssetLibrary';
 import type { BuildContext } from '../world/World';
 import { addGlow } from '../assets/glow';
 import { GeneratedBody } from './GeneratedBody';
+import type { WalkCycle } from './WalkCycle';
 import { addHologram, type Hologram } from './hologram';
 import { GESTURES, POSES, type GestureName, type PoseName } from './motion';
 import { FaceLayer, neutralFace, type FaceLook, type FaceState } from './head';
@@ -76,6 +77,7 @@ export class Character {
   private liveliness = 1;
   private seatHeight = 0.36;
   onPose: ((bones: Rig['bones']) => void) | null = null;
+  walk: WalkCycle | null = null;
 
   constructor(spec: CharacterSpec, model: Model, shadowMaps = true) {
     this.spec = spec;
@@ -246,9 +248,12 @@ export class Character {
     this.lookPitch = damp(this.lookPitch, pitch, 6, dt);
 
     const breath = Math.sin(t * 1.7) * live, sway = Math.sin(t * 0.63) * live, talk = this.talk;
+    const walking = this.walk?.weight ?? 0;
     for (const name of BONES) {
       const b = base.bones[name];
       let x = b ? b[0] : 0, y = b ? b[1] : 0, z = b ? b[2] : 0;
+      const stridePitch = this.walk?.pitch[name];
+      if (stridePitch !== undefined) x += stridePitch * walking;
       if (gesture) {
         const track = gesture.tracks[name];
         if (track) {
@@ -275,12 +280,12 @@ export class Character {
       }
       _e.set(x * DEG, y * DEG, z * DEG, 'YXZ');
       _q.setFromEuler(_e);
-      bones[name].quaternion.slerp(_q, k);
+      bones[name].quaternion.slerp(_q, stridePitch === undefined ? k : lerp(k, 1, walking));
     }
     const hips = bones.hips;
     const seatedY = base.seated ? this.seatHeight + 0.07 - this.bindY : 0;
-    const targetY = this.bindY + base.hipsY + seatedY + this.hover + (gesture?.hop ? gesture.hop(gt) * gw : 0);
-    hips.position.y = lerp(hips.position.y, targetY, k);
+    const targetY = this.bindY + base.hipsY + seatedY + lerp(this.hover, this.walk?.hipsY ?? 0, walking) + (gesture?.hop ? gesture.hop(gt) * gw : 0);
+    hips.position.y = lerp(hips.position.y, targetY, lerp(k, 1, walking));
     hips.position.x = lerp(hips.position.x, sway * 0.006 * (this.pose === 'stand' ? 1 : 0), k);
     hips.position.z = lerp(hips.position.z, base.hipsZ, k);
     this.onPose?.(bones);

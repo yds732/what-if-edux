@@ -290,20 +290,21 @@ export class RallyWorld extends Minigame {
   }
 
   private buildNet(): void {
-    const wide = TABLE.width + TABLE.overhang * 2;
-    const net = new THREE.Mesh(new THREE.PlaneGeometry(wide, TABLE.net, 48, 4), new THREE.ShaderMaterial({ vertexShader: NET_VS, fragmentShader: NET_FS, uniforms: this.netU, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-    net.position.set(0, H + TABLE.net / 2, 0);
+    // The rounded slab sits just below the painted playing plane at the sidelines.
+    const hem = 0.018;
+    const net = new THREE.Mesh(new THREE.PlaneGeometry(TABLE.width, TABLE.net + hem, 48, 4), new THREE.ShaderMaterial({ vertexShader: NET_VS, fragmentShader: NET_FS, uniforms: this.netU, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    net.position.set(0, H + (TABLE.net - hem) / 2, 0);
     net.renderOrder = 2;
     const alloy = new THREE.MeshStandardMaterial({ color: 0xcfe0f2, metalness: 0.9, roughness: 0.28 });
     const tip = new THREE.MeshBasicMaterial({ color: CYAN.clone().multiplyScalar(2.6) });
     for (const s of [-1, 1]) {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.014, TABLE.net + 0.03, 12), alloy);
-      post.position.set((s * wide) / 2, H + TABLE.net / 2 - 0.005, 0);
+      post.position.set(s * HALF_W, H + TABLE.net / 2 - 0.005, 0);
       post.castShadow = true;
       const cap = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 8), tip);
-      cap.position.set((s * wide) / 2, H + TABLE.net + 0.014, 0);
+      cap.position.set(s * HALF_W, H + TABLE.net + 0.014, 0);
       const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.05), alloy);
-      clamp.position.set(s * (wide / 2 - 0.02), H - 0.012, 0);
+      clamp.position.set(s * HALF_W, H - 0.012, 0);
       this.court3d.add(post, cap, clamp);
     }
     this.court3d.add(net);

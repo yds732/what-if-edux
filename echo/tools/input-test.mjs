@@ -342,6 +342,11 @@ const open = async (query) => {
   // W walks where the player faces, up the meadow towards the bridge, and D steps to the right of that
   await t.face(0, 1.6, -12.3);
   const start = await t.at();
+  const footsteps = Promise.all([1, -1].map(sign => page.waitForFunction(sign => {
+    const { footL, footR } = window.__game.worlds.haven.cast.lumi.rig.bones;
+    const at = footL.position.clone();
+    return sign * (footL.getWorldPosition(at).y - footR.getWorldPosition(at).y) > 0.06;
+  }, sign, { timeout: 20000 }).then(() => true, () => false)));
   await page.keyboard.down('KeyW');
   await page.waitForTimeout(2900);
   await page.keyboard.up('KeyW');
@@ -356,6 +361,7 @@ const open = async (query) => {
   // up the middle of the meadow, over its edge to the bridge's first tile, and along the bridge as it winds
   const edge = await t.walk(0, -9.4, 0.6, 20000);
   const tile = await t.walk(0, -12.3, 0.7, 10000);
+  check('Lumi lifts each foot while leading the player to the Star Bridge', (await footsteps).every(Boolean));
   const first = await t.at();
   check('Monday: the bridge can be walked onto from the meadow', edge && tile, `(${first.x.toFixed(1)}, ${first.z.toFixed(1)})`);
   for (let k = 0.03; k <= 1.0001; k += 0.03) {

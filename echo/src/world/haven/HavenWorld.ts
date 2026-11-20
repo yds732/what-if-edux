@@ -473,7 +473,6 @@ export class HavenWorld extends World {
   }
 
   override update(frame: FrameContext): void {
-    super.update(frame);
     const { dt, time } = frame;
     this.time.value = time;
     this.sky.update(time, frame.camera, frame.pixelHeight);
@@ -484,6 +483,7 @@ export class HavenWorld extends World {
       frame.camera.getWorldPosition(_eye);
       this.companion.update(dt, _player.set(_eye.x, 0, _eye.z), _eye, frame.camera);
     }
+    super.update(frame);
     this.gateway.update(dt, time);
     this.arcade.update(dt, time, frame.camera);
     if (this.bonusRing.group.visible) {
