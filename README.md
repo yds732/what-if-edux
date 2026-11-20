@@ -4,6 +4,8 @@ EduX 2026 UK, Track 4: *Immersive Worlds for Future Citizenship*.
 
 **Play it:** https://echo-between-two-worlds.vercel.app (desktop browser, phone, tablet or WebXR headset; no install, no account)
 
+On Quest 2 or Quest 3, open the game in the headset browser and select **Play in VR**. The default **Auto** graphics setting picks the low preset on both headsets. It simplifies glass and foliage and renders each eye at 90% of its recommended width and height.
+
 ## The problem
 
 AI companions are arriving in young people's lives faster than anyone is teaching them how to think about them. A companion that always agrees is comfortable. Real people disagree, ask for things, and sometimes need you at an inconvenient moment. Students aged 11 to 14 are already making choices between the two, usually alone and without anyone asking them to notice what those choices cost.
@@ -80,7 +82,7 @@ All figures were measured from this repository on 19 Nov 2026 (`echo/`, Node 22,
 | JavaScript | 1.6 MB raw, **~485 KB gzipped**, split so each arcade game loads only when it is opened |
 | 3D models | 183 files at three quality tiers: low 11.6 MB, medium 38.1 MB, high 46.7 MB in total |
 | Per-session download | about 12 MB (low) / 22 MB (medium) / 47 MB (high), fetched as each world is first entered |
-| Frame rate | the graphics tier is picked per device and internal resolution adapts to hold the frame rate |
+| Rendering resolution | the browser view adapts its internal resolution as frame time changes. Immersive VR uses a fixed render scale for the session |
 
 **Arcade fairness (by simulation)**
 
@@ -153,7 +155,8 @@ what-if-edux/
 
 - **Complete and deployed.** The whole week, all three decisions, every ending and the arcade can be played from start to finish on desktop, touch and VR.
 - **Verified by automated tests.** Unit, end-to-end, input, touch and emulated-VR checks pass.
-- **Not yet verified:** comfort and frame rate on a real headset, how the sound comes across to a listener, and playtesting with students aged 11 to 14.
+- **Classroom lighting in VR.** The window beams and desk projections now fade more gently where they overlap. In a matched view of Friday’s classroom on the live site, near-white pixels fell from about 1.6% to 0.05% in each eye of an emulated Quest 3.
+- **Still to check in person.** Classroom glare, comfort and frame rate on physical headsets, how the sound comes across to a listener, and playtesting with students aged 11 to 14.
 - **Remaining work:** character art polish (Lumi, Nova, Kai and Jamie), facial expression in conversation, and the pitch video.
 
 ## Team
